@@ -16,6 +16,8 @@ An agent represents a complete AI workflow that can:
 - Use external tools and services
 - Handle errors and retry logic
 - Store and retrieve knowledge
+- Validate outputs and ensure data quality
+- Parse and fix malformed responses
 
 <CardGroup cols={2}>
   <Card title="Single-Purpose Agents" icon="target">
@@ -79,41 +81,96 @@ my_agent = Agent(
 
 ### Data Processing Agents
 
-Agents focused on analyzing and transforming data:
+Agents focused on analyzing and transforming data with validation:
 
 ```python
 from erdo import Agent
-from erdo.actions import llm, codeexec, memory
-from erdo.conditions import IsSuccess, GreaterThan
+from erdo.actions import llm, codeexec, memory, utils
+from erdo.conditions import IsSuccess, GreaterThan, TextContains
 
 data_agent = Agent(
     name="sales_data_analyzer",
-    description="Analyzes sales data and generates business insights"
+    description="Analyzes sales data and generates business insights with validation"
 )
 
 analyze_step = data_agent.step(
     llm.message(
         model="claude-sonnet-4",
         query="Analyze sales data: {{data}}",
-        system_prompt="You are a business analyst expert"
+        system_prompt="You are a business analyst expert. Provide insights in JSON format.",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "insights": {"type": "array"},
+                    "trends": {"type": "array"},
+                    "metrics": {"type": "object"}
+                }
+            }
+        }
     )
+)
+
+# Validate analysis contains required components
+analyze_step.on(
+    IsSuccess() & TextContains("insights") & TextContains("trends"),
+    memory.store(memory={
+        "content": "{{analyze_step.output.response}}",
+        "type": "validated_analysis",
+        "tags": ["sales", "validated"]
+    })
+)
+
+# Handle incomplete analysis
+analyze_step.on(
+    IsSuccess() & ~TextContains("insights"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="The analysis is missing key insights. Please provide detailed insights for: {{data}}",
+        system_prompt="Focus on generating comprehensive business insights and trends."
+    )
+)
+
+# Parse and validate JSON structure
+json_step = data_agent.step(
+    utils.parse_json(
+        json="{{analyze_step.output.response}}",
+        required_keys=["insights", "trends", "metrics"]
+    ),
+    depends_on=analyze_step
 )
 
 calculate_step = data_agent.step(
     codeexec.execute(
         code_files=[{
             "filename": "calculate.py",
-            "content": "calculate_sales_metrics({{analyze_step.output.insights}})"
+            "content": "calculate_sales_metrics({{json_step.output.insights}})"
         }]
     ),
-    depends_on=analyze_step
+    depends_on=json_step
 )
 
+# Validate calculation results
 calculate_step.on(
-    IsSuccess(),
+    IsSuccess() & TextContains("result") & TextContains("metrics"),
     memory.store(memory={
         "content": "{{calculate_step.output.metrics}}",
-        "type": "sales_analysis"
+        "type": "validated_sales_analysis",
+        "tags": ["sales", "calculated", "validated"]
+    })
+)
+
+# Handle calculation errors with fallback
+calculate_step.on(
+    IsError(),
+    utils.send_status(
+        status="calculation_failed",
+        message="Calculation failed - using original analysis"
+    ),
+    memory.store(memory={
+        "content": "{{json_step.output.insights}}",
+        "type": "fallback_analysis"
     })
 )
 ```
@@ -312,6 +369,8 @@ final_report = orchestrator.step(
 2. **Composability**: Design agents to work together in larger workflows
 3. **Error Handling**: Always include error handling for robust operation
 4. **State Management**: Use memory effectively for context and persistence
+5. **Output Validation**: Validate outputs using TextContains and format checking
+6. **Graceful Degradation**: Provide fallback actions for failed validations
 
 ### Naming Conventions
 
@@ -348,23 +407,201 @@ development_agent = Agent(
 )
 ```
 
-### Testing and Validation
+### Output Validation and Error Handling
+
+Erdo provides powerful validation tools to ensure AI outputs meet your quality standards and handle format errors gracefully:
 
 ```python
-# Include validation steps
-validator_step = agent.step(
+from erdo.conditions import TextContains, IsSuccess, IsError, GreaterThan
+from erdo.actions import llm, utils, memory
+
+# Validate LLM output contains expected content
+analysis_step = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Validate this analysis: {{analysis_result}}",
-        system_prompt="You are a data validation expert"
+        query="Analyze this data: {{dataset}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "insights": {"type": "array"},
+                    "confidence": {"type": "number"},
+                    "status": {"type": "string"}
+                }
+            }
+        }
     )
 )
 
-validator_step.on(
-    IsSuccess() & TextEquals("valid", "false"),
+
+# Validate analysis contains expected content
+analysis_step.on(
+    IsSuccess() & TextContains("insights") & TextContains("confidence"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.response}}",
+        "type": "validated_analysis",
+        "tags": ["validated", "high-quality"]
+    })
+)
+
+# Validate specific field values and content quality
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("status", "complete"),
     utils.send_status(
-        status="validation_failed",
-        message="Analysis failed validation - review required"
+        status="high_quality_analysis",
+        message="Analysis meets quality standards"
+    )
+)
+
+# Handle missing required fields
+analysis_step.on(
+    IsSuccess() & ~TextContains("insights"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="The previous analysis is missing insights. Please provide detailed insights for: {{dataset}}",
+        system_prompt="Focus on generating comprehensive insights and analysis."
+    )
+)
+
+# JSON parsing with required key validation
+json_parse_step = agent.step(
+    utils.parse_json(
+        json="{{analysis_step.output.response}}",
+    ),
+    depends_on=analysis_step
+)
+
+# Validate parsed JSON has required structure
+json_parse_step.on(
+    IsSuccess() & TextContains("insights") & TextContains("confidence"),
+    utils.send_status(
+        status="json_validated",
+        message="JSON parsing successful with required fields"
+    )
+)
+
+# Handle JSON parsing failures with recovery
+json_parse_step.on(
+    IsError(),
+    utils.send_status(
+        status="json_parse_failed",
+        message="JSON parsing failed - using text extraction fallback"
+    ),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Extract key insights from this text even if it's not valid JSON: {{analysis_step.output.response}}",
+        system_prompt="Extract insights in a structured format regardless of input format."
+    )
+)
+
+# Handle successful JSON parsing
+json_parse_step.on(
+    IsSuccess(),
+    utils.send_status(
+        status="json_validated",
+        message="JSON parsing successful with required fields"
+    )
+)
+```
+
+### Advanced Validation Patterns
+
+```python
+# Multi-condition validation
+code_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Generate Python code for: {{task}}",
+        system_prompt="Generate clean, executable Python code with proper imports."
+    )
+)
+
+# Validate code structure and content
+code_step.on(
+    IsSuccess() & TextContains("def ") & TextContains("import ") & TextContains("return"),
+    memory.store(memory={
+        "content": "{{code_step.output.code}}",
+        "type": "validated_code",
+        "tags": ["code", "validated", "executable"]
+    })
+)
+
+# Handle incomplete code generation
+code_step.on(
+    IsSuccess() & ~TextContains("def "),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Complete this code by adding proper function definitions: {{code_step.output.code}}",
+        system_prompt="Ensure the code has proper function definitions and structure."
+    )
+)
+
+# Validate email format and content
+email_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Generate a professional email for: {{context}}"
+    )
+)
+
+email_step.on(
+    IsSuccess() & TextContains("Subject:") & TextContains("Dear") & TextContains("Best regards"),
+    utils.send_status(
+        status="email_validated",
+        message="Email contains proper formatting and professional tone"
+    )
+)
+
+# Chain validation with error recovery
+email_step.on(
+    IsSuccess() & ~TextContains("Subject:"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Add a proper subject line to this email: {{email_step.output.email}}",
+        system_prompt="Ensure the email has a clear, professional subject line."
+    )
+)
+```
+
+### Content Quality Validation
+
+```python
+# Validate content completeness and quality
+content_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Write a comprehensive report on: {{topic}}"
+    )
+)
+
+# Check for comprehensive content
+content_step.on(
+    IsSuccess() & TextContains("introduction") & TextContains("conclusion") & GreaterThan("word_count", "500"),
+    memory.store(memory={
+        "content": "{{content_step.output.report}}",
+        "type": "comprehensive_report",
+        "tags": ["complete", "quality", "{{topic}}"]
+    })
+)
+
+# Handle insufficient content
+content_step.on(
+    IsSuccess() & ~TextContains("conclusion"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Add a comprehensive conclusion to this report: {{content_step.output.report}}",
+        system_prompt="Write a detailed conclusion that summarizes key points and provides actionable insights."
+    )
+)
+
+# Validate technical accuracy
+content_step.on(
+    IsSuccess() & TextContains("data") & TextContains("analysis"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Review this report for technical accuracy: {{content_step.output.report}}",
+        system_prompt="You are a technical expert. Identify any inaccuracies or areas needing clarification."
     )
 )
 ```

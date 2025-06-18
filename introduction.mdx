@@ -31,6 +31,9 @@ Erdo is a powerful platform for building AI agents that can automate complex wor
   <Card title="Smart Result Handling" icon="brain">
     Use decorators and direct handlers for sophisticated conditional logic
   </Card>
+  <Card title="Output Validation" icon="shield-check">
+    Built-in validation with TextContains, parse_json, and format checking
+  </Card>
   <Card title="Production Ready" icon="rocket">
     Built-in error handling, retry logic, and scalable deployment
   </Card>
@@ -43,15 +46,15 @@ Here's a complete AI agent that analyzes data and makes intelligent decisions:
 ```python
 from erdo import Agent
 from erdo.actions import llm, memory, codeexec, utils
-from erdo.conditions import IsSuccess, GreaterThan, IsError
+from erdo.conditions import IsSuccess, GreaterThan, IsError, TextContains
 
 # Create your agent
 data_analyst = Agent(
     name="smart_data_analyst",
-    description="Analyzes data and provides intelligent insights"
+    description="Analyzes data and provides intelligent insights with validation"
 )
 
-# Step 1: Analyze the data
+# Step 1: Analyze the data with structured output
 analysis_step = data_analyst.step(
     llm.message(
         model="claude-sonnet-4",
@@ -63,24 +66,33 @@ analysis_step = data_analyst.step(
                 "properties": {
                     "insights": {"type": "array"},
                     "confidence": {"type": "number"},
-                    "recommendations": {"type": "array"}
+                    "recommendations": {"type": "array"},
+                    "status": {"type": "string"}
                 }
             }
         }
     )
 )
 
-# Step 2: Generate code for deeper analysis
-code_generation = data_analyst.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate Python code to validate these insights: {{analysis_step.output.insights}}",
-        system_prompt="You are an expert data scientist. Generate clean, efficient Python code."
+# Step 2: Parse JSON format
+validation_step = data_analyst.step(
+    utils.parse_json(
+        json="{{analysis_step.output.response}}"
     ),
     depends_on=analysis_step
 )
 
-# Step 3: Execute the generated code
+# Step 3: Generate code for deeper analysis
+code_generation = data_analyst.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Generate Python code to validate these insights: {{validation_step.output.insights}}",
+        system_prompt="You are an expert data scientist. Generate clean, efficient Python code."
+    ),
+    depends_on=validation_step
+)
+
+# Step 4: Execute the generated code
 code_execution = data_analyst.step(
     codeexec.execute(
         code_files=[{
@@ -91,26 +103,65 @@ code_execution = data_analyst.step(
     depends_on=code_generation
 )
 
-# Handle high-confidence results
+# Validate analysis contains expected content
 analysis_step.on(
-    IsSuccess() & GreaterThan("confidence", "0.8"),
+    IsSuccess() & TextContains("insights") & TextContains("confidence"),
     memory.store(memory={
-        "content": result.output.insights,
+        "content": "{{analysis_step.output.response}}",
+        "type": "validated_analysis",
+        "tags": ["analysis", "validated", "{{domain}}"]
+    })
+)
+
+# Validate parsed JSON has required fields
+validation_step.on(
+    IsSuccess() & TextContains("insights") & TextContains("confidence") & TextContains("recommendations"),
+    memory.store(memory={
+        "content": "{{validation_step.output}}",
+        "type": "validated_json",
+        "tags": ["analysis", "validated", "{{domain}}"]
+    })
+)
+
+# Handle high-confidence results with additional validation
+validation_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("status", "complete"),
+    memory.store(memory={
+        "content": "{{validation_step.output.insights}}",
         "type": "verified_insights",
         "tags": ["analysis", "high-confidence", "{{domain}}"],
         "extra": {
-            "confidence": result.output.confidence,
-            "recommendations": result.output.recommendations
+            "confidence": "{{validation_step.output.confidence}}",
+            "recommendations": "{{validation_step.output.recommendations}}"
         }
     })
 )
 
-# Handle successful code execution with direct handler
+# Validate code generation output format
+code_generation.on(
+    IsSuccess() & TextContains("def ") & TextContains("import "),
+    utils.send_status(
+        status="code_validated",
+        message="Generated code contains proper function definitions and imports"
+    )
+)
+
+# Handle malformed code generation
+code_generation.on(
+    IsSuccess() & ~TextContains("def "),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Fix this code to include proper function definitions: {{code_generation.output.code}}",
+        system_prompt="Generate valid Python code with proper function definitions."
+    )
+)
+
+# Handle successful code execution with validation
 code_execution.on(
-    IsSuccess(),
+    IsSuccess() & TextContains("result"),
     utils.send_status(
         status="analysis_complete",
-        message="Data analysis completed successfully"
+        message="Data analysis completed successfully with validation"
     ),
     memory.store(memory={
         "content": "{{code_execution.output.result}}",
@@ -118,13 +169,17 @@ code_execution.on(
     })
 )
 
-# Handle errors gracefully
-code_execution.on(
+# Handle JSON parsing errors with recovery
+validation_step.on(
     IsError(),
     utils.send_status(
-        status="execution_failed",
-        message=f"Code execution failed: {error.message}. Using original analysis.",
-        fallback_data=analysis_step.output.insights
+        status="json_parse_failed",
+        message="JSON parsing failed, using fallback processing"
+    ),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Extract insights from this text even if it's not valid JSON: {{analysis_step.output.response}}",
+        system_prompt="Extract key insights in a structured format regardless of input format."
     )
 )
 ```
@@ -181,28 +236,55 @@ Actions are the building blocks that define what each step does:
 - **Code Execution**: Run Python scripts, process data, perform calculations
 - **Memory Operations**: Store and retrieve information across workflows
 - **Web Research**: Search the internet, parse websites, gather information
+- **Validation Actions**: Parse JSON, validate formats, handle errors
 - **Utility Actions**: Send notifications, manage state, debug workflows
 
 ## Use Cases
 
 <AccordionGroup>
   <Accordion title="Business Process Automation">
-    Automate complex business workflows like invoice processing, customer onboarding, and document analysis:
+    Automate complex business workflows like invoice processing, customer onboarding, and document analysis with validation:
     
     ```python
+    from erdo.conditions import TextContains, IsSuccess
+    
     invoice_processor = Agent(name="invoice_processor")
     
     extract_step = invoice_processor.step(
         llm.message(
             model="claude-sonnet-4",
-            query="Extract key information from this invoice: {{invoice_image}}"
+            query="Extract key information from this invoice: {{invoice_image}}",
+            response_format={
+                "Type": "json_schema",
+                "Schema": {
+                    "type": "object",
+                    "properties": {
+                        "amount": {"type": "number"},
+                        "vendor": {"type": "string"},
+                        "date": {"type": "string"}
+                    }
+                }
+            }
         )
     )
     
-    extract_step.on(IsSuccess(), memory.store(memory={
-        "content": result.output.invoice_data,
-        "type": "processed_invoice"
-    }))
+    # Validate extracted data contains required fields
+    extract_step.on(
+        IsSuccess() & TextContains("amount") & TextContains("vendor"),
+        memory.store(memory={
+            "content": "{{extract_step.output.response}}",
+            "type": "validated_invoice"
+        })
+    )
+    
+    # Handle missing required fields
+    extract_step.on(
+        IsSuccess() & ~TextContains("amount"),
+        utils.send_status(
+            status="validation_failed",
+            message="Invoice amount not found - manual review required"
+        )
+    )
     ```
   </Accordion>
 
@@ -287,6 +369,47 @@ decision_step.on(IsSuccess() & GreaterThan("risk_score", "0.7"), utils.send_stat
     status="escalated",
     message="High risk detected - human review required"
 ))
+```
+
+### Output Validation & Quality Assurance
+
+Ensure AI outputs meet your standards with built-in validation tools:
+
+```python
+from erdo.conditions import TextContains, GreaterThan
+
+# Validate content quality and format
+analysis_step.on(
+    IsSuccess() & TextContains("analysis") & TextContains("recommendation") & GreaterThan("confidence", "0.8"),
+    memory.store(memory={"content": "{{analysis_step.output.response}}", "type": "validated"})
+)
+
+# Parse JSON output
+json_step = agent.step(
+    utils.parse_json(
+        json="{{llm_output}}"
+    )
+)
+
+# Validate specific field requirements
+json_step.on(
+    IsSuccess() & TextContains("status", "complete") & TextContains("data"),
+    utils.send_status(status="validated", message="Output meets all requirements")
+)
+
+# Handle JSON parsing errors with recovery
+json_step.on(
+    IsError(),
+    utils.send_status(
+        status="json_error",
+        message="JSON parsing failed - using fallback"
+    ),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Fix this malformed JSON: {{llm_output}}",
+        system_prompt="Return only valid JSON with the same content structure."
+    )
+)
 ```
 
 ### Error Handling & Recovery
