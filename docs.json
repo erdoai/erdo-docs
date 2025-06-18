@@ -59,7 +59,6 @@
         "group": "Advanced",
         "pages": [
           "advanced/memory-management",
-          "advanced/websocket-streaming",
           "advanced/background-tasks",
           "troubleshooting"
         ]

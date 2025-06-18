@@ -45,22 +45,33 @@ my_agent = Agent(
     visibility="public"  # or "private"
 )
 ```
-
 ### Agent Properties
 
 <Tabs>
   <Tab title="Core Properties">
-    ```python agent = Agent( name="unique_agent_name", # Required: Unique
-    identifier description="What this agent does", # Required: Clear description
-    visibility="public", # public, private, or organization version="1.0.0", #
-    Semantic versioning tags=["analysis", "automation"], # Categorization tags
-    timeout=300 # Maximum execution time (seconds) ) ```
+    ```python
+    agent = Agent(
+        name="unique_agent_name",  # Required: Unique identifier
+        description="What this agent does",  # Required: Clear description
+        visibility="public",  # public, private, or organization
+        version="1.0.0",  # Semantic versioning
+        tags=["analysis", "automation"],  # Categorization tags
+        timeout=300  # Maximum execution time (seconds)
+    )
+    ```
   </Tab>
   <Tab title="Advanced Configuration">
-    ```python agent = Agent( name="advanced_agent", description="Advanced agent
-    with custom configuration", visibility="organization",
-    running_message="Processing your request...", finished_message="Analysis
-    complete!", retry_attempts=3, tags=["data", "analysis", "automation"] ) ```
+    ```python
+    agent = Agent(
+        name="advanced_agent",
+        description="Advanced agent with custom configuration",
+        visibility="organization",
+        running_message="Processing your request...",
+        finished_message="Analysis complete!",
+        retry_attempts=3,
+        tags=["data", "analysis", "automation"]
+    )
+    ```
   </Tab>
 </Tabs>
 
