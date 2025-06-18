@@ -206,60 +206,60 @@ print(json.dumps(result))
 )
 
 # Handle successful preprocessing
-@preprocess_step.when(IsSuccess())
-def store_clean_data(result):
-    """Store cleaned data for future use."""
-    return memory.store(memory={
-        "content": result.output.cleaned_data,
+preprocess_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "{{preprocess_step.output.cleaned_data}}",
         "description": "Cleaned sales data with quality metrics",
         "type": "cleaned_sales_data",
         "tags": ["sales", "cleaned", "preprocessed"],
-        "extra": result.output.data_quality
+        "extra": "{{preprocess_step.output.data_quality}}"
     })
+)
 
 # Handle high-quality analysis results
-@analysis_step.when(IsSuccess())
-def store_insights(result):
-    """Store business insights."""
-    return memory.store(memory={
-        "content": result.output.insights,
+analysis_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
         "description": "Sales analysis insights and recommendations",
         "type": "business_insights",
         "tags": ["sales", "insights", "analysis"],
         "extra": {
-            "recommendations": result.output.recommendations,
-            "key_findings": result.output.key_findings
+            "recommendations": "{{analysis_step.output.recommendations}}",
+            "key_findings": "{{analysis_step.output.key_findings}}"
         }
     })
+)
 
 # Handle statistical analysis completion
-@stats_step.when(IsSuccess() & GreaterThan("growth_rate", 0))
-def celebrate_growth(result):
-    """Highlight positive growth trends."""
-    return utils.send_status(
+stats_step.on(
+    IsSuccess() & GreaterThan("growth_rate", 0),
+    utils.send_status(
         status="positive_growth",
-        message=f"Excellent! Sales showing {result.output.growth_rate:.2%} growth rate",
+        message="Excellent! Sales showing {{stats_step.output.growth_rate}} growth rate",
         priority="high"
     )
+)
 
 # Handle error cases
-@preprocess_step.when(IsError())
-def handle_data_error(error):
-    """Handle data preprocessing errors."""
-    return utils.send_status(
+preprocess_step.on(
+    IsError(),
+    utils.send_status(
         status="data_error",
-        message=f"Data preprocessing failed: {error.message}",
-        error_details=error.details
+        message="Data preprocessing failed: {{preprocess_step.error.message}}",
+        error_details="{{preprocess_step.error.details}}"
     )
+)
 
-@analysis_step.when(IsError())
-def handle_analysis_error(error):
-    """Handle analysis errors."""
-    return utils.send_status(
+analysis_step.on(
+    IsError(),
+    utils.send_status(
         status="analysis_error",
-        message=f"Analysis failed: {error.message}",
+        message="Analysis failed: {{analysis_step.error.message}}",
         suggestion="Check data quality and try again"
     )
+)
 ```
 
 <CardGroup cols={2}>

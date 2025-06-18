@@ -76,49 +76,45 @@ classify_step.on(
 )
 
 # Auto-respond to routine inquiries
-@response_step.when(
+response_step.on(
     IsSuccess() &
     TextEquals("category", "general") &
     TextContains("sentiment", "positive") &
-    GreaterThan("confidence", "0.8")
-)
-def auto_send_routine_response(result):
-    """Auto-send responses for routine, positive inquiries."""
-    return utils.send_status(
+    GreaterThan("confidence", "0.8"),
+    utils.send_status(
         status="auto_responded",
         message="Automatic response sent",
-        response_content=result.output.response
+        response_content="{{response_step.output.response}}"
     )
+)
 
 # Flag complex support issues for human review
-@response_step.when(
+response_step.on(
     IsSuccess() &
     TextEquals("category", "support") &
-    (TextContains("sentiment", "negative") | TextEquals("urgency", "high"))
-)
-def escalate_complex_support(result):
-    """Escalate complex support issues to human agents."""
-    return memory.store(memory={
-        "content": f"Complex support case: {result.output.analysis}",
+    (TextContains("sentiment", "negative") | TextEquals("urgency", "high")),
+    memory.store(memory={
+        "content": "Complex support case: {{response_step.output.analysis}}",
         "type": "escalated_support",
         "tags": ["support", "escalated", "{{email_sender}}"],
         "extra": {
             "original_email": "{{email_content}}",
-            "suggested_response": result.output.response,
+            "suggested_response": "{{response_step.output.response}}",
             "urgency": "{{classify_step.output.urgency}}"
         }
     })
+)
 
 # Store all email interactions for context
-@response_step.when(IsSuccess())
-def store_email_interaction(result):
-    """Store email interaction for future context."""
-    return memory.store(memory={
-        "content": f"Email from {{email_sender}}: {{email_content}}\nResponse: {result.output.response}",
+response_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "Email from {{email_sender}}: {{email_content}}\nResponse: {{response_step.output.response}}",
         "type": "email_interaction",
         "tags": ["email", "{{classify_step.output.category}}", "{{email_sender}}"],
-        "searchable_texts": ["{{email_content}}", result.output.response]
+        "searchable_texts": ["{{email_content}}", "{{response_step.output.response}}"]
     })
+)
 ```
 
 ## Document Processing & Analysis
@@ -228,62 +224,56 @@ print(json.dumps(result))
 )
 
 # Handle simple documents with high confidence
-@extraction_step.when(
+extraction_step.on(
     IsSuccess() &
     TextEquals("processing_complexity", "simple") &
-    GreaterThan("confidence", "0.9")
-)
-def auto_process_simple_documents(result):
-    """Auto-process simple, high-confidence documents."""
-    return utils.send_status(
+    GreaterThan("confidence", "0.9"),
+    utils.send_status(
         status="auto_processed",
         message="Document automatically processed and filed",
-        extracted_data=result.output.extracted_data
+        extracted_data="{{extraction_step.output.extracted_data}}"
     )
+)
 
 # Handle complex documents requiring review
-@analysis_step.when(
+analysis_step.on(
     IsSuccess() &
-    (TextEquals("processing_complexity", "complex") | LessThan("confidence", "0.7"))
-)
-def flag_complex_documents(result):
-    """Flag complex or low-confidence documents for human review."""
-    return memory.store(memory={
-        "content": f"Complex document requiring review: {result.output.document_type}",
+    (TextEquals("processing_complexity", "complex") | LessThan("confidence", "0.7")),
+    memory.store(memory={
+        "content": "Complex document requiring review: {{analysis_step.output.document_type}}",
         "type": "document_review_required",
         "tags": ["document", "review", "complex"],
         "extra": {
-            "document_type": result.output.document_type,
-            "complexity": result.output.processing_complexity,
-            "confidence": result.output.confidence
+            "document_type": "{{analysis_step.output.document_type}}",
+            "complexity": "{{analysis_step.output.processing_complexity}}",
+            "confidence": "{{analysis_step.output.confidence}}"
         }
     })
+)
 
 # Store successfully validated documents
-@validation_step.when(IsSuccess() & TextEquals("is_valid", "true"))
-def store_validated_document(result):
-    """Store successfully validated documents."""
-    return memory.store(memory={
+validation_step.on(
+    IsSuccess() & TextEquals("is_valid", "true"),
+    memory.store(memory={
         "content": "{{extraction_step.output.extracted_data}}",
         "type": "validated_document",
         "tags": ["document", "{{analysis_step.output.document_type}}", "validated"],
         "extra": {
-            "validation_results": result.output,
-            "completeness_score": result.output.completeness_score,
-            "processing_date": "{{current_timestamp}}"
+            "validation_score": "{{validation_step.output.completeness_score}}",
+            "extracted_fields": "{{extraction_step.output.extracted_data}}"
         }
     })
+)
 
-# Handle validation failures
-@validation_step.when(IsSuccess() & TextEquals("is_valid", "false"))
-def handle_validation_failure(result):
-    """Handle documents that fail validation."""
-    return utils.send_status(
+# Flag documents with validation issues
+validation_step.on(
+    IsSuccess() & TextEquals("is_valid", "false"),
+    utils.send_status(
         status="validation_failed",
         message="Document validation failed - manual review required",
-        errors=result.output.errors,
-        warnings=result.output.warnings
+        validation_errors="{{validation_step.output.errors}}"
     )
+)
 ```
 
 ## Invoice Processing Workflow
@@ -397,46 +387,44 @@ po_validation.on(
 )
 
 # Route for manager approval
-@po_validation.when(
+po_validation.on(
     IsSuccess() &
     TextEquals("approval_required", "true") &
-    TextEquals("approval_level", "manager")
-)
-def route_to_manager(result):
-    """Route invoice to manager for approval."""
-    return utils.send_status(
+    TextEquals("approval_level", "manager"),
+    utils.send_status(
         status="pending_manager_approval",
         message="Invoice requires manager approval",
         invoice_details="{{extract_step.output}}",
         amount="{{extract_step.output.total_amount}}"
     )
+)
 
 # Escalate high-risk invoices
-@risk_assessment.when(IsSuccess() & GreaterThan("risk_score", "0.7"))
-def escalate_high_risk_invoice(result):
-    """Escalate high-risk invoices for investigation."""
-    return utils.send_status(
+risk_assessment.on(
+    IsSuccess() & GreaterThan("risk_score", "0.7"),
+    utils.send_status(
         status="high_risk_detected",
         message="High-risk invoice detected - investigation required",
         priority="urgent",
-        risk_factors=result.output.risk_factors,
+        risk_factors="{{risk_assessment.output.risk_factors}}",
         invoice_data="{{extract_step.output}}"
     )
+)
 
 # Store all processed invoices for audit trail
-@extract_step.when(IsSuccess())
-def create_audit_trail(result):
-    """Create audit trail for all processed invoices."""
-    return memory.store(memory={
-        "content": f"Invoice processed: {result.output.invoice_number} from {result.output.vendor_name}",
+extract_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "Invoice processed: {{extract_step.output.invoice_number}} from {{extract_step.output.vendor_name}}",
         "type": "invoice_audit_trail",
-        "tags": ["audit", "invoice", result.output.vendor_name],
+        "tags": ["audit", "invoice", "{{extract_step.output.vendor_name}}"],
         "extra": {
-            "invoice_data": result.output,
+            "invoice_data": "{{extract_step.output}}",
             "processing_timestamp": "{{current_timestamp}}",
             "processor": "automated_invoice_processor"
         }
     })
+)
 ```
 
 ## Customer Onboarding Automation
@@ -556,42 +544,42 @@ document_analysis.on(
 )
 
 # Handle incomplete documentation
-@document_analysis.when(IsSuccess() & LessThan("completeness_score", "0.8"))
-def request_additional_documents(result):
-    """Request additional documents from customer."""
-    return utils.send_status(
+document_analysis.on(
+    IsSuccess() & LessThan("completeness_score", "0.8"),
+    utils.send_status(
         status="additional_documents_required",
         message="Additional documentation required to complete onboarding",
-        missing_documents=result.output.missing_documents,
+        missing_documents="{{document_analysis.output.missing_documents}}",
         customer_id="{{customer_info.id}}"
     )
+)
 
 # Flag compliance issues
-@compliance_check.when(IsSuccess() & ~TextEquals("overall_compliance", "approved"))
-def flag_compliance_issues(result):
-    """Flag customers with compliance issues."""
-    return memory.store(memory={
-        "content": f"Compliance issues detected for customer {{customer_info.id}}",
+compliance_check.on(
+    IsSuccess() & ~TextEquals("overall_compliance", "approved"),
+    memory.store(memory={
+        "content": "Compliance issues detected for customer {{customer_info.id}}",
         "type": "compliance_flag",
         "tags": ["compliance", "onboarding", "{{customer_info.id}}"],
         "extra": {
-            "compliance_status": result.output.overall_compliance,
-            "required_actions": result.output.required_actions,
-            "aml_status": result.output.aml_status,
-            "kyc_status": result.output.kyc_status
+            "compliance_status": "{{compliance_check.output.overall_compliance}}",
+            "required_actions": "{{compliance_check.output.required_actions}}",
+            "aml_status": "{{compliance_check.output.aml_status}}",
+            "kyc_status": "{{compliance_check.output.kyc_status}}"
         }
     })
+)
 
 # Send welcome package to approved customers
-@welcome_package.when(IsSuccess())
-def send_welcome_package(result):
-    """Send welcome package to newly onboarded customers."""
-    return utils.send_status(
+welcome_package.on(
+    IsSuccess(),
+    utils.send_status(
         status="welcome_package_sent",
         message="Welcome package sent to customer",
         customer_id="{{customer_info.id}}",
-        welcome_content=result.output.welcome_message
+        welcome_content="{{welcome_package.output.welcome_message}}"
     )
+)
 
 # Store successful onboarding records
 welcome_package.on(
@@ -615,65 +603,54 @@ welcome_package.on(
 
 ```python
 # Comprehensive error handling with fallbacks
-@step.when(IsError())
-def handle_processing_error(error):
-    """Handle processing errors with appropriate fallbacks."""
-    if "timeout" in error.message.lower():
-        return utils.send_status(
-            status="timeout_retry",
-            message="Processing timeout - retrying with extended timeout"
-        )
-    elif "validation" in error.message.lower():
-        return utils.send_status(
-            status="validation_error",
-            message="Validation failed - manual review required"
-        )
-    else:
-        return utils.send_status(
-            status="general_error",
-            message=f"Processing failed: {error.message}"
-        )
+step.on(
+    IsError(),
+    utils.send_status(
+        status="error_detected",
+        message="Processing failed: {{step.error.message}}"
+    )
+)
 ```
 
 ### Conditional Workflow Routing
 
 ```python
 # Route workflows based on business rules
-@analysis_step.when(IsSuccess() & GreaterThan("amount", "10000"))
-def route_high_value(result):
-    """Route high-value transactions for additional approval."""
-    return utils.send_status(
+analysis_step.on(
+    IsSuccess() & GreaterThan("amount", "10000"),
+    utils.send_status(
         status="high_value_approval_required",
         message="High-value transaction requires additional approval"
     )
+)
 
-@analysis_step.when(IsSuccess() & TextContains("category", "international"))
-def route_international(result):
-    """Route international transactions for compliance review."""
-    return utils.send_status(
+analysis_step.on(
+    IsSuccess() & TextContains("category", "international"),
+    utils.send_status(
         status="international_compliance_review",
         message="International transaction requires compliance review"
     )
+)
 ```
 
 ### Audit Trail Management
 
 ```python
 # Maintain comprehensive audit trails
-@step.when(IsSuccess())
-def create_audit_record(result):
-    """Create audit record for all successful operations."""
-    return memory.store(memory={
-        "content": f"Operation completed: {result.output.operation_type}",
+step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "Operation completed: {{step.output.operation_type}}",
         "type": "audit_record",
         "tags": ["audit", "{{operation_type}}", "{{user_id}}"],
         "extra": {
-            "operation_details": result.output,
+            "operation_details": "{{step.output}}",
             "timestamp": "{{current_timestamp}}",
             "user_id": "{{user_id}}",
             "system_version": "{{system_version}}"
         }
     })
+)
 ```
 
 ## Next Steps

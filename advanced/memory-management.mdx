@@ -71,7 +71,7 @@ Store new information for future retrieval:
 store_step = Step(
     agent=analyzer_agent,
     key="store_insights",
-    actiontype=memory.store(
+    actiontype=memory.store(memory=
         memory={
             "content": "{{analysis_results}}",
             "description": "Analysis of customer churn patterns",
@@ -212,7 +212,7 @@ context_agent = Agent(
 store_context = Step(
     agent=context_agent,
     key="store_context",
-    actiontype=memory.store(
+    actiontype=memory.store(memory=
         memory={
             "content": "Starting analysis of {{project_name}}",
             "type": "execution_context",
@@ -300,7 +300,7 @@ consolidate = Step(
 store_knowledge = Step(
     agent=knowledge_builder,
     key="store_knowledge",
-    actiontype=memory.store(
+    actiontype=memory.store(memory=
         memory={
             "content": "{{steps.consolidate.consolidated_knowledge}}",
             "type": "domain_knowledge",
@@ -507,7 +507,7 @@ analyze_with_context = Step(
 store_insights = Step(
     agent=smart_agent,
     key="store_insights",
-    actiontype=memory.store(
+    actiontype=memory.store(memory=
         memory={
             "content": "{{steps.analyze.insights}}",
             "description": "Analysis of {{analysis_topic}} with historical context",
@@ -539,7 +539,7 @@ Implement proper access controls for sensitive memories:
 secure_store = Step(
     agent=secure_agent,
     key="store_secure",
-    actiontype=memory.store(
+    actiontype=memory.store(memory=
         memory={
             "content": "{{sensitive_analysis}}",
             "type": "confidential_insight",

@@ -91,19 +91,20 @@ analyze_step = data_agent.step(
 calculate_step = data_agent.step(
     codeexec.execute(
         code_files=[{
-            "filename": "metrics.py",
+            "filename": "calculate.py",
             "content": "calculate_sales_metrics({{analyze_step.output.insights}})"
         }]
     ),
     depends_on=analyze_step
 )
 
-@calculate_step.when(IsSuccess())
-def store_results(result):
-    return memory.store(memory={
-        "content": result.output.metrics,
+calculate_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "{{calculate_step.output.metrics}}",
         "type": "sales_analysis"
     })
+)
 ```
 
 ### Research Agents
@@ -174,12 +175,13 @@ classify_step = automation_agent.step(
     )
 )
 
-@classify_step.when(IsSuccess() & TextEquals("requires_response", "true"))
-def generate_response(result):
-    return llm.message(
+classify_step.on(
+    IsSuccess() & TextEquals("requires_response", "true"),
+    llm.message(
         model="claude-sonnet-4",
-        query="Generate response for {{category}} email: {{email_content}}"
+        query="Generate response for {{classify_step.output.category}} email: {{email_content}}"
     )
+)
 
 classify_step.on(
     IsSuccess() & TextEquals("priority", "urgent"),
@@ -220,13 +222,14 @@ response_step = chat_agent.step(
     depends_on=context_step
 )
 
-@response_step.when(IsSuccess())
-def store_conversation(result):
-    return memory.store(memory={
-        "content": f"User: {{user_message}}\nAgent: {result.output.response}",
+response_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "User: {{user_message}}\nAgent: {{response_step.output.response}}",
         "type": "conversation",
         "tags": ["support", "{{customer_id}}"]
     })
+)
 ```
 
 ## Agent Composition
@@ -346,12 +349,13 @@ validator_step = agent.step(
     )
 )
 
-@validator_step.when(IsSuccess() & TextEquals("valid", "false"))
-def handle_invalid_analysis(result):
-    return utils.send_status(
+validator_step.on(
+    IsSuccess() & TextEquals("valid", "false"),
+    utils.send_status(
         status="validation_failed",
         message="Analysis failed validation - review required"
     )
+)
 ```
 
 ## Agent Lifecycle

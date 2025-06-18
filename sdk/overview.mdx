@@ -40,21 +40,22 @@ agent = Agent(
     description="Automatically responds to emails with context-aware replies"
 )
 
-  response_step = agent.step(
+response_step = agent.step(
     llm.message(
         model="claude-sonnet-4",
         query="Generate a professional response to this email: {{email_content}}"
     )
 )
 
-# Add result handlers with decorators
-@response_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def store_high_quality_response(result):
-    return memory.store(memory={
-        "content": result.output.response,
+# Add result handlers
+response_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": "{{response_step.output.response}}",
         "type": "email_response",
         "tags": ["automated", "high-quality"]
     })
+)
 ```
 
 ## Core Components
@@ -96,7 +97,6 @@ step = agent.step(
 - **Clean syntax**: Simple step creation with intuitive methods
 - **Intuitive parameter order**: Action first, then optional parameters
 - **Direct handlers**: Use `step.on()` for immediate action chaining
-- **Decorator-based handlers**: Use `@step.when()` for result handling
 - **Type-safe output access**: Use `step.output.field` syntax
 - **Condition operators**: Use `&` (and), `|` (or), `~` (not) for combining conditions
 
@@ -144,7 +144,7 @@ Erdo provides multiple action types for different use cases:
 
     # Store information
     store_step = agent.step(
-        memory.store(
+        memory.store(memory=
             memory={
                 "content": "{{analysis_result}}",
                 "type": "customer_insight",
@@ -272,26 +272,28 @@ analysis_step.on(
 )
 ````
 
-### Decorator Handlers with @step.when()
+### Result Handlers with step.on()
 
 ```python
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def handle_high_confidence(result):
-    """Store high-confidence analysis results."""
-    return memory.store(memory={
-        "content": result.output.insights,
+# Store high-confidence analysis results
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
         "type": "analysis_result",
         "tags": ["analysis", "high-confidence"],
-        "extra": {"confidence": result.output.confidence}
+        "extra": {"confidence": "{{analysis_step.output.confidence}}"}
     })
+)
 
-@analysis_step.when(IsError())
-def handle_analysis_error(error):
-    """Handle analysis failures."""
-    return utils.send_status(
+# Handle analysis failures
+analysis_step.on(
+    IsError(),
+    utils.send_status(
         status="failed",
-        message=f"Analysis failed: {error.message}"
+        message="Analysis failed: {{analysis_step.error.message}}"
     )
+)
 ```
 
 ## Dependencies and Flow Control
@@ -356,35 +358,35 @@ from erdo.conditions import (
 )
 
 # Success/Error conditions
-@step.when(IsSuccess())
-def handle_success(result): pass
-
-@step.when(IsError())
-def handle_error(error): pass
+step.on(IsSuccess(), handle_success_action)
+step.on(IsError(), handle_error_action)
 
 # Numeric comparisons
-@step.when(IsSuccess() & GreaterThan("score", "0.8"))
-def handle_high_score(result): pass
+step.on(
+    IsSuccess() & GreaterThan("score", "0.8"),
+    handle_high_score_action
+)
 
 # Text conditions
-@step.when(IsSuccess() & TextContains("category", "urgent"))
-def handle_urgent(result): pass
+step.on(
+    IsSuccess() & TextContains("category", "urgent"),
+    handle_urgent_action
+)
 ```
 
 ### Complex Conditions
 
 ```python
 # Combine conditions with logical operators
-@step.when(
+step.on(
     IsSuccess() &
     (GreaterThan("confidence", "0.8") | TextContains("priority", "high")) &
-    ~TextContains("status", "draft")
-)
-def handle_complex_condition(result):
-    return memory.store(memory={
-        "content": result.output.data,
+    ~TextContains("status", "draft"),
+    memory.store(memory={
+        "content": "{{step.output.data}}",
         "type": "priority_result"
     })
+)
 ```
 
 ## Complete Example
@@ -438,14 +440,15 @@ execute_step = data_processor.step(
     depends_on=code_gen_step
 )
 
-# Handle successful execution with decorator
-@execute_step.when(IsSuccess() & ~TextContains("stderr", "error"))
-def store_results(result):
-    return memory.store(memory={
-        "content": result.output.stdout,
+# Handle successful execution
+execute_step.on(
+    IsSuccess() & ~TextContains("stderr", "error"),
+    memory.store(memory={
+        "content": "{{execute_step.output.stdout}}",
         "type": "analysis_result",
         "tags": ["analysis", "{{query}}"]
     })
+)
 
 # Handle execution with warnings using direct handler
 execute_step.on(
@@ -457,12 +460,13 @@ execute_step.on(
 )
 
 # Handle errors
-@execute_step.when(IsError())
-def handle_execution_error(error):
-    return utils.send_status(
+execute_step.on(
+    IsError(),
+    utils.send_status(
         status="failed",
-        message=f"Execution failed: {error.message}"
+        message="Execution failed: {{execute_step.error.message}}"
     )
+)
 ```
 
 ## Best Practices

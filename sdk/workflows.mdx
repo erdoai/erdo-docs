@@ -55,7 +55,7 @@ report_step = research_agent.step(
 
 # Step 4: Store insights
 memory_step = research_agent.step(
-    memory.store(
+    memory.store(memory=
         memory={
             "content": "{{report.output.content}}",
             "description": "Research report on {{topic}}",
@@ -164,18 +164,20 @@ analyze_data_step = smart_processor.step(
 )
 
 # Simple processing for small datasets
-@analyze_data_step.when(IsSuccess() & LessThan("data_size", 1000) & TextContains("complexity", "low"))
-def simple_processing(result):
-    return codeexec.execute(
+analyze_data_step.on(
+    IsSuccess() & LessThan("data_size", 1000) & TextContains("complexity", "low"),
+    codeexec.execute(
         code="simple_data_processing({{input_data}})"
     )
+)
 
 # Advanced processing for large or complex datasets
-@analyze_data_step.when(IsSuccess() & (GreaterThan("data_size", 1000) | TextContains("complexity", "high")))
-def advanced_processing(result):
-    return codeexec.execute(
+analyze_data_step.on(
+    IsSuccess() & (GreaterThan("data_size", 1000) | TextContains("complexity", "high")),
+    codeexec.execute(
         code="advanced_data_processing({{input_data}})"
     )
+)
 ```
 
 ### Dynamic Branching
@@ -213,25 +215,28 @@ classify_step = content_processor.step(
 )
 
 # Route to different processing based on classification
-@classify_step.when(TextContains("content_type", "text"))
-def process_text(result):
-    return llm.message(
+classify_step.on(
+    TextContains("content_type", "text"),
+    llm.message(
         model="claude-sonnet-4",
         query="Process text content: {{content}}"
     )
+)
 
-@classify_step.when(TextContains("content_type", "image"))
-def process_image(result):
-    return codeexec.execute(
+classify_step.on(
+    TextContains("content_type", "image"),
+    codeexec.execute(
         code="process_image_content({{content}})"
     )
+)
 
-@classify_step.when(TextContains("content_type", "document"))
-def process_document(result):
-    return llm.message(
+classify_step.on(
+    TextContains("content_type", "document"),
+    llm.message(
         model="claude-sonnet-4",
         query="Extract and summarize document: {{content}}"
     )
+)
 ```
 
 ## Iterative Processing
@@ -325,42 +330,46 @@ main_processing = resilient_processor.step(
 )
 
 # Success handler - normal flow continuation
-@main_processing.when(IsSuccess())
-def handle_success(result):
-    return utils.send_status(
+main_processing.on(
+    IsSuccess(),
+    utils.send_status(
         status="completed",
         message="Processing completed successfully",
-        data=result.output
+        data="{{main_processing.output}}"
     )
+)
 
 # Retry handler for transient errors
-@main_processing.when(IsError() & LessThan("retry_count", 3) & TextContains("error", "timeout"))
-def retry_on_timeout(error):
-    return utils.echo(
+main_processing.on(
+    IsError() & LessThan("retry_count", 3) & TextContains("error", "timeout"),
+    utils.echo(
         data={
             "retry_count": "{{increment retry_count}}",
             "backoff_time": "{{multiply retry_count 5}}",
-            "last_error": "{{error}}"
+            "last_error": "{{main_processing.error}}"
         }
     )
+)
 
 # Fallback handler for code generation errors
-@main_processing.when(IsError() & TextContains("error", "syntax"))
-def regenerate_code(error):
-    return llm.message(
+main_processing.on(
+    IsError() & TextContains("error", "syntax"),
+    llm.message(
         model="claude-sonnet-4",
-        query="Fix the code error: {{error}}\nOriginal code: {{generated_code}}",
+        query="Fix the code error: {{main_processing.error}}\nOriginal code: {{generated_code}}",
         system_prompt="Fix syntax and logical errors in the code."
     )
+)
 
 # Critical error handler
-@main_processing.when(IsError() & GreaterThan("retry_count", 2))
-def handle_critical_failure(error):
-    return utils.send_status(
-        status="error",
-        message="Critical processing failure after {{retry_count}} attempts",
-        details={"final_error": "{{error}}"}
+main_processing.on(
+    IsError() & GreaterThan("retry_count", 2),
+    utils.send_status(
+        status="critical_failure",
+        message="Processing failed after multiple attempts",
+        error="{{main_processing.error}}"
     )
+)
 ```
 
 ## Advanced Workflow Patterns

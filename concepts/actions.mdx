@@ -135,7 +135,7 @@ Store, search, and retrieve knowledge and information:
 from erdo.actions import memory
 
 # Store information
-store_memory = memory.store(
+store_memory = memory.store(memory=
     memory={
         "content": "{{analysis_results}}",
         "tags": ["analysis", "{{project_name}}"],
@@ -435,7 +435,7 @@ def composite_analysis(data):
     )
 
     # Step 3: Store results
-    stored = memory.store(
+    stored = memory.store(memory=
         memory={
             "content": analysis,
             "source_data": data

@@ -237,38 +237,41 @@ detail_step = agent.step(
 
 ## Result Handlers
 
-### Decorator-Based Handlers
+### Result Handlers
 
-Use `@step.when()` decorators for conditional result handling:
+Use `step.on()` for conditional result handling:
 
 ```python
-from erdo.conditions import IsSuccess, GreaterThan, IsError
+from erdo.conditions import IsSuccess, GreaterThan, IsError, LessThan
 from erdo.actions import memory, utils
 
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def handle_high_confidence(result):
-    """Store high-confidence analysis results."""
-    return memory.store(memory={
-        "content": result.output.insights,
+# Store high-confidence analysis results
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
         "type": "analysis_result",
         "tags": ["analysis", "high-confidence"]
     })
+)
 
-@analysis_step.when(IsSuccess() & GreaterThan("0.5", "confidence"))
-def handle_low_confidence(result):
-    """Flag low confidence results."""
-    return utils.send_status(
+# Flag low confidence results
+analysis_step.on(
+    IsSuccess() & LessThan("confidence", "0.8") & GreaterThan("confidence", "0.5"),
+    utils.send_status(
         status="low_confidence",
         message="Analysis completed but confidence is low"
     )
+)
 
-@analysis_step.when(IsError())
-def handle_analysis_error(error):
-    """Handle analysis failures."""
-    return utils.send_status(
+# Handle analysis failures
+analysis_step.on(
+    IsError(),
+    utils.send_status(
         status="failed",
-        message=f"Analysis failed: {error.message}"
+        message="Analysis failed: {{analysis_step.error.message}}"
     )
+)
 ```
 
 ### Direct Handlers
@@ -392,7 +395,7 @@ search_context = agent.step(
 )
 
 store_results = agent.step(
-    memory.store(
+    memory.store(memory=
         memory={
             "content": "{{analysis_step.output.insights}}",
             "description": "Analysis results for {{user_query}}",
@@ -424,24 +427,26 @@ process_step = agent.step(
     )
 )
 
-@process_step.when(IsError() & LessThan("retry_count", "3"))
-def retry_processing(error):
-    """Retry processing with fallback method."""
-    return codeexec.execute(
+# Retry processing with fallback method
+process_step.on(
+    IsError() & LessThan("retry_count", "3"),
+    codeexec.execute(
         code_files=[{
             "filename": "fallback_process.py",
             "content": "fallback_processing_logic({{input_data}})"
         }]
     )
+)
 
-@process_step.when(IsError() & GreaterThan("retry_count", "2"))
-def escalate_failure(error):
-    """Escalate after max retries."""
-    return utils.send_status(
+# Escalate after max retries
+process_step.on(
+    IsError() & GreaterThan("retry_count", "2"),
+    utils.send_status(
         status="escalated",
-        message=f"Processing failed after 3 attempts: {error.message}",
+        message="Processing failed after 3 attempts: {{process_step.error.message}}",
         priority="high"
     )
+)
 ```
 
 ### Graceful Degradation
@@ -451,14 +456,15 @@ primary_step = agent.step(
     llm.message(model="claude-sonnet-4", query="{{complex_query}}")
 )
 
-@primary_step.when(IsError())
-def fallback_processing(error):
-    """Use simpler model as fallback."""
-    return llm.message(
+# Use simpler model as fallback
+primary_step.on(
+    IsError(),
+    llm.message(
         model="gpt-4",
         query="{{simplified_query}}",
         system_prompt="Provide a basic analysis of the given data"
     )
+)
 ```
 
 ## Performance Optimization
@@ -493,24 +499,25 @@ initial_check = agent.step(
     )
 )
 
-# Only run expensive analysis if needed
-@initial_check.when(IsSuccess() & TextContains("assessment", "complex"))
-def run_detailed_analysis(result):
-    """Run detailed analysis only for complex cases."""
-    return codeexec.execute(
+# Run detailed analysis only for complex cases
+initial_check.on(
+    IsSuccess() & TextContains("assessment", "complex"),
+    codeexec.execute(
         code_files=[{
             "filename": "detailed_analysis.py",
             "content": "perform_complex_analysis({{input_data}})"
         }]
     )
+)
 
-@initial_check.when(IsSuccess() & TextContains("assessment", "simple"))
-def run_basic_analysis(result):
-    """Use basic analysis for simple cases."""
-    return llm.message(
+# Use basic analysis for simple cases
+initial_check.on(
+    IsSuccess() & TextContains("assessment", "simple"),
+    llm.message(
         model="gpt-4",
         query="Basic analysis: {{input_data}}"
     )
+)
 ```
 
 ## Best Practices
@@ -550,17 +557,18 @@ structured_step = agent.step(
 
 ```python
 # Store important results for future reference
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def store_high_quality_results(result):
-    return memory.store(memory={
-        "content": result.output.analysis,
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.analysis}}",
         "type": "verified_analysis",
         "tags": ["high-quality", "{{domain}}", "{{timestamp}}"],
         "extra": {
-            "confidence": result.output.confidence,
+            "confidence": "{{analysis_step.output.confidence}}",
             "model_used": "claude-sonnet-4"
         }
     })
+)
 ```
 
 ## Next Steps

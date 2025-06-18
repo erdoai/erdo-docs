@@ -254,7 +254,7 @@ Save knowledge and insights for future use:
 ```python
 from erdo.actions import memory
 
-store_action = memory.store(
+store_action = memory.store(memory=
     memory={
         "content": "{{analysis_result}}",
         "description": "Market analysis insights",
@@ -480,15 +480,16 @@ iterative_step = agent.step(
 Implement robust error handling:
 
 ```python
-@main_step.when(IsError() & LessThan("retry_count", 3))
-def retry_on_error(error):
-    return utils.echo(
+main_step.on(
+    IsError() & LessThan("retry_count", 3),
+    utils.echo(
         data={
             "retry_count": "{{increment retry_count}}",
-            "error": "{{error_message}}",
+            "error": "{{main_step.error.message}}",
             "next_attempt": "{{add_seconds timestamp 60}}"
         }
     )
+)
 ```
 
 ## Best Practices

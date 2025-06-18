@@ -1,11 +1,11 @@
 ---
 title: "Result Handlers"
-description: "Handle step outcomes with conditional logic using @step.when() decorators and step.on() methods"
+description: "Handle step outcomes with conditional logic using step.on() methods"
 ---
 
 # Result Handlers
 
-Result handlers define how agents respond to step outcomes, enabling sophisticated conditional logic and workflow control. You can use `@step.when()` decorators and `step.on()` methods for clean, readable result handling.
+Result handlers define how agents respond to step outcomes, enabling sophisticated conditional logic and workflow control. Use `step.on()` methods for clean, readable result handling.
 
 ## What are Result Handlers?
 
@@ -18,9 +18,6 @@ Result handlers allow you to:
 - **Control workflow flow** dynamically
 
 <CardGroup cols={2}>
-  <Card title="Decorator Handlers" icon="at">
-    Use @step.when() decorators for clean, readable handlers
-  </Card>
   <Card title="Direct Handlers" icon="link">
     Use step.on() for direct action chaining
   </Card>
@@ -30,18 +27,21 @@ Result handlers allow you to:
   <Card title="Error Recovery" icon="refresh">
     Implement sophisticated error handling and recovery
   </Card>
+  <Card title="Multiple Actions" icon="layers">
+    Chain multiple actions in a single handler
+  </Card>
 </CardGroup>
 
 ## Handler Methods
 
-### Decorator-Based Handlers with @step.when()
+### Result Handlers with step.on()
 
-The most readable way to handle step outcomes:
+Handle step outcomes with conditional logic:
 
 ```python
 from erdo import Agent
 from erdo.actions import llm, memory, utils
-from erdo.conditions import IsSuccess, IsError, GreaterThan, TextContains
+from erdo.conditions import IsSuccess, IsError, GreaterThan, LessThan, TextContains
 
 agent = Agent(name="analysis_agent")
 
@@ -63,48 +63,52 @@ analysis_step = agent.step(
     )
 )
 
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def handle_high_confidence(result):
-    """Store high-confidence analysis results."""
-    return memory.store(memory={
-        "content": result.output.insights,
+# Store high-confidence analysis results
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
         "description": "High-confidence analysis results",
         "type": "analysis_result",
         "tags": ["analysis", "high-confidence"],
-        "extra": {"confidence": result.output.confidence}
+        "extra": {"confidence": "{{analysis_step.output.confidence}}"}
     })
+)
 
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.5") & GreaterThan("0.8", "confidence"))
-def handle_moderate_confidence(result):
-    """Request review for moderate confidence results."""
-    return utils.send_status(
+# Request review for moderate confidence results
+analysis_step.on(
+    IsSuccess() & LessThan("confidence", "0.8") & GreaterThan("confidence", "0.5"),
+    utils.send_status(
         status="review_needed",
         message="Analysis completed with moderate confidence. Human review recommended.",
-        data=result.output
+        data="{{analysis_step.output}}"
     )
+)
 
-@analysis_step.when(IsSuccess() & GreaterThan("0.5", "confidence"))
-def handle_low_confidence(result):
-    """Flag low confidence results."""
-    return utils.send_status(
+# Flag low confidence results
+analysis_step.on(
+    IsSuccess() & LessThan("confidence", "0.5"),
+    utils.send_status(
         status="low_confidence",
         message="Analysis completed but confidence is very low. Results may be unreliable.",
-        data=result.output
+        data="{{analysis_step.output}}"
     )
+)
 
-@analysis_step.when(IsError())
-def handle_analysis_error(error):
-    """Handle analysis failures."""
-    return utils.send_status(
+# Handle analysis failures
+analysis_step.on(
+    IsError(),
+    utils.send_status(
         status="failed",
-        message=f"Analysis failed: {error.message}",
-        error=error.details
+        message="Analysis failed: {{analysis_step.error.message}}",
+        error="{{analysis_step.error.details}}"
     )
+)
 ```
 
-### Direct Handlers with step.on()
+### Multiple Action Handlers
 
-For direct action chaining:
+Chain multiple actions in a single handler:
 
 ```python
 # Single action handler
@@ -152,32 +156,38 @@ from erdo.conditions import (
 )
 
 # Success conditions
-@step.when(IsSuccess())
-def handle_success(result):
-    return memory.store(memory={"content": result.output.data})
+step.on(
+    IsSuccess(),
+    memory.store(memory={"content": "{{step.output.data}}"})
+)
 
 # Error conditions
-@step.when(IsError())
-def handle_error(error):
-    return utils.send_status(status="failed", message=error.message)
+step.on(
+    IsError(),
+    utils.send_status(status="failed", message="{{step.error.message}}")
+)
 
 # Numeric comparisons
-@step.when(IsSuccess() & GreaterThan("score", "0.8"))
-def handle_high_score(result):
-    return utils.send_status(status="high_score", message="Excellent results!")
+step.on(
+    IsSuccess() & GreaterThan("score", "0.8"),
+    utils.send_status(status="high_score", message="Excellent results!")
+)
 
-@step.when(IsSuccess() & LessThan("score", "0.3"))
-def handle_low_score(result):
-    return utils.send_status(status="low_score", message="Results need improvement")
+step.on(
+    IsSuccess() & LessThan("score", "0.3"),
+    utils.send_status(status="low_score", message="Results need improvement")
+)
 
 # Text conditions
-@step.when(IsSuccess() & TextContains("category", "urgent"))
-def handle_urgent(result):
-    return utils.send_status(status="urgent", priority="high")
+step.on(
+    IsSuccess() & TextContains("category", "urgent"),
+    utils.send_status(status="urgent", priority="high")
+)
 
-@step.when(IsSuccess() & TextEquals("status", "completed"))
-def handle_completed(result):
-    return memory.store(memory={"content": "Task completed successfully"})
+step.on(
+    IsSuccess() & TextEquals("status", "completed"),
+    memory.store(memory={"content": "Task completed successfully"})
+)
 ```
 
 ### Complex Conditions
@@ -186,53 +196,52 @@ Combine conditions with logical operators:
 
 ```python
 # AND operator (&)
-@step.when(IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("category", "important"))
-def handle_high_confidence_important(result):
-    return memory.store(memory={
-        "content": result.output.analysis,
+step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("category", "important"),
+    memory.store(memory={
+        "content": "{{step.output.analysis}}",
         "type": "high_priority_analysis"
     })
+)
 
 # OR operator (|)
-@step.when(
-    IsSuccess() & (
-        TextContains("risk_level", "high") |
-        TextContains("risk_level", "critical")
+step.on(
+    IsSuccess() & (TextContains("risk_level", "high") | TextContains("risk_level", "critical")),
+    utils.send_status(
+        status="high_risk_alert",
+        message="High or critical risk detected",
+        priority="urgent"
     )
 )
-def handle_high_risk(result):
-    return utils.send_status(
-        status="high_risk_alert",
-        message="High risk detected - immediate attention required"
-    )
 
 # NOT operator (~)
-@step.when(IsSuccess() & ~TextContains("status", "completed"))
-def handle_incomplete(result):
-    return utils.send_status(
+step.on(
+    IsSuccess() & ~TextContains("status", "completed"),
+    utils.send_status(
         status="incomplete",
-        message="Process not completed - may need retry"
+        message="Task not yet completed"
     )
+)
 
 # Complex nested conditions
-@step.when(
-    IsSuccess() &
-    (GreaterThan("confidence", "0.7") | TextEquals("priority", "high")) &
-    ~TextContains("errors", "critical")
-)
-def handle_complex_success(result):
-    return memory.store(memory={
-        "content": result.output.data,
-        "type": "validated_result"
+step.on(
+    IsSuccess() & (
+        (GreaterThan("confidence", "0.9") & TextContains("category", "finance")) |
+        (GreaterThan("confidence", "0.8") & TextContains("category", "critical"))
+    ),
+    memory.store(memory={
+        "content": "{{step.output.data}}",
+        "type": "priority_result"
     })
+)
 ```
 
-## Error Handling Patterns
+## Error Handling and Recovery
 
 ### Retry Logic
 
 ```python
-from erdo.conditions import IsError, LessThan
+from erdo.conditions import IsError, LessThan, GreaterThan
 
 process_step = agent.step(
     codeexec.execute(
@@ -243,295 +252,226 @@ process_step = agent.step(
     )
 )
 
-@process_step.when(IsError() & LessThan("retry_count", "3"))
-def retry_with_backoff(error):
-    """Retry processing with exponential backoff."""
-    return codeexec.execute(
+# Retry processing with fallback method
+process_step.on(
+    IsError() & LessThan("retry_count", "3"),
+    codeexec.execute(
         code_files=[{
-            "filename": "retry_process.py",
-            "content": """
-import time
-import random
-
-# Exponential backoff
-retry_count = int('{{retry_count}}' or '0')
-delay = (2 ** retry_count) + random.uniform(0, 1)
-time.sleep(delay)
-
-# Retry the operation
-retry_processing_logic({{input_data}})
-"""
+            "filename": "fallback_process.py",
+            "content": "fallback_processing_logic({{input_data}})"
         }]
     )
+)
 
-@process_step.when(IsError() & GreaterThan("retry_count", "2"))
-def escalate_persistent_failure(error):
-    """Escalate after max retries exceeded."""
-    return utils.send_status(
+# Escalate after max retries
+process_step.on(
+    IsError() & GreaterThan("retry_count", "2"),
+    utils.send_status(
         status="escalated",
-        message=f"Processing failed after 3 attempts: {error.message}",
-        priority="critical",
-        error_details=error.details
+        message="Processing failed after 3 attempts: {{process_step.error.message}}",
+        priority="high"
     )
+)
 ```
 
 ### Graceful Degradation
 
 ```python
+# Primary analysis step
 primary_analysis = agent.step(
+    llm.message(model="claude-sonnet-4", query="{{complex_query}}")
+)
+
+# Use simpler model as fallback
+primary_analysis.on(
+    IsError(),
     llm.message(
-        model="claude-sonnet-4",
-        query="Perform detailed analysis: {{complex_data}}"
+        model="gpt-4",
+        query="{{simplified_query}}",
+        system_prompt="Provide a basic analysis of the given data"
     )
 )
 
-@primary_analysis.when(IsError())
-def fallback_to_simpler_analysis(error):
-    """Use simpler analysis when primary fails."""
-    return llm.message(
-        model="gpt-4",
-        query="Perform basic analysis: {{simplified_data}}",
-        system_prompt="Provide a basic summary analysis"
-    )
-
+# Secondary analysis if primary fails
 secondary_analysis = agent.step(
-    llm.message(
-        model="gpt-4",
-        query="Basic analysis: {{input_data}}"
-    )
+    llm.message(model="gpt-4", query="{{fallback_query}}")
 )
 
-@secondary_analysis.when(IsError())
-def final_fallback(error):
-    """Final fallback to rule-based analysis."""
-    return codeexec.execute(
-        code_files=[{
-            "filename": "rule_based_analysis.py",
-            "content": "perform_rule_based_analysis({{input_data}})"
-        }]
+secondary_analysis.on(
+    IsError(),
+    utils.send_status(
+        status="analysis_failed",
+        message="Both primary and secondary analysis failed",
+        priority="high"
     )
+)
 ```
 
-### Error Recovery with Context
+### Specialized Error Handling
 
 ```python
 data_processing = agent.step(
     codeexec.execute(
         code_files=[{
             "filename": "data_processor.py",
-            "content": "process_complex_data({{input_data}})"
+            "content": "process_large_dataset({{dataset}})"
         }]
     )
 )
 
-@data_processing.when(IsError() & TextContains("error_type", "memory"))
-def handle_memory_error(error):
-    """Handle memory-related errors by processing in chunks."""
-    return codeexec.execute(
+# Handle memory errors
+data_processing.on(
+    IsError() & TextContains("error_type", "memory"),
+    codeexec.execute(
         code_files=[{
             "filename": "chunked_processor.py",
-            "content": """
-# Process data in smaller chunks to avoid memory issues
-import pandas as pd
-
-data = pd.read_csv('{{input_data}}')
-chunk_size = 1000
-results = []
-
-for chunk in pd.read_csv('{{input_data}}', chunksize=chunk_size):
-    chunk_result = process_chunk(chunk)
-    results.append(chunk_result)
-
-final_result = combine_results(results)
-print(json.dumps(final_result))
-"""
+            "content": "process_dataset_in_chunks({{dataset}})"
         }]
     )
+)
 
-@data_processing.when(IsError() & TextContains("error_type", "format"))
-def handle_format_error(error):
-    """Handle data format errors with preprocessing."""
-    return codeexec.execute(
-        code_files=[{
-            "filename": "format_fixer.py",
-            "content": """
-# Fix common data format issues
-import pandas as pd
-import numpy as np
-
-try:
-    # Attempt to fix common format issues
-    data = pd.read_csv('{{input_data}}', encoding='utf-8')
-    data = data.replace([np.inf, -np.inf], np.nan)
-    data = data.dropna()
-
-    # Process the cleaned data
-    result = process_clean_data(data)
-    print(json.dumps(result))
-except Exception as e:
-    print(f"Format fixing failed: {str(e)}")
-"""
-        }]
+# Handle format errors
+data_processing.on(
+    IsError() & TextContains("error_type", "format"),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Convert this data to proper format: {{dataset}}",
+        system_prompt="You are a data format converter"
     )
+)
 ```
 
-## Advanced Result Handling
+## Advanced Patterns
 
-### Multi-Step Result Chains
+### Conditional Workflows
 
 ```python
+# Initial complexity assessment
 initial_analysis = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Initial analysis: {{input_data}}"
+        query="Assess complexity and confidence: {{input_data}}"
     )
 )
 
-@initial_analysis.when(IsSuccess() & GreaterThan("complexity", "0.8"))
-def trigger_detailed_analysis(result):
-    """Trigger detailed analysis for complex cases."""
-    return llm.message(
-        model="claude-sonnet-4",
-        query="Detailed analysis needed for: {{initial_analysis.output.findings}}",
-        system_prompt="You are a senior analyst. Provide comprehensive analysis."
+# Route to detailed analysis for complex cases
+initial_analysis.on(
+    IsSuccess() & GreaterThan("complexity", "0.8"),
+    codeexec.execute(
+        code_files=[{
+            "filename": "detailed_analysis.py",
+            "content": "perform_detailed_analysis({{input_data}})"
+        }]
     )
+)
 
-@initial_analysis.when(IsSuccess() & LessThan("complexity", "0.3"))
-def handle_simple_case(result):
-    """Handle simple cases with basic processing."""
-    return utils.send_status(
-        status="completed",
-        message="Simple case processed successfully",
-        result=result.output.summary
-    )
+# Use simple analysis for straightforward cases
+initial_analysis.on(
+    IsSuccess() & LessThan("complexity", "0.3"),
+    llm.message(model="gpt-4", query="Simple analysis: {{input_data}}")
+)
 
-@initial_analysis.when(IsSuccess() & GreaterThan("confidence", "0.9"))
-def auto_approve_high_confidence(result):
-    """Auto-approve high-confidence results."""
-    return memory.store(memory={
-        "content": result.output.analysis,
-        "type": "auto_approved",
-        "approval_reason": "high_confidence_auto_approval"
+# Use high-confidence results immediately
+initial_analysis.on(
+    IsSuccess() & GreaterThan("confidence", "0.9"),
+    memory.store(memory={
+        "content": "{{initial_analysis.output.insights}}",
+        "type": "quick_analysis",
+        "tags": ["fast", "high-confidence"]
     })
+)
 ```
 
-### Conditional Workflow Branching
+### Risk-Based Processing
 
 ```python
 risk_assessment = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Assess risk level: {{transaction_data}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "risk_score": {"type": "number"},
-                    "risk_category": {"type": "string"},
-                    "flags": {"type": "array"}
-                }
-            }
-        }
+        query="Assess risk level: {{transaction_data}}"
     )
 )
 
-# Low risk - auto-approve
-@risk_assessment.when(IsSuccess() & LessThan("risk_score", "0.3"))
-def auto_approve_low_risk(result):
-    """Auto-approve low-risk transactions."""
-    return utils.send_status(
-        status="approved",
-        message="Transaction auto-approved - low risk",
-        risk_score=result.output.risk_score
+# Auto-approve low-risk transactions
+risk_assessment.on(
+    IsSuccess() & LessThan("risk_score", "0.3"),
+    utils.send_status(
+        status="auto_approved",
+        message="Transaction auto-approved (low risk)",
+        data="{{risk_assessment.output}}"
     )
-
-# Medium risk - flag for review
-@risk_assessment.when(
-    IsSuccess() &
-    GreaterThan("risk_score", "0.3") &
-    LessThan("risk_score", "0.7")
 )
-def flag_for_review(result):
-    """Flag medium-risk transactions for human review."""
-    return utils.send_status(
-        status="pending_review",
-        message="Transaction flagged for human review",
-        risk_details=result.output.flags
-    )
 
-# High risk - immediate escalation
-@risk_assessment.when(IsSuccess() & GreaterThan("risk_score", "0.7"))
-def escalate_high_risk(result):
-    """Immediately escalate high-risk transactions."""
-    return utils.send_status(
-        status="escalated",
-        message="HIGH RISK TRANSACTION - Immediate review required",
-        priority="urgent",
-        risk_score=result.output.risk_score,
-        flags=result.output.flags
+# Flag medium-risk for review
+risk_assessment.on(
+    IsSuccess() & GreaterThan("risk_score", "0.3") & LessThan("risk_score", "0.7"),
+    utils.send_status(
+        status="review_required",
+        message="Transaction flagged for manual review",
+        priority="medium"
     )
+)
+
+# Block high-risk transactions
+risk_assessment.on(
+    IsSuccess() & GreaterThan("risk_score", "0.7"),
+    utils.send_status(
+        status="blocked",
+        message="Transaction blocked due to high risk",
+        priority="high"
+    )
+)
 ```
 
-### Dynamic Handler Selection
+### Content-Type Routing
 
 ```python
 content_analysis = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze content type and quality: {{content}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "content_type": {"type": "string"},
-                    "quality_score": {"type": "number"},
-                    "language": {"type": "string"},
-                    "sentiment": {"type": "string"}
-                }
-            }
-        }
+        query="Analyze content type and quality: {{content}}"
     )
 )
 
-# Handle different content types
-@content_analysis.when(IsSuccess() & TextEquals("content_type", "technical"))
-def handle_technical_content(result):
-    """Process technical content with specialized analysis."""
-    return llm.message(
+# Route technical content to specialized processor
+content_analysis.on(
+    IsSuccess() & TextEquals("content_type", "technical"),
+    llm.message(
         model="claude-sonnet-4",
         query="Technical analysis: {{content}}",
-        system_prompt="You are a technical expert. Analyze for accuracy and completeness."
+        system_prompt="You are a technical documentation expert"
     )
+)
 
-@content_analysis.when(IsSuccess() & TextEquals("content_type", "creative"))
-def handle_creative_content(result):
-    """Process creative content with different criteria."""
-    return llm.message(
+# Route creative content to different processor
+content_analysis.on(
+    IsSuccess() & TextEquals("content_type", "creative"),
+    llm.message(
         model="claude-sonnet-4",
         query="Creative analysis: {{content}}",
-        system_prompt="You are a creative expert. Analyze for originality and impact."
+        system_prompt="You are a creative writing expert"
     )
+)
 
-@content_analysis.when(IsSuccess() & TextEquals("content_type", "legal"))
-def handle_legal_content(result):
-    """Process legal content with compliance focus."""
-    return llm.message(
+# Route legal content to compliance checker
+content_analysis.on(
+    IsSuccess() & TextEquals("content_type", "legal"),
+    llm.message(
         model="claude-sonnet-4",
-        query="Legal compliance analysis: {{content}}",
-        system_prompt="You are a legal expert. Analyze for compliance and risk."
+        query="Legal compliance check: {{content}}",
+        system_prompt="You are a legal compliance expert"
     )
+)
 
-# Quality-based routing
-@content_analysis.when(IsSuccess() & LessThan("quality_score", "0.4"))
-def handle_low_quality(result):
-    """Handle low-quality content with improvement suggestions."""
-    return llm.message(
-        model="claude-sonnet-4",
-        query="Improve this content: {{content}}",
-        system_prompt="Provide specific suggestions to improve content quality."
+# Flag low-quality content
+content_analysis.on(
+    IsSuccess() & LessThan("quality_score", "0.4"),
+    utils.send_status(
+        status="quality_issue",
+        message="Content quality below threshold",
+        data="{{content_analysis.output}}"
     )
+)
 ```
 
 ## Best Practices
@@ -539,116 +479,77 @@ def handle_low_quality(result):
 ### Handler Organization
 
 ```python
-# Group related handlers together
-analysis_step = agent.step(llm.message(...))
+# Group related handlers logically
+analysis_step.on(IsSuccess() & GreaterThan("confidence", "0.8"), high_confidence_action)
+analysis_step.on(IsSuccess() & LessThan("confidence", "0.5"), low_confidence_action)
+analysis_step.on(IsError(), error_handling_action)
 
-# Success handlers
-@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-def store_high_confidence_results(result):
-    return memory.store(memory={...})
-
-@analysis_step.when(IsSuccess() & LessThan("confidence", "0.5"))
-def flag_low_confidence_results(result):
-    return utils.send_status(status="review_needed", ...)
-
-# Error handlers
-@analysis_step.when(IsError())
-def handle_general_error(error):
-    return utils.send_status(status="failed", ...)
+# Use descriptive condition combinations
+step.on(IsSuccess() & GreaterThan("score", "0.9"), excellent_result_action)
+step.on(IsSuccess() & GreaterThan("score", "0.7") & LessThan("score", "0.9"), good_result_action)
+step.on(IsSuccess() & LessThan("score", "0.7"), needs_improvement_action)
 ```
 
-### Condition Specificity
+### Error Handling
 
 ```python
-# Be specific with conditions to avoid conflicts
-@step.when(IsSuccess() & GreaterThan("score", "0.9"))
-def handle_excellent(result): pass
+# Always include error handlers
+step.on(IsError(), fallback_action)
 
-@step.when(IsSuccess() & GreaterThan("score", "0.7") & LessThan("score", "0.9"))
-def handle_good(result): pass
-
-@step.when(IsSuccess() & LessThan("score", "0.7"))
-def handle_needs_improvement(result): pass
+# Use specific error conditions when possible
+step.on(IsError() & TextContains("error", "timeout"), retry_action)
+step.on(IsError() & TextContains("error", "permission"), escalate_action)
 ```
 
-### Error Context Preservation
+### Condition Reusability
 
 ```python
-@step.when(IsError())
-def preserve_error_context(error):
-    """Preserve error context for debugging."""
-    return memory.store(memory={
-        "content": f"Error in step: {error.message}",
-        "type": "error_log",
-        "tags": ["error", "{{step_name}}", "{{timestamp}}"],
-        "extra": {
-            "error_type": error.type,
-            "error_details": error.details,
-            "input_data": "{{input_data}}",
-            "step_config": "{{step_config}}"
-        }
-    })
+# Define reusable conditions
+high_confidence = IsSuccess() & GreaterThan("confidence", "0.8")
+critical_priority = TextContains("priority", "critical") | TextContains("priority", "urgent")
+complex_condition = high_confidence & critical_priority
+
+# Use in handlers
+step.on(complex_condition, priority_processing_action)
 ```
 
-### Performance Considerations
-
-```python
-# Use direct handlers for simple actions
-step.on(
-    IsSuccess(),
-    utils.send_status(status="completed", message="Processing finished")
-)
-
-# Use decorator handlers for complex logic
-@step.when(IsSuccess() & complex_condition)
-def handle_complex_case(result):
-    # Complex processing logic here
-    processed_data = complex_processing(result.output)
-    return memory.store(memory={"content": processed_data})
-```
-
-## Testing Result Handlers
-
-### Handler Validation
+### Validation Patterns
 
 ```python
 validation_step = agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Validate input: {{test_input}}"
-    )
+    llm.message(query="Validate: {{data}}")
 )
 
-@validation_step.when(IsSuccess())
-def test_success_handler(result):
-    """Test handler for successful validation."""
-    return utils.echo(data={
-        "test_result": "success_handler_triggered",
-        "output": result.output
+validation_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": "{{validation_step.output.result}}",
+        "type": "validated_data"
     })
+)
 
-@validation_step.when(IsError())
-def test_error_handler(error):
-    """Test handler for validation errors."""
-    return utils.echo(data={
-        "test_result": "error_handler_triggered",
-        "error": error.message
-    })
+validation_step.on(
+    IsError(),
+    utils.send_status(
+        status="validation_failed",
+        message="Data validation failed"
+    )
+)
 ```
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Conditions" icon="code-branch" href="/concepts/conditions">
-    Learn about available condition types and operators
-  </Card>
   <Card title="Actions" icon="bolt" href="/concepts/actions">
-    Explore actions you can use in result handlers
+    Explore the available action types for result handlers
+  </Card>
+  <Card title="Conditions" icon="filter" href="/concepts/conditions">
+    Master the condition system for complex logic
   </Card>
   <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
     See result handlers in complete workflows
   </Card>
-  <Card title="SDK Reference" icon="code" href="/sdk/overview">
-    Complete SDK documentation and reference
+  <Card title="Best Practices" icon="star" href="/concepts/agents">
+    Learn agent design patterns and best practices
   </Card>
 </CardGroup>

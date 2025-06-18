@@ -128,13 +128,14 @@ Erdo agents are built with these key components:
         utils.send_status(status="completed", message="Task automated successfully")
     )
 
-    # Decorator-based handlers
-    @automation_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
-    def handle_success(result):
-        return memory.store(memory={
+    # Chain multiple actions
+    automation_step.on(
+        IsSuccess() & GreaterThan("confidence", "0.8"),
+        memory.store(memory={
             "content": result.output.analysis,
             "type": "automation_result"
         })
+    )
     ```
 
   </Accordion>
@@ -183,15 +184,15 @@ plan_step = task_agent.step(
     depends_on=analyze_step
 )
 
-# Handle high-complexity tasks with decorator
-@analyze_step.when(IsSuccess() & GreaterThan("complexity", "0.8"))
-def handle_complex_task(result):
-    """Store complex tasks for detailed analysis."""
-    return memory.store(memory={
+# Handle high-complexity tasks
+analyze_step.on(
+    IsSuccess() & GreaterThan("complexity", "0.8"),
+    memory.store(memory={
         "content": result.output.recommendations,
         "type": "complex_automation",
         "tags": ["complex", "automation"]
     })
+)
 
 # Handle successful planning with direct handler
 plan_step.on(
@@ -204,12 +205,13 @@ plan_step.on(
 )
 
 # Handle errors
-@plan_step.when(IsError())
-def handle_planning_error(error):
-    return utils.send_status(
+plan_step.on(
+    IsError(),
+    utils.send_status(
         status="failed",
         message=f"Planning failed: {error.message}"
     )
+)
 ```
 
 ## Step 6: Run Your Agent
@@ -246,7 +248,7 @@ erdo test task_automator --input '{"task_description": "Organize my email inbox"
 - **Agents** orchestrate your automation workflow
 - **Steps** define individual actions in your workflow
 - **Actions** are the building blocks (LLM calls, code execution, etc.)
-- **Result handlers** use `step.on()` or `@step.when()` for conditional logic
+- **Result handlers** use `step.on()` for conditional logic
 - **Dependencies** control step execution order with `depends_on`
 - **Output access** uses `step.output.field` for referencing step results
 
