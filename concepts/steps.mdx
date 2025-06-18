@@ -31,33 +31,34 @@ A step defines:
   </Card>
 </CardGroup>
 
-## Step Structure
+## Creating Steps
 
-### Basic Step Definition
+### Basic Step Creation
 
 ```python
-from erdo import Step
+from erdo import Agent
 from erdo.actions import llm
 
-basic_step = Step(
-    agent=my_agent,
-    key="analyze_data",
-    actiontype=llm.message(
+my_agent = Agent(name="data_analyzer")
+
+basic_step = my_agent.step(
+    llm.message(
         model="claude-sonnet-4",
         query="{{user_input}}"
     )
 )
 ```
 
-### Step Properties
+### Step Parameters
 
 <Tabs>
-  <Tab title="Core Properties">
+  <Tab title="Core Parameters">
     ```python
-    step = Step(
-        agent=my_agent,                    # Required: Parent agent
-        key="unique_step_name",            # Required: Unique identifier
-        actiontype=llm.message(...),       # Required: Action to perform
+    step = my_agent.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="{{user_input}}"
+        ),
         depends_on=[previous_step],        # Dependencies
         user_output_visibility="visible",  # visible, hidden
         bot_output_visibility="visible",   # visible, hidden
@@ -66,25 +67,24 @@ basic_step = Step(
     )
     ```
   </Tab>
-  <Tab title="Advanced Properties">
+  <Tab title="Advanced Parameters">
     ```python
-    advanced_step = Step(
-        agent=my_agent,
-        key="advanced_process",
-        actiontype=codeexec.execute(...),
-        depends_on=[step1, step2],
-        execution_mode=ExecutionMode(
-            mode="all",
-            if_condition=IsSuccess()
+    from erdo.actions import codeexec
+
+    advanced_step = my_agent.step(
+        codeexec.execute(
+            code_files=[{
+                "filename": "process.py",
+                "content": "process_data({{input_data}})"
+            }]
         ),
+        depends_on=[step1, step2],
         timeout=300,                       # Step timeout in seconds
-        retry_config={
-            "max_attempts": 3,
-            "backoff_factor": 2,
-            "retry_on": ["timeout", "rate_limit"]
-        }
+        running_message="Processing advanced data...",
+        finished_message="Advanced processing complete!"
     )
     ```
+
   </Tab>
 </Tabs>
 
@@ -95,33 +95,26 @@ basic_step = Step(
 Steps can depend on previous steps for ordered execution:
 
 ```python
-# Step 1: Data collection
-collect_step = Step(
-    agent=agent,
-    key="collect",
-    actiontype=websearch.search(query="{{topic}}")
+from erdo.actions import websearch, llm
+
+collect_step = agent.step(
+    websearch.search(query="{{topic}}")
 )
 
-# Step 2: Analysis (depends on collection)
-analyze_step = Step(
-    agent=agent,
-    key="analyze",
-    actiontype=llm.message(
+analyze_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Analyze this data: {{steps.collect.results}}"
+        query="Analyze this data: {{collect_step.output.results}}"
     ),
-    depends_on=[collect_step]
+    depends_on=collect_step
 )
 
-# Step 3: Report (depends on analysis)
-report_step = Step(
-    agent=agent,
-    key="report",
-    actiontype=llm.message(
+report_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Create report from: {{steps.analyze.insights}}"
+        query="Create report from: {{analyze_step.output.insights}}"
     ),
-    depends_on=[analyze_step]
+    depends_on=analyze_step
 )
 ```
 
@@ -130,31 +123,47 @@ report_step = Step(
 Steps without dependencies can run in parallel:
 
 ```python
-# These steps can run simultaneously
-process_sales = Step(
-    agent=agent,
-    key="process_sales",
-    actiontype=codeexec.execute(code="process_sales_data({{sales_data}})")
+from erdo.actions import codeexec
+
+process_sales = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "sales.py",
+            "content": "process_sales_data({{sales_data}})"
+        }]
+    )
 )
 
-process_marketing = Step(
-    agent=agent,
-    key="process_marketing",
-    actiontype=codeexec.execute(code="process_marketing_data({{marketing_data}})")
+process_marketing = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "marketing.py",
+            "content": "process_marketing_data({{marketing_data}})"
+        }]
+    )
 )
 
-process_finance = Step(
-    agent=agent,
-    key="process_finance",
-    actiontype=codeexec.execute(code="process_finance_data({{finance_data}})")
+process_finance = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "finance.py",
+            "content": "process_finance_data({{finance_data}})"
+        }]
+    )
 )
 
-# Combine results after parallel processing
-combine_step = Step(
-    agent=agent,
-    key="combine",
-    actiontype=codeexec.execute(
-        code="combine_results({{steps.process_sales.output}}, {{steps.process_marketing.output}}, {{steps.process_finance.output}})"
+combine_step = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "combine.py",
+            "content": """
+combine_results(
+    {{process_sales.output.result}},
+    {{process_marketing.output.result}},
+    {{process_finance.output.result}}
+)
+"""
+        }]
     ),
     depends_on=[process_sales, process_marketing, process_finance]
 )
@@ -165,485 +174,408 @@ combine_step = Step(
 Handle complex dependency patterns:
 
 ```python
-# Multiple dependency patterns
-validation_step = Step(
-    agent=agent,
-    key="validate",
-    actiontype=llm.message(
+validation_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Validate results from multiple sources"
+        query="Validate results from multiple sources: {{data_collection_step.output}}, {{external_api_step.output}}, {{database_query_step.output}}"
     ),
-    depends_on=[
-        data_collection_step,
-        external_api_step,
-        database_query_step
-    ]
+    depends_on=[data_collection_step, external_api_step, database_query_step]
 )
 ```
 
-## Conditional Execution
+## Output Access
 
-### Execution Modes
+### Referencing Step Results
 
-Control when and how steps execute:
-
-```python
-from erdo import ExecutionMode
-from erdo._generated.condition import IsSuccess, TextContains, GreaterThan
-
-# Only execute if previous step succeeded
-conditional_step = Step(
-    agent=agent,
-    key="conditional",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="{{conditional_query}}"
-    ),
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=IsSuccess(step="data_analysis")
-    )
-)
-
-# Execute only for large datasets
-large_data_step = Step(
-    agent=agent,
-    key="large_data_process",
-    actiontype=codeexec.execute(
-        code="advanced_processing({{data}})"
-    ),
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=GreaterThan(
-            number="{{data_size}}",
-            value="1000"
-        )
-    )
-)
-
-# Execute based on content analysis
-content_specific_step = Step(
-    agent=agent,
-    key="content_specific",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="{{specialized_query}}"
-    ),
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=TextContains(
-            text="{{content_type}}",
-            value="technical"
-        )
-    )
-)
-```
-
-### Iterative Execution
-
-Process collections of data:
+Access outputs from previous steps using the `step.output.field` pattern:
 
 ```python
-# Process each item in a collection
-iterative_step = Step(
-    agent=agent,
-    key="process_items",
-    actiontype=llm.message(
+analysis_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Process this item: {{item}}"
-    ),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="items_list"
-    )
-)
-
-# Conditional iteration
-filtered_iteration = Step(
-    agent=agent,
-    key="process_priority_items",
-    actiontype=codeexec.execute(
-        code="process_priority_item({{item}})"
-    ),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="all_items",
-        if_condition=TextEquals(
-            text="{{item.priority}}",
-            value="high"
-        )
-    )
-)
-```
-
-## Data Flow and Variables
-
-### Accessing Step Outputs
-
-Use outputs from previous steps in subsequent steps:
-
-```python
-# First step generates data
-generation_step = Step(
-    agent=agent,
-    key="generate",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="Generate analysis plan for {{topic}}",
+        query="Analyze: {{data_input}}",
         response_format={
             "Type": "json_schema",
             "Schema": {
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "plan": {"type": "string"},
-                        "steps": {"type": "array"},
-                        "estimated_time": {"type": "number"}
-                    }
+                "type": "object",
+                "properties": {
+                    "insights": {"type": "array"},
+                    "confidence": {"type": "number"},
+                    "recommendations": {"type": "array"}
                 }
             }
         }
     )
 )
 
-# Second step uses generated data
-execution_step = Step(
-    agent=agent,
-    key="execute",
-    actiontype=codeexec.execute(
-        code="""
-# Use data from previous step
-plan = {{steps.generate.plan}}
-steps = {{steps.generate.steps}}
-estimated_time = {{steps.generate.estimated_time}}
-
-execute_plan(plan, steps)
-"""
+report_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Create report using insights: {{analysis_step.output.insights}} with confidence: {{analysis_step.output.confidence}}"
     ),
-    depends_on=[generation_step]
+    depends_on=analysis_step
 )
 ```
 
-### Variable Interpolation
-
-Use template variables throughout your steps:
+### Dynamic Field Access
 
 ```python
-dynamic_step = Step(
-    agent=agent,
-    key="dynamic",
-    actiontype=llm.message(
-        model="{{preferred_model}}",
-        query="Analyze {{data_type}} data: {{input_data}}",
-        system_prompt="You are a {{expert_type}} expert specializing in {{domain}}"
+# Access nested fields
+summary_step = agent.step(
+    llm.message(
+        query="Summarize: {{analysis_step.output.results.summary}}"
+    )
+)
+
+# Access array elements
+detail_step = agent.step(
+    llm.message(
+        query="Detail first recommendation: {{analysis_step.output.recommendations.0}}"
     )
 )
 ```
 
-### Complex Data Transformation
+## Result Handlers
 
-Transform and combine data from multiple sources:
+### Decorator-Based Handlers
+
+Use `@step.when()` decorators for conditional result handling:
 
 ```python
-transformation_step = Step(
-    agent=agent,
-    key="transform",
-    actiontype=codeexec.execute(
-        code="""
-# Combine data from multiple previous steps
-raw_data = {{steps.collect.data}}
-analysis_results = {{steps.analyze.results}}
-external_data = {{steps.external_api.response}}
+from erdo.conditions import IsSuccess, GreaterThan, IsError
+from erdo.actions import memory, utils
 
-# Transform and combine
-processed_data = transform_data(raw_data)
-enriched_data = enrich_with_analysis(processed_data, analysis_results)
-final_data = merge_external_data(enriched_data, external_data)
+@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+def handle_high_confidence(result):
+    """Store high-confidence analysis results."""
+    return memory.store(memory={
+        "content": result.output.insights,
+        "type": "analysis_result",
+        "tags": ["analysis", "high-confidence"]
+    })
 
-return {
-    "processed_items": len(final_data),
-    "data_quality": calculate_quality(final_data),
-    "insights": extract_insights(final_data)
+@analysis_step.when(IsSuccess() & GreaterThan("0.5", "confidence"))
+def handle_low_confidence(result):
+    """Flag low confidence results."""
+    return utils.send_status(
+        status="low_confidence",
+        message="Analysis completed but confidence is low"
+    )
+
+@analysis_step.when(IsError())
+def handle_analysis_error(error):
+    """Handle analysis failures."""
+    return utils.send_status(
+        status="failed",
+        message=f"Analysis failed: {error.message}"
+    )
+```
+
+### Direct Handlers
+
+Use `step.on()` for immediate action chaining:
+
+```python
+# Single action
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.9"),
+    utils.send_status(status="excellent", message="Excellent analysis results")
+)
+
+# Multiple actions
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    utils.send_status(status="high_confidence", message="High confidence analysis"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
+        "type": "verified_analysis"
+    }),
+    utils.echo(message="Analysis stored successfully")
+)
+```
+
+## Step Types and Patterns
+
+### Data Processing Steps
+
+```python
+from erdo.actions import codeexec
+
+data_step = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "data_processor.py",
+            "content": """
+import pandas as pd
+import numpy as np
+
+# Load and process data
+data = pd.read_csv('{{input_file}}')
+processed = data.groupby('category').agg({
+    'amount': ['sum', 'mean', 'count'],
+    'date': ['min', 'max']
+})
+
+result = {
+    'summary': processed.to_dict(),
+    'total_records': len(data),
+    'categories': data['category'].nunique()
 }
+
+import json
+print(json.dumps(result))
 """
-    ),
-    depends_on=[collect_step, analyze_step, external_api_step]
-)
-```
-
-## Error Handling
-
-### Result Handlers
-
-Define how to handle different step outcomes:
-
-```python
-from erdo import ResultHandler
-from erdo._generated.condition import IsError, IsSuccess, LessThan
-
-# Main processing step
-main_step = Step(
-    agent=agent,
-    key="main_process",
-    actiontype=codeexec.execute(
-        code="{{generated_code}}"
-    )
-)
-
-# Success handler
-success_handler = ResultHandler(
-    step=main_step,
-    type="final",
-    if_conditions=IsSuccess(),
-    result_handler_order=0
-)
-
-# Retry handler for errors
-retry_handler = ResultHandler(
-    step=main_step,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        LessThan(number="{{retry_count}}", value="3")
-    ),
-    result_handler_order=1
-)
-
-# Error recovery step
-recovery_step = Step(
-    result_handler=retry_handler,
-    key="recovery",
-    actiontype=utils.echo(
-        data={
-            "retry_count": "{{increment retry_count}}",
-            "error": "{{error_message}}"
-        }
+        }]
     )
 )
 ```
 
-### Error Types and Recovery
-
-Handle different types of errors appropriately:
+### Analysis Steps
 
 ```python
-# Network error recovery
-network_error_handler = ResultHandler(
-    step=api_step,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        TextContains(text="{{error}}", value="network")
-    )
-)
-
-# Rate limit handling
-rate_limit_handler = ResultHandler(
-    step=api_step,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        TextContains(text="{{error}}", value="rate_limit")
-    )
-)
-
-# Validation error handling
-validation_error_handler = ResultHandler(
-    step=processing_step,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        TextContains(text="{{error}}", value="validation")
-    )
-)
-```
-
-## Step Visibility and Output
-
-### Controlling Visibility
-
-Manage what users see during execution:
-
-```python
-# Hidden internal step
-internal_step = Step(
-    agent=agent,
-    key="internal_processing",
-    actiontype=codeexec.execute(code="internal_calculation()"),
-    user_output_visibility="hidden",
-    bot_output_visibility="hidden"
-)
-
-# Visible analysis step
-visible_step = Step(
-    agent=agent,
-    key="user_analysis",
-    actiontype=llm.message(
+insight_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="{{user_query}}"
-    ),
-    user_output_visibility="visible",
-    bot_output_visibility="visible"
-)
-
-# Visible to system, hidden from user
-system_step = Step(
-    agent=agent,
-    key="system_check",
-    actiontype=utils.send_status(
-        status="checking",
-        message="Validating data quality..."
-    ),
-    user_output_visibility="hidden",
-    bot_output_visibility="visible"
-)
-```
-
-### Custom Messages
-
-Provide informative status messages:
-
-```python
-informative_step = Step(
-    agent=agent,
-    key="analysis",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="{{analysis_query}}"
-    ),
-    running_message="🔍 Analyzing {{data_type}} data...",
-    finished_message="✅ Analysis complete! Found {{insights_count}} key insights."
-)
-```
-
-## Advanced Step Patterns
-
-### Checkpoint and Recovery
-
-Implement checkpointing for long-running processes:
-
-```python
-# Checkpoint step
-checkpoint_step = Step(
-    agent=agent,
-    key="checkpoint",
-    actiontype=utils.checkpoint_attempt(
-        loops="{{current_loop}}",
-        attempts="{{attempt_count}}"
-    )
-)
-
-# Recovery step that uses checkpoint
-recovery_step = Step(
-    agent=agent,
-    key="recovery",
-    actiontype=codeexec.execute(
-        code="""
-# Resume from last checkpoint
-checkpoint_data = load_checkpoint("{{checkpoint_id}}")
-resume_processing_from(checkpoint_data)
-"""
-    )
-)
-```
-
-### Dynamic Step Generation
-
-Create steps dynamically based on runtime conditions:
-
-```python
-# Planning step that determines what steps to run
-planning_step = Step(
-    agent=agent,
-    key="plan",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="Create processing plan for: {{requirements}}",
+        system_prompt="You are a data analyst expert. Provide actionable insights.",
+        query="Analyze this processed data: {{data_step.output.summary}}",
         response_format={
             "Type": "json_schema",
             "Schema": {
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "required_steps": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        }
-                    }
+                "type": "object",
+                "properties": {
+                    "key_insights": {"type": "array"},
+                    "trends": {"type": "array"},
+                    "recommendations": {"type": "array"},
+                    "risk_factors": {"type": "array"}
                 }
             }
         }
+    ),
+    depends_on=data_step
+)
+```
+
+### Integration Steps
+
+```python
+from erdo.actions import websearch, webparser
+
+research_step = agent.step(
+    websearch.search(
+        query="{{topic}} industry trends {{current_year}}",
+        language="en",
+        country="us"
     )
 )
 
-# Dynamic execution based on plan
-dynamic_step = Step(
-    agent=agent,
-    key="dynamic_execution",
-    actiontype=codeexec.execute(
-        code="""
-# Execute steps based on plan
-required_steps = {{steps.plan.required_steps}}
-for step_name in required_steps:
-    execute_dynamic_step(step_name)
-"""
+parse_step = agent.step(
+    webparser.parse(
+        url="{{research_step.output.results.0.url}}",
+        selectors=["h1", "h2", "p", ".content"],
+        extract_links=True
     ),
-    depends_on=[planning_step]
+    depends_on=research_step
 )
+```
+
+### Memory Operations
+
+```python
+from erdo.actions import memory
+
+search_context = agent.step(
+    memory.search(
+        query="{{user_query}} {{context_keywords}}",
+        limit=10,
+        organization_scope="specific"
+    )
+)
+
+store_results = agent.step(
+    memory.store(
+        memory={
+            "content": "{{analysis_step.output.insights}}",
+            "description": "Analysis results for {{user_query}}",
+            "type": "analysis_result",
+            "tags": ["analysis", "{{topic}}", "{{date}}"],
+            "searchable_texts": [
+                "{{analysis_step.output.insights}}",
+                "{{analysis_step.output.recommendations}}"
+            ]
+        }
+    ),
+    depends_on=analysis_step
+)
+```
+
+## Error Handling and Recovery
+
+### Retry Logic
+
+```python
+from erdo.conditions import IsError, LessThan
+
+process_step = agent.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "main_process.py",
+            "content": "main_processing_logic({{input_data}})"
+        }]
+    )
+)
+
+@process_step.when(IsError() & LessThan("retry_count", "3"))
+def retry_processing(error):
+    """Retry processing with fallback method."""
+    return codeexec.execute(
+        code_files=[{
+            "filename": "fallback_process.py",
+            "content": "fallback_processing_logic({{input_data}})"
+        }]
+    )
+
+@process_step.when(IsError() & GreaterThan("retry_count", "2"))
+def escalate_failure(error):
+    """Escalate after max retries."""
+    return utils.send_status(
+        status="escalated",
+        message=f"Processing failed after 3 attempts: {error.message}",
+        priority="high"
+    )
+```
+
+### Graceful Degradation
+
+```python
+primary_step = agent.step(
+    llm.message(model="claude-sonnet-4", query="{{complex_query}}")
+)
+
+@primary_step.when(IsError())
+def fallback_processing(error):
+    """Use simpler model as fallback."""
+    return llm.message(
+        model="gpt-4",
+        query="{{simplified_query}}",
+        system_prompt="Provide a basic analysis of the given data"
+    )
+```
+
+## Performance Optimization
+
+### Parallel Processing
+
+```python
+# Independent parallel steps
+api_call_1 = agent.step(utils.api_call(endpoint="/data/sales"))
+api_call_2 = agent.step(utils.api_call(endpoint="/data/marketing"))
+api_call_3 = agent.step(utils.api_call(endpoint="/data/finance"))
+
+# Combine after parallel execution
+combined_analysis = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze combined data: {{api_call_1.output.data}}, {{api_call_2.output.data}}, {{api_call_3.output.data}}"
+    ),
+    depends_on=[api_call_1, api_call_2, api_call_3]
+)
+```
+
+### Conditional Execution
+
+```python
+from erdo.conditions import TextContains
+
+initial_check = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Quick assessment: {{input_data}}"
+    )
+)
+
+# Only run expensive analysis if needed
+@initial_check.when(IsSuccess() & TextContains("assessment", "complex"))
+def run_detailed_analysis(result):
+    """Run detailed analysis only for complex cases."""
+    return codeexec.execute(
+        code_files=[{
+            "filename": "detailed_analysis.py",
+            "content": "perform_complex_analysis({{input_data}})"
+        }]
+    )
+
+@initial_check.when(IsSuccess() & TextContains("assessment", "simple"))
+def run_basic_analysis(result):
+    """Use basic analysis for simple cases."""
+    return llm.message(
+        model="gpt-4",
+        query="Basic analysis: {{input_data}}"
+    )
 ```
 
 ## Best Practices
 
-<AccordionGroup>
-  <Accordion title="Step Design">
-    **Single Purpose**: Each step should have one clear responsibility
+### Step Design
 
-    **Descriptive Names**: Use clear, descriptive key names for steps
+1. **Single Responsibility**: Each step should have one clear purpose
+2. **Descriptive Actions**: Use clear, descriptive action configurations
+3. **Proper Dependencies**: Define dependencies to ensure correct execution order
+4. **Error Handling**: Always include error handling for robust workflows
 
-    **Proper Dependencies**: Define dependencies accurately to ensure correct execution order
+### Output Management
 
-    **Error Handling**: Plan for failure scenarios in every step
+```python
+# Use structured outputs for better data handling
+structured_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="{{analysis_query}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "required": ["summary", "confidence"],
+                "properties": {
+                    "summary": {"type": "string"},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "details": {"type": "array"}
+                }
+            }
+        }
+    )
+)
+```
 
-  </Accordion>
+### Memory Usage
 
-  <Accordion title="Data Flow">
-    **Clear Inputs**: Make input requirements explicit and well-documented
+```python
+# Store important results for future reference
+@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+def store_high_quality_results(result):
+    return memory.store(memory={
+        "content": result.output.analysis,
+        "type": "verified_analysis",
+        "tags": ["high-quality", "{{domain}}", "{{timestamp}}"],
+        "extra": {
+            "confidence": result.output.confidence,
+            "model_used": "claude-sonnet-4"
+        }
+    })
+```
 
-    **Structured Outputs**: Use consistent output formats, preferably JSON schemas
-
-    **Variable Naming**: Use clear, consistent variable names in templates
-
-    **Data Validation**: Validate data at step boundaries
-
-  </Accordion>
-
-  <Accordion title="Performance">
-    **Parallel Execution**: Use parallel execution where steps are independent
-
-    **Conditional Logic**: Use execution modes to avoid unnecessary processing
-
-    **Resource Management**: Set appropriate timeouts and resource limits
-
-    **Caching**: Cache expensive operations within steps
-
-  </Accordion>
-</AccordionGroup>
+## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Actions Reference" icon="bolt" href="/sdk/actions">
-    Explore all available action types for steps
+  <Card title="Actions" icon="bolt" href="/concepts/actions">
+    Explore the available action types and configurations
   </Card>
-  <Card title="Conditions & Logic" icon="code-branch" href="/sdk/conditions">
-    Learn about conditional execution and logic
+  <Card title="Result Handlers" icon="wrench" href="/concepts/result-handlers">
+    Master conditional logic and error handling
   </Card>
-  <Card
-    title="Error Handling"
-    icon="exclamation-triangle"
-    href="/sdk/error-handling"
-  >
-    Master error handling and recovery patterns
+  <Card title="Examples" icon="lightbulb" href="/examples/data-analysis">
+    See complete step implementations in action
   </Card>
-  <Card title="Step Examples" icon="code" href="/examples">
-    See real-world step implementations
+  <Card title="SDK Reference" icon="code" href="/sdk/overview">
+    Dive deeper into the Python SDK capabilities
   </Card>
 </CardGroup>

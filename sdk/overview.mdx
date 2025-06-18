@@ -5,7 +5,7 @@ description: "Comprehensive guide to the Erdo Python SDK"
 
 # SDK Overview
 
-The Erdo Python SDK provides a powerful framework for building intelligent AI agents. With simple, intuitive APIs, you can create sophisticated automation workflows that combine language models, web research, code execution, and custom integrations.
+The Erdo Python SDK provides a powerful framework for building intelligent AI agents. With our agent-centric API design, you can create sophisticated automation workflows that combine language models, web research, code execution, and custom integrations using clean, readable code.
 
 ## Installation
 
@@ -30,9 +30,9 @@ conda install -c conda-forge erdo
 Here's a simple agent that automates email responses:
 
 ```python
-from erdo import Agent, Step
-from erdo.actions import llm
-from erdo.tools import EmailTool
+from erdo import Agent
+from erdo.actions import llm, memory
+from erdo.conditions import IsSuccess, GreaterThan
 
 # Create your agent
 agent = Agent(
@@ -40,21 +40,21 @@ agent = Agent(
     description="Automatically responds to emails with context-aware replies"
 )
 
-# Define the automation step
-response_step = Step(
-    agent=agent,
-    key="generate_response",
-    actiontype=llm.message(
+  response_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Generate a professional response to this email: {{email_content}}"
     )
 )
 
-# Add email integration
-email_tool = EmailTool(
-    smtp_host="smtp.gmail.com",
-    credentials="{{email_credentials}}"
-)
+# Add result handlers with decorators
+@response_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+def store_high_quality_response(result):
+    return memory.store(memory={
+        "content": result.output.response,
+        "type": "email_response",
+        "tags": ["automated", "high-quality"]
+    })
 ```
 
 ## Core Components
@@ -69,10 +69,36 @@ email_tool = EmailTool(
   <Card title="Actions" icon="bolt" href="/concepts/actions">
     Building blocks that define what each step does
   </Card>
-  <Card title="Tools" icon="wrench" href="/concepts/tools">
-    External integrations and custom functions
+  <Card title="Result Handlers" icon="wrench" href="/concepts/result-handlers">
+    Conditional logic for processing step outcomes
   </Card>
 </CardGroup>
+
+## API Patterns
+
+The Erdo SDK uses an agent-centric approach:
+
+### Creating Steps
+
+```python
+from erdo import Agent
+from erdo.actions import llm
+
+agent = Agent(name="my_agent")
+
+step = agent.step(
+    llm.message(model="claude-sonnet-4", query="{{query}}")
+)
+```
+
+### Key Features
+
+- **Clean syntax**: Simple step creation with intuitive methods
+- **Intuitive parameter order**: Action first, then optional parameters
+- **Direct handlers**: Use `step.on()` for immediate action chaining
+- **Decorator-based handlers**: Use `@step.when()` for result handling
+- **Type-safe output access**: Use `step.output.field` syntax
+- **Condition operators**: Use `&` (and), `|` (or), `~` (not) for combining conditions
 
 ## Action Types
 
@@ -84,16 +110,29 @@ Erdo provides multiple action types for different use cases:
     from erdo.actions import llm
 
     # Simple message generation
-    response = llm.message(
-        model="claude-sonnet-4",
-        query="Analyze this data: {{input_data}}"
+    response_step = agent.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="Analyze this data: {{input_data}}"
+        )
     )
 
     # Structured output with validation
-    analysis = llm.structured(
-        model="gpt-4",
-        query="Extract key insights from {{document}}",
-        schema=AnalysisSchema
+    analysis_step = agent.step(
+        llm.message(
+            model="gpt-4",
+            query="Extract key insights from {{document}}",
+            response_format={
+                "Type": "json_schema",
+                "Schema": {
+                    "type": "object",
+                    "properties": {
+                        "insights": {"type": "array"},
+                        "confidence": {"type": "number"}
+                    }
+                }
+            }
+        )
     )
     ```
 
@@ -104,17 +143,23 @@ Erdo provides multiple action types for different use cases:
     from erdo.actions import memory
 
     # Store information
-    memory.store(
-        key="customer_preference",
-        value="{{preferences}}",
-        organization="{{org_id}}"
+    store_step = agent.step(
+        memory.store(
+            memory={
+                "content": "{{analysis_result}}",
+                "type": "customer_insight",
+                "tags": ["analysis", "{{customer_id}}"]
+            }
+        )
     )
 
     # Search stored memories
-    memory.search(
-        query="{{search_term}}",
-        limit=5,
-        user="{{user_id}}"
+    search_step = agent.step(
+        memory.search(
+            query="{{search_term}}",
+            limit=5,
+            organization_scope="specific"
+        )
     )
     ```
 
@@ -125,17 +170,21 @@ Erdo provides multiple action types for different use cases:
     from erdo.actions import websearch, webparser
 
     # Search the web
-    websearch.search(
-        query="{{topic}} latest research",
-        language="en",
-        country="us"
+    search_step = agent.step(
+        websearch.search(
+            query="{{topic}} latest research",
+            language="en",
+            country="us"
+        )
     )
 
     # Parse web content
-    webparser.parse(
-        url="{{target_url}}",
-        selectors=["h1", "p", ".content"],
-        extract_links=True
+    parse_step = agent.step(
+        webparser.parse(
+            url="{{target_url}}",
+            selectors=["h1", "p", ".content"],
+            extract_links=True
+        )
     )
     ```
 
@@ -146,180 +195,302 @@ Erdo provides multiple action types for different use cases:
     from erdo.actions import codeexec
 
     # Execute Python code
-    codeexec.execute(
-        code="""
-        import pandas as pd
-        df = pd.read_csv('{{data_file}}')
-        result = df.describe()
-        print(result)
-        """,
-        entrypoint="analysis.py"
+    code_step = agent.step(
+        codeexec.execute(
+            code_files=[{
+                "filename": "analysis.py",
+                "content": """
+
+import pandas as pd
+import numpy as np
+
+# Process the data
+
+data = pd.read_csv('{{data_source}}')
+result = data.describe()
+print(result.to_json())
+"""
+}],
+parameters={"data_source": "{{input_file}}"}
+)
+)
+
+````
+
+  </Accordion>
+
+  <Accordion title="Utility Actions">
+    ```python
+    from erdo.actions import utils
+
+    # Send status updates
+    status_step = agent.step(
+        utils.send_status(
+            status="processing",
+            message="Analysis in progress...",
+            data={"progress": "50%"}
+        )
+    )
+
+    # Echo data for debugging
+    debug_step = agent.step(
+        utils.echo(
+            message="Debug info: {{debug_data}}",
+            data={"timestamp": "{{current_time}}"}
+        )
     )
     ```
 
   </Accordion>
 </AccordionGroup>
 
-## Advanced Features
+## Result Handlers
 
-### Execution Modes
+Handle step outcomes with conditional logic:
 
-Control when and how steps execute:
+### Direct Handlers with step.on()
 
 ```python
-from erdo import ExecutionMode
-from erdo._generated.condition import IsSuccess
+from erdo.conditions import IsSuccess, GreaterThan, IsError
+from erdo.actions import memory, utils
 
-# Iterate over data sets
-iterate_step = Step(
-    agent=agent,
-    key="process_files",
-    actiontype=codeexec.execute(code="process_file({{file}})"),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="files",
-        if_condition=IsSuccess()
+# Single action handler
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    utils.send_status(status="high_confidence", message="Analysis highly reliable")
+)
+
+# Multiple action handler
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.9"),
+    utils.send_status(status="excellent", message="Excellent analysis results"),
+    memory.store(memory={
+        "content": "{{analysis_step.output.insights}}",
+        "type": "excellent_analysis"
+    }),
+    utils.echo(message="Analysis stored successfully")
+)
+````
+
+### Decorator Handlers with @step.when()
+
+```python
+@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+def handle_high_confidence(result):
+    """Store high-confidence analysis results."""
+    return memory.store(memory={
+        "content": result.output.insights,
+        "type": "analysis_result",
+        "tags": ["analysis", "high-confidence"],
+        "extra": {"confidence": result.output.confidence}
+    })
+
+@analysis_step.when(IsError())
+def handle_analysis_error(error):
+    """Handle analysis failures."""
+    return utils.send_status(
+        status="failed",
+        message=f"Analysis failed: {error.message}"
+    )
+```
+
+## Dependencies and Flow Control
+
+### Sequential Steps
+
+```python
+# Step 1: Data collection
+collect_step = agent.step(
+    websearch.search(query="{{topic}}")
+)
+
+# Step 2: Analysis (depends on collection)
+analyze_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze this data: {{collect_step.output.results}}"
+    ),
+    depends_on=collect_step
+)
+
+# Step 3: Report (depends on analysis)
+report_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Create report from: {{analyze_step.output.insights}}"
+    ),
+    depends_on=analyze_step
+)
+```
+
+### Parallel Steps
+
+```python
+# These steps run in parallel
+sales_step = agent.step(
+    codeexec.execute(code_files=[{"filename": "sales.py", "content": "process_sales()"}])
+)
+
+marketing_step = agent.step(
+    codeexec.execute(code_files=[{"filename": "marketing.py", "content": "process_marketing()"}])
+)
+
+# Combine results after parallel processing
+combine_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Combine results: {{sales_step.output.data}}, {{marketing_step.output.data}}"
+    ),
+    depends_on=[sales_step, marketing_step]
+)
+```
+
+## Conditions and Logic
+
+### Basic Conditions
+
+```python
+from erdo.conditions import (
+    IsSuccess, IsError, GreaterThan, LessThan,
+    TextContains, TextEquals, Not
+)
+
+# Success/Error conditions
+@step.when(IsSuccess())
+def handle_success(result): pass
+
+@step.when(IsError())
+def handle_error(error): pass
+
+# Numeric comparisons
+@step.when(IsSuccess() & GreaterThan("score", "0.8"))
+def handle_high_score(result): pass
+
+# Text conditions
+@step.when(IsSuccess() & TextContains("category", "urgent"))
+def handle_urgent(result): pass
+```
+
+### Complex Conditions
+
+```python
+# Combine conditions with logical operators
+@step.when(
+    IsSuccess() &
+    (GreaterThan("confidence", "0.8") | TextContains("priority", "high")) &
+    ~TextContains("status", "draft")
+)
+def handle_complex_condition(result):
+    return memory.store(memory={
+        "content": result.output.data,
+        "type": "priority_result"
+    })
+```
+
+## Complete Example
+
+Here's a comprehensive example showing all the key patterns:
+
+```python
+from erdo import Agent
+from erdo.actions import llm, memory, codeexec, utils
+from erdo.conditions import IsSuccess, GreaterThan, IsError, TextContains
+
+# Create agent
+data_processor = Agent(
+    name="data_processor",
+    description="Processes and analyzes data with AI insights"
+)
+
+# Step 1: Search for context
+search_step = data_processor.step(
+    memory.search(query="{{query}}", limit=10)
+)
+
+# Step 2: Generate analysis code
+code_gen_step = data_processor.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Generate Python code to analyze: {{query}}",
+        context="{{search_step.output.memories}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string"},
+                    "explanation": {"type": "string"}
+                }
+            }
+        }
+    ),
+    depends_on=search_step
+)
+
+# Step 3: Execute the code
+execute_step = data_processor.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "analysis.py",
+            "content": "{{code_gen_step.output.code}}"
+        }]
+    ),
+    depends_on=code_gen_step
+)
+
+# Handle successful execution with decorator
+@execute_step.when(IsSuccess() & ~TextContains("stderr", "error"))
+def store_results(result):
+    return memory.store(memory={
+        "content": result.output.stdout,
+        "type": "analysis_result",
+        "tags": ["analysis", "{{query}}"]
+    })
+
+# Handle execution with warnings using direct handler
+execute_step.on(
+    IsSuccess() & TextContains("stderr", "warning"),
+    utils.send_status(
+        status="completed_with_warnings",
+        message="Analysis completed but with warnings"
     )
 )
-```
 
-### Result Handlers
-
-Process step outcomes and control workflow:
-
-```python
-from erdo import ResultHandler
-from erdo._generated.condition import IsSuccess, IsError
-
-success_handler = ResultHandler(
-    step=response_step,
-    type="final",
-    if_conditions=IsSuccess()
-)
-
-error_handler = ResultHandler(
-    step=response_step,
-    type="retry",
-    if_conditions=IsError(),
-    max_retries=3
-)
-```
-
-### Complex Workflows
-
-Build sophisticated multi-step automation:
-
-```python
-# Research workflow
-research_agent = Agent(name="research_assistant")
-
-# Step 1: Search for information
-search_step = Step(
-    agent=research_agent,
-    key="search",
-    actiontype=websearch.search(query="{{research_topic}}")
-)
-
-# Step 2: Analyze findings
-analysis_step = Step(
-    agent=research_agent,
-    key="analyze",
-    actiontype=llm.message(
-        model="claude-sonnet-4",
-        query="Analyze these search results: {{steps.search.results}}"
-    ),
-    depends_on=[search_step]
-)
-
-# Step 3: Generate report
-report_step = Step(
-    agent=research_agent,
-    key="report",
-    actiontype=llm.message(
-        model="gpt-4",
-        query="Create a comprehensive report: {{steps.analyze.analysis}}"
-    ),
-    depends_on=[analysis_step]
-)
+# Handle errors
+@execute_step.when(IsError())
+def handle_execution_error(error):
+    return utils.send_status(
+        status="failed",
+        message=f"Execution failed: {error.message}"
+    )
 ```
 
 ## Best Practices
 
-<Tabs>
-  <Tab title="Agent Design">
-    - **Single Responsibility**: Each agent should have a clear, focused purpose
-    - **Descriptive Names**: Use clear, descriptive names for agents and steps
-    - **Error Handling**: Always include error handling and retry logic
-    - **Testing**: Test agents with various inputs before deployment
-  </Tab>
-
-{" "}
-<Tab title="Performance">
-  - **Caching**: Use memory actions to cache frequently accessed data -
-  **Parallel Execution**: Use background execution for independent tasks -
-  **Resource Management**: Monitor API usage and implement rate limiting -
-  **Optimization**: Profile and optimize slow operations
-</Tab>
-
-  <Tab title="Security">
-    - **Credential Management**: Store sensitive data securely
-    - **Input Validation**: Validate all external inputs
-    - **Access Control**: Implement proper permissions and visibility settings
-    - **Audit Logging**: Log all agent actions for debugging and compliance
-  </Tab>
-</Tabs>
-
-## Examples by Use Case
-
-<CardGroup cols={3}>
-  <Card
-    title="Business Automation"
-    icon="briefcase"
-    href="/examples/business-automation"
-  >
-    Automate workflows, data processing, and reporting
-  </Card>
-  <Card
-    title="Research Assistant"
-    icon="magnifying-glass"
-    href="/examples/research-assistant"
-  >
-    Gather information and generate insights
-  </Card>
-  <Card
-    title="Development Workflow"
-    icon="code-branch"
-    href="/examples/development-workflow"
-  >
-    Automate code generation and testing
-  </Card>
-  <Card
-    title="Content Creation"
-    icon="pen-to-square"
-    href="/examples/content-creation"
-  >
-    Generate and review content at scale
-  </Card>
-  <Card title="Data Analysis" icon="chart-line" href="/bots/data-analyst">
-    Process and visualize complex datasets
-  </Card>
-  <Card
-    title="Security Scanning"
-    icon="shield-check"
-    href="/bots/security-checker"
-  >
-    Automated security validation and monitoring
-  </Card>
-</CardGroup>
+- **Use descriptive agent names** for easy identification
+- **Structure dependencies clearly** to avoid circular references
+- **Handle both success and error cases** for robust workflows
+- **Use type-safe output access** with `step.output.field`
+- **Combine conditions logically** using `&`, `|`, `~` operators
+- **Store important results** in memory for future reference
+- **Provide clear status updates** for better user experience
 
 ## Next Steps
 
-Ready to dive deeper? Explore these resources:
-
-1. **[Quick Start Guide](/quickstart)** - Build your first agent
-2. **[Action Reference](/sdk/actions/llm)** - Detailed action documentation
-3. **[Pre-built Bots](/bots/security-checker)** - Ready-made automation solutions
-4. **[Examples](/examples/business-automation)** - Real-world implementations
+<CardGroup cols={2}>
+  <Card title="Concepts" icon="lightbulb" href="/concepts/overview">
+    Learn core concepts and patterns
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/business-automation">
+    See real-world implementations
+  </Card>
+  <Card title="Actions Reference" icon="bolt" href="/sdk/actions">
+    Complete action documentation
+  </Card>
+  <Card title="Workflows" icon="sitemap" href="/sdk/workflows">
+    Advanced workflow patterns
+  </Card>
+</CardGroup>
 
 ## API Reference
 

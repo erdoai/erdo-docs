@@ -120,10 +120,8 @@ This guide covers common issues you might encounter when building and deploying 
     # No dependencies = parallel execution
 
     # Cache expensive operations
-    cache_step = Step(
-        agent=agent,
-        key="cached_operation",
-        actiontype=memory.search(
+    cache_step = agent.step(
+        memory.search(
             query="{{query}}",
             cache_ttl=3600  # 1 hour cache
         )

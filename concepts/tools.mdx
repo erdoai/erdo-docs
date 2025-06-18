@@ -1,33 +1,33 @@
 ---
 title: "Tools"
-description: "Understanding tools - external integrations that extend agent capabilities"
+description: "Understanding tools - how LLMs dynamically call actions in your workflows"
 ---
 
 # Tools
 
-Tools are external integrations that extend your agents' capabilities beyond their built-in actions. They allow agents to interact with APIs, databases, web services, and custom functions to access real-world data and perform specialized operations.
+Tools are a mechanism that allows LLMs to dynamically call actions during their execution. Instead of having fixed, pre-defined actions, tools give LLMs the ability to decide which actions to call based on the context and their reasoning.
 
 ## What is a Tool?
 
 A tool defines:
 
-- **An external capability** that your agent can use
-- **The interface** for interacting with that capability
-- **Input parameters** and expected outputs
-- **Authentication** and configuration requirements
+- **An action** that an LLM can choose to call
+- **When and how** the LLM can use that action
+- **Input parameters** the LLM should provide
+- **The expected output** format and usage
 
 <CardGroup cols={2}>
-  <Card title="Web Tools" icon="globe">
-    Search engines, web scrapers, and content parsers
+  <Card title="Bot Invocation" icon="robot">
+    Allow LLMs to call other bots dynamically
   </Card>
-  <Card title="API Tools" icon="api">
-    REST APIs, GraphQL endpoints, and web services
+  <Card title="Memory Operations" icon="database">
+    Enable LLMs to search and store memories as needed
   </Card>
-  <Card title="Database Tools" icon="database">
-    SQL databases, document stores, and data warehouses
+  <Card title="Web Research" icon="globe">
+    Let LLMs search the web and parse content
   </Card>
-  <Card title="Custom Tools" icon="wrench">
-    Your own functions and specialized integrations
+  <Card title="Code Execution" icon="code">
+    Allow LLMs to run code when needed
   </Card>
 </CardGroup>
 
@@ -38,492 +38,341 @@ A tool defines:
 ```python
 from erdo import Tool
 
-# Simple web search tool
-search_tool = Tool(
-    name="web_search",
-    description="Search for information on the web",
-    actiontype="websearch.search",
+# Tool for bot invocation
+bot_tool = Tool(
+    name="invoke_specialist_bot",
+    description="Call a specialist bot for specific analysis tasks",
+    actiontype="bot.ask",
     parameters={
-        "query": "{{search_query}}",
-        "num_results": 10
+        "bot_name": "{{bot_name}}",
+        "question": "{{question}}",
+        "context": "{{context}}"
     }
 )
 
-# API integration tool
-api_tool = Tool(
-    name="get_weather",
-    description="Get current weather for a location",
-    actiontype="api.call",
+# Tool for memory search
+memory_tool = Tool(
+    name="search_knowledge",
+    description="Search stored knowledge and memories",
+    actiontype="memory.search",
     parameters={
-        "url": "https://api.weather.com/v1/current",
-        "method": "GET",
-        "query_params": {
-            "location": "{{location}}",
-            "units": "metric"
-        },
-        "headers": {
-            "Authorization": "Bearer {{weather_api_key}}"
-        }
+        "query": "{{search_query}}",
+        "limit": 5,
+        "tags": "{{relevant_tags}}"
     }
 )
 ```
 
-### Using Tools in Actions
+### Using Tools in LLM Actions
 
-Tools are typically used within LLM actions to give AI models access to external capabilities:
+Tools are provided to LLM actions to expand their capabilities:
 
 ```python
 from erdo.actions import llm
 from erdo import Tool
 
-# LLM action with multiple tools
-research_action = llm.message(
+# LLM action with multiple tools available
+analyst_action = llm.message(
     model="claude-sonnet-4",
-    query="Research the latest developments in {{topic}}",
+    query="Analyze this data and provide insights: {{data}}",
     tools=[
         Tool(
-            name="search_web",
-            description="Search for recent information",
-            actiontype="websearch.search",
-            parameters={"query": "{{query}}"}
-        ),
-        Tool(
-            name="parse_content",
-            description="Extract content from web pages",
-            actiontype="webparser.parse",
-            parameters={"url": "{{url}}"}
-        ),
-        Tool(
-            name="academic_search",
-            description="Search academic papers",
-            actiontype="api.call",
+            name="search_similar_analysis",
+            description="Search for similar previous analyses",
+            actiontype="memory.search",
             parameters={
-                "url": "https://api.arxiv.org/query",
-                "query_params": {"search_query": "{{query}}"}
+                "query": "{{query}}",
+                "memory_types": ["analysis", "insights"]
+            }
+        ),
+        Tool(
+            name="invoke_data_specialist",
+            description="Get expert analysis from data specialist bot",
+            actiontype="bot.ask",
+            parameters={
+                "bot_name": "data-analyst",
+                "question": "{{question}}"
+            }
+        ),
+        Tool(
+            name="run_calculations",
+            description="Execute code for complex calculations",
+            actiontype="codeexec.execute",
+            parameters={
+                "code": "{{python_code}}"
             }
         )
     ]
 )
 ```
 
-## Built-in Tool Types
+## Common Tool Patterns
 
-### Web Search Tools
+### Bot Invocation Tools
 
-Search the web for information:
+Allow LLMs to call specialist bots:
 
 ```python
-# Basic web search
-web_search = Tool(
-    name="search_engine",
-    description="Search the web for information",
-    actiontype="websearch.search",
+# Security analysis tool
+security_tool = Tool(
+    name="security_check",
+    description="Analyze code or systems for security vulnerabilities",
+    actiontype="bot.ask",
+    parameters={
+        "bot_name": "security-checker",
+        "question": "{{security_question}}",
+        "code_or_config": "{{target_content}}"
+    }
+)
+
+# Data analysis tool
+data_tool = Tool(
+    name="analyze_data",
+    description="Perform statistical analysis on datasets",
+    actiontype="bot.ask",
+    parameters={
+        "bot_name": "data-analyst",
+        "question": "{{analysis_question}}",
+        "dataset": "{{data}}"
+    }
+)
+```
+
+### Memory Tools
+
+Enable LLMs to interact with memory:
+
+```python
+# Memory search tool
+search_memory = Tool(
+    name="search_knowledge_base",
+    description="Search for relevant information in memory",
+    actiontype="memory.search",
     parameters={
         "query": "{{search_term}}",
-        "num_results": 10,
-        "time_filter": "past_month",
-        "safe_search": True
+        "limit": 10,
+        "tags": "{{filter_tags}}"
     }
 )
 
-# Site-specific search
-site_search = Tool(
-    name="search_specific_site",
-    description="Search within specific websites",
+# Memory storage tool
+store_memory = Tool(
+    name="save_insight",
+    description="Store important insights for future reference",
+    actiontype="memory.store",
+    parameters={
+        "content": "{{insight_content}}",
+        "description": "{{insight_description}}",
+        "tags": "{{insight_tags}}"
+    }
+)
+```
+
+### Research Tools
+
+Web search and content parsing:
+
+```python
+# Web search tool
+web_search = Tool(
+    name="search_web",
+    description="Search the internet for current information",
     actiontype="websearch.search",
     parameters={
-        "query": "{{query}} site:{{domain}}",
-        "sites": ["github.com", "stackoverflow.com"]
+        "query": "{{search_query}}",
+        "num_results": "{{result_count}}"
     }
 )
-```
 
-### Web Parsing Tools
-
-Extract content from web pages:
-
-```python
-# Web content parser
-content_parser = Tool(
+# Content parsing tool
+parse_content = Tool(
     name="parse_webpage",
-    description="Extract text content from web pages",
+    description="Extract and analyze content from web pages",
     actiontype="webparser.parse",
     parameters={
-        "url": "{{target_url}}",
-        "extract_format": "markdown",
-        "include_links": True,
-        "include_images": False,
-        "css_selector": "article, .content, main"
-    }
-)
-
-# PDF parser
-pdf_parser = Tool(
-    name="parse_pdf",
-    description="Extract text from PDF documents",
-    actiontype="fileparser.parse",
-    parameters={
-        "url": "{{pdf_url}}",
-        "format": "text",
-        "extract_tables": True
+        "url": "{{page_url}}",
+        "extract_format": "markdown"
     }
 )
 ```
 
-### API Integration Tools
+### Code Execution Tools
 
-Connect with external APIs:
-
-```python
-# REST API tool
-rest_api = Tool(
-    name="api_request",
-    description="Make REST API requests",
-    actiontype="api.call",
-    parameters={
-        "url": "{{api_endpoint}}",
-        "method": "{{http_method}}",
-        "headers": {
-            "Authorization": "Bearer {{api_token}}",
-            "Content-Type": "application/json"
-        },
-        "body": "{{request_payload}}"
-    }
-)
-
-# GraphQL API tool
-graphql_api = Tool(
-    name="graphql_query",
-    description="Execute GraphQL queries",
-    actiontype="api.graphql",
-    parameters={
-        "endpoint": "{{graphql_endpoint}}",
-        "query": "{{graphql_query}}",
-        "variables": "{{query_variables}}",
-        "headers": {
-            "Authorization": "Bearer {{graphql_token}}"
-        }
-    }
-)
-```
-
-### Database Tools
-
-Query databases and data stores:
+Allow LLMs to run code dynamically:
 
 ```python
-# SQL database tool
-sql_tool = Tool(
-    name="query_database",
-    description="Execute SQL queries",
-    actiontype="database.query",
-    parameters={
-        "connection_string": "{{db_connection}}",
-        "query": "{{sql_query}}",
-        "parameters": "{{query_params}}"
-    }
-)
-
-# Document database tool
-document_db = Tool(
-    name="document_search",
-    description="Search document database",
-    actiontype="database.document_search",
-    parameters={
-        "collection": "{{collection_name}}",
-        "query": "{{search_criteria}}",
-        "limit": 20
-    }
-)
-```
-
-## Custom Tools
-
-### Creating Custom Tools
-
-Define your own tools for specialized operations:
-
-```python
-# Custom calculation tool
-calculator_tool = Tool(
-    name="advanced_calculator",
-    description="Perform complex mathematical calculations",
+# Python execution tool
+python_tool = Tool(
+    name="execute_python",
+    description="Run Python code for calculations and data processing",
     actiontype="codeexec.execute",
     parameters={
-        "code": """
-import math
-import numpy as np
-
-# Perform calculation
-expression = "{{math_expression}}"
-variables = {{variables}}
-
-# Safe evaluation with math functions
-result = eval(expression, {
-    "__builtins__": {},
-    "math": math,
-    "np": np,
-    **variables
-})
-"""
+        "code": "{{python_code}}",
+        "requirements": "{{pip_packages}}"
     }
 )
 
-# Custom data processing tool
-data_processor = Tool(
-    name="data_transformer",
-    description="Transform data using custom logic",
+# Data analysis tool
+analysis_tool = Tool(
+    name="analyze_dataset",
+    description="Perform statistical analysis on data",
     actiontype="codeexec.execute",
     parameters={
         "code": """
 import pandas as pd
-import json
+import numpy as np
 
-# Load data
-data = {{input_data}}
-transformation_rules = {{rules}}
+# Load and analyze data
+data = {{dataset}}
+df = pd.DataFrame(data)
 
-# Apply transformations
-if isinstance(data, dict):
-    df = pd.DataFrame([data])
-else:
-    df = pd.DataFrame(data)
-
-# Apply custom transformations
-for rule in transformation_rules:
-    df = apply_transformation(df, rule)
-
-result = df.to_dict('records')
+# Perform analysis
+{{analysis_code}}
 """
     }
 )
 ```
 
-### Tool Libraries
+## Tool Selection by LLMs
 
-Create reusable tool libraries:
+### How LLMs Choose Tools
 
-```python
-# Email tools library
-class EmailTools:
-    @staticmethod
-    def send_email():
-        return Tool(
-            name="send_email",
-            description="Send email messages",
-            actiontype="email.send",
-            parameters={
-                "to": "{{recipient}}",
-                "subject": "{{email_subject}}",
-                "body": "{{email_body}}",
-                "attachments": "{{file_attachments}}"
-            }
-        )
+LLMs select tools based on:
 
-    @staticmethod
-    def read_email():
-        return Tool(
-            name="read_email",
-            description="Read emails from inbox",
-            actiontype="email.read",
-            parameters={
-                "mailbox": "{{mailbox_name}}",
-                "filter": "{{email_filter}}",
-                "limit": 10
-            }
-        )
+1. **Tool descriptions** - Clear, specific descriptions help LLMs choose correctly
+2. **Context relevance** - LLMs match tools to the current task
+3. **Parameter requirements** - LLMs consider what information they have available
+4. **Expected outcomes** - LLMs choose tools that will help achieve their goals
 
-# Social media tools
-class SocialMediaTools:
-    @staticmethod
-    def post_update():
-        return Tool(
-            name="post_social_update",
-            description="Post updates to social media",
-            actiontype="social.post",
-            parameters={
-                "platform": "{{platform}}",
-                "content": "{{post_content}}",
-                "media": "{{media_files}}"
-            }
-        )
-```
-
-## Tool Authentication
-
-### API Keys and Tokens
-
-Secure authentication for external services:
+### Example Tool Selection
 
 ```python
-# Tool with API key authentication
-authenticated_tool = Tool(
-    name="secure_api",
-    description="Access secured API endpoint",
-    actiontype="api.call",
-    parameters={
-        "url": "{{api_endpoint}}",
-        "headers": {
-            "Authorization": "Bearer {{secret:api_token}}",
-            "X-API-Key": "{{secret:api_key}}"
-        }
-    }
-)
-
-# Tool with OAuth authentication
-oauth_tool = Tool(
-    name="oauth_api",
-    description="Access OAuth-protected resource",
-    actiontype="api.call",
-    parameters={
-        "url": "{{api_endpoint}}",
-        "auth_type": "oauth2",
-        "client_id": "{{oauth_client_id}}",
-        "client_secret": "{{secret:oauth_client_secret}}",
-        "token_url": "{{oauth_token_url}}"
-    }
-)
-```
-
-### Database Connections
-
-Secure database access:
-
-```python
-# Database tool with connection string
-db_tool = Tool(
-    name="production_db",
-    description="Query production database",
-    actiontype="database.query",
-    parameters={
-        "connection_string": "{{secret:prod_db_connection}}",
-        "query": "{{sql_query}}",
-        "read_only": True
-    }
-)
-```
-
-## Tool Error Handling
-
-### Retry Configuration
-
-Configure how tools handle failures:
-
-```python
-# Tool with retry logic
-resilient_tool = Tool(
-    name="resilient_api",
-    description="API with automatic retry",
-    actiontype="api.call",
-    parameters={
-        "url": "{{api_endpoint}}",
-        "retry_config": {
-            "max_attempts": 3,
-            "backoff_factor": 2,
-            "retry_on": ["timeout", "5xx_error"]
-        },
-        "timeout": 30
-    }
-)
-```
-
-### Fallback Tools
-
-Provide alternative tools when primary tools fail:
-
-```python
-# Primary search tool
-primary_search = Tool(
-    name="primary_search",
-    description="Primary search engine",
-    actiontype="websearch.search",
-    parameters={"query": "{{query}}"}
-)
-
-# Fallback search tool
-fallback_search = Tool(
-    name="fallback_search",
-    description="Backup search engine",
-    actiontype="websearch.search",
-    parameters={
-        "query": "{{query}}",
-        "engine": "alternative"
-    }
-)
-
-# LLM action with fallback tools
-search_action = llm.message(
+# Research workflow with multiple tool options
+research_action = llm.message(
     model="claude-sonnet-4",
-    query="Search for information about {{topic}}",
-    tools=[primary_search],
-    fallback_tools=[fallback_search]
+    query="Research and analyze the latest trends in {{industry}}",
+    tools=[
+        Tool(
+            name="search_recent_news",
+            description="Find recent news and articles about the industry",
+            actiontype="websearch.search",
+            parameters={"query": "{{search_terms}}"}
+        ),
+        Tool(
+            name="check_past_research",
+            description="Look for previous research we've done on this topic",
+            actiontype="memory.search",
+            parameters={"query": "{{research_topic}}"}
+        ),
+        Tool(
+            name="get_expert_analysis",
+            description="Get analysis from our industry expert bot",
+            actiontype="bot.ask",
+            parameters={
+                "bot_name": "industry-analyst",
+                "question": "{{expert_question}}"
+            }
+        ),
+        Tool(
+            name="analyze_data_trends",
+            description="Analyze numerical data and identify trends",
+            actiontype="codeexec.execute",
+            parameters={"code": "{{analysis_code}}"}
+        )
+    ]
+)
+```
+
+## Tool Composition
+
+### Chaining Tool Calls
+
+LLMs can use multiple tools in sequence:
+
+```python
+# Multi-step research tool
+comprehensive_research = Tool(
+    name="comprehensive_research",
+    description="Perform thorough research using multiple sources",
+    actiontype="llm.message",
+    parameters={
+        "model": "claude-sonnet-4",
+        "query": "Research {{topic}} thoroughly",
+        "tools": [
+            # First search for current information
+            {"actiontype": "websearch.search", "query": "{{topic}} 2024"},
+            # Then check our existing knowledge
+            {"actiontype": "memory.search", "query": "{{topic}}"},
+            # Finally get expert perspective
+            {"actiontype": "bot.ask", "bot_name": "research-analyst"}
+        ]
+    }
 )
 ```
 
 ## Best Practices
 
 <AccordionGroup>
-  <Accordion title="Tool Design">
-    **Clear Purpose**: Each tool should have a specific, well-defined function
+  <Accordion title="Tool Descriptions">
+    **Be Specific**: Clearly describe what the tool does and when to use it
 
-    **Descriptive Names**: Use clear, descriptive names and descriptions
+    **Include Context**: Explain the expected input and output
 
-    **Parameter Validation**: Validate inputs and provide helpful error messages
+    **Use Examples**: Show parameter formats and usage patterns
 
-    **Documentation**: Document expected inputs, outputs, and usage patterns
+    **Avoid Ambiguity**: Make tool purposes distinct and non-overlapping
 
   </Accordion>
 
-  <Accordion title="Security">
-    **Authentication**: Use secure authentication methods
+  <Accordion title="Parameter Design">
+    **Clear Parameters**: Use descriptive parameter names
 
-    **Secrets Management**: Store API keys and credentials securely
+    **Flexible Inputs**: Allow LLMs to provide parameters in natural ways
 
-    **Access Control**: Implement appropriate access restrictions
+    **Validation**: Validate parameters to prevent errors
 
-    **Input Sanitization**: Validate and sanitize all inputs
+    **Documentation**: Document expected parameter formats
+
+  </Accordion>
+
+  <Accordion title="Tool Selection">
+    **Logical Grouping**: Provide related tools together
+
+    **Appropriate Scope**: Don't overwhelm LLMs with too many options
+
+    **Clear Boundaries**: Make tool purposes distinct
+
+    **Fallback Options**: Provide alternative tools for similar tasks
 
   </Accordion>
 
   <Accordion title="Performance">
-    **Timeout Configuration**: Set appropriate timeouts for external calls
+    **Efficient Actions**: Ensure underlying actions perform well
 
-    **Rate Limiting**: Respect API rate limits and quotas
+    **Error Handling**: Handle tool failures gracefully
 
-    **Caching**: Cache responses when appropriate
+    **Timeout Management**: Set appropriate timeouts
 
-    **Error Handling**: Implement robust error handling and retries
-
-  </Accordion>
-
-  <Accordion title="Maintenance">
-    **Version Management**: Track API versions and compatibility
-
-    **Monitoring**: Monitor tool usage and performance
-
-    **Testing**: Test tools regularly to ensure reliability
-
-    **Updates**: Keep tools updated with latest API changes
+    **Resource Limits**: Manage computational resources
 
   </Accordion>
 </AccordionGroup>
 
-## Tool Examples by Use Case
+## Tool Categories
 
 <CardGroup cols={2}>
+  <Card title="Bot Interactions" icon="robot">
+    Invoke specialist bots, ask questions, chain bot workflows
+  </Card>
+  <Card title="Memory Operations" icon="brain">
+    Search knowledge, store insights, manage organizational memory
+  </Card>
   <Card title="Research & Analysis" icon="magnifying-glass">
-    Web search, academic databases, content parsing, data analysis APIs
+    Web search, content parsing, data analysis, trend identification
   </Card>
-  <Card title="Business Operations" icon="briefcase">
-    CRM systems, email platforms, project management tools, accounting APIs
-  </Card>
-  <Card title="Development Workflows" icon="code">
-    Version control APIs, CI/CD platforms, code analysis tools, deployment
-    services
-  </Card>
-  <Card title="Data Processing" icon="chart-bar">
-    Database connectors, ETL tools, analytics platforms, visualization APIs
+  <Card title="Code & Computation" icon="calculator">
+    Execute code, perform calculations, process data, generate reports
   </Card>
 </CardGroup>
 
-Tools are what make your agents truly powerful by connecting them to the vast ecosystem of external services and data sources. Choose and configure your tools carefully to match your specific use cases and requirements.
+Tools empower LLMs to be more than just text generators - they become intelligent agents that can dynamically choose the right actions to accomplish complex tasks.

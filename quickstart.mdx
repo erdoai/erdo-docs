@@ -78,13 +78,10 @@ Erdo agents are built with these key components:
 
   <Accordion title="Steps - Individual Actions">
     ```python
-    from erdo import Step
     from erdo.actions import llm
 
-    automation_step = Step(
-        agent=agent,
-        key="automate",
-        actiontype=llm.message(
+    automation_step = agent.step(
+        llm.message(
             model="claude-sonnet-4",
             query="Help automate this task: {{task_description}}"
         )
@@ -98,81 +95,160 @@ Erdo agents are built with these key components:
     from erdo.actions import llm, memory, codeexec, websearch
 
     # Language model actions
-    llm_action = llm.message(model="claude-sonnet-4", query="{{query}}")
+    llm_step = agent.step(
+        llm.message(model="claude-sonnet-4", query="{{query}}")
+    )
 
     # Memory operations
-    memory_action = memory.search(query="{{search_term}}", limit=5)
+    memory_step = agent.step(
+        memory.search(query="{{search_term}}", limit=5)
+    )
 
     # Code execution
-    code_action = codeexec.execute(code="print('Hello!')")
+    code_step = agent.step(
+        codeexec.execute(code="print('Hello!')")
+    )
 
     # Web search
-    search_action = websearch.search(query="{{topic}} research")
+    search_step = agent.step(
+        websearch.search(query="{{topic}} research")
+    )
     ```
 
   </Accordion>
 
-  <Accordion title="Tools - External Capabilities">
+  <Accordion title="Result Handlers">
     ```python
-    from erdo import Tool
+    from erdo.conditions import IsSuccess, GreaterThan
+    from erdo.actions import memory, utils
 
-    web_search_tool = Tool(
-        name="search_web",
-        description="Search for information online",
-        actiontype="websearch.search",
-        parameters={"query": "{{query}}"}
+    # Direct handlers with step.on()
+    automation_step.on(
+        IsSuccess() & GreaterThan("confidence", "0.8"),
+        utils.send_status(status="completed", message="Task automated successfully")
     )
+
+    # Decorator-based handlers
+    @automation_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+    def handle_success(result):
+        return memory.store(memory={
+            "content": result.output.analysis,
+            "type": "automation_result"
+        })
     ```
 
   </Accordion>
 </AccordionGroup>
 
-## Step 5: Test Locally
+## Step 5: Complete Example
 
-Before deploying to production, test your agent locally:
+Here's a complete agent that demonstrates the API patterns:
 
-```bash
-# Run your agent locally for testing
-erdo run --input "Automate my email responses"
+```python
+from erdo import Agent
+from erdo.actions import llm, memory, utils
+from erdo.conditions import IsSuccess, GreaterThan, IsError
 
-# Validate your agent configuration
-erdo validate
+# Create your agent
+task_agent = Agent(
+    name="task_automator",
+    description="Automates tasks and provides intelligent responses"
+)
+
+# Step 1: Analyze the task
+analyze_step = task_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze this task and provide automation recommendations: {{task_description}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "task_type": {"type": "string"},
+                    "complexity": {"type": "number"},
+                    "recommendations": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        }
+    )
+)
+
+# Step 2: Generate automation plan
+plan_step = task_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Create a detailed automation plan for: {{analyze_step.output.recommendations}}"
+    ),
+    depends_on=analyze_step
+)
+
+# Handle high-complexity tasks with decorator
+@analyze_step.when(IsSuccess() & GreaterThan("complexity", "0.8"))
+def handle_complex_task(result):
+    """Store complex tasks for detailed analysis."""
+    return memory.store(memory={
+        "content": result.output.recommendations,
+        "type": "complex_automation",
+        "tags": ["complex", "automation"]
+    })
+
+# Handle successful planning with direct handler
+plan_step.on(
+    IsSuccess(),
+    utils.send_status(status="plan_ready", message="Automation plan generated successfully"),
+    memory.store(memory={
+        "content": "{{plan_step.output.plan}}",
+        "type": "automation_plan"
+    })
+)
+
+# Handle errors
+@plan_step.when(IsError())
+def handle_planning_error(error):
+    return utils.send_status(
+        status="failed",
+        message=f"Planning failed: {error.message}"
+    )
 ```
 
-## Step 6: Deploy to Production
+## Step 6: Run Your Agent
 
-Once you're satisfied with your local testing, deploy to production:
+Deploy and test your agent:
 
 ```bash
-# Deploy your agent to production
+# Sync your agent to the platform
 erdo sync
 
-# Your agent is now live at: https://my-first-agent.erdo.ai
+# Test your agent
+erdo test task_automator --input '{"task_description": "Organize my email inbox"}'
 ```
-
-Your agent will automatically get:
-
-- A production URL
-- Persistent state across deployments
-- Built-in monitoring and logging
-- API and web interface access
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="SDK Reference" icon="code" href="/sdk/overview">
-    Dive deeper into the Python SDK
+  <Card title="Core Concepts" icon="book" href="/concepts/overview">
+    Learn about agents, steps, actions, and result handlers
   </Card>
-  <Card title="Pre-built Bots" icon="robot" href="/bots/security-checker">
-    Leverage ready-made automation solutions
+  <Card title="SDK Reference" icon="code" href="/sdk/overview">
+    Explore the full Python SDK capabilities
   </Card>
   <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
-    See real-world implementations
+    See real-world automation examples
   </Card>
-  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
-    Complete command documentation
+  <Card title="CLI Tools" icon="terminal" href="/cli/overview">
+    Master the Erdo command-line interface
   </Card>
 </CardGroup>
+
+## Key Concepts
+
+- **Agents** orchestrate your automation workflow
+- **Steps** define individual actions in your workflow
+- **Actions** are the building blocks (LLM calls, code execution, etc.)
+- **Result handlers** use `step.on()` or `@step.when()` for conditional logic
+- **Dependencies** control step execution order with `depends_on`
+- **Output access** uses `step.output.field` for referencing step results
 
 ## Troubleshooting
 
@@ -184,17 +260,19 @@ Your agent will automatically get:
 
   </Accordion>
 
-  <Accordion title="Agent not deploying">
-    Verify your agent configuration with: `erdo validate`
-
-    Check logs with: `erdo logs --agent my-first-agent`
+  <Accordion title="Agent validation errors">
+    Run `erdo validate` to check for common issues:
+    - Missing required fields
+    - Invalid action configurations
+    - Circular dependencies
 
   </Accordion>
 
-  <Accordion title="CLI command not found">
-    Make sure the CLI is in your PATH or try installing via Homebrew:
+  <Accordion title="Local testing issues">
+    Ensure your agent has all required parameters:
     ```bash
-    brew install erdoai/tap/erdo
+    erdo run --input "test input" --param key=value
     ```
+
   </Accordion>
 </AccordionGroup>

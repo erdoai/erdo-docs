@@ -5,15 +5,16 @@ description: "Real-world examples of data analysis agents for business insights 
 
 # Data Analysis Examples
 
-Comprehensive examples showing how to build powerful data analysis agents that can process, analyze, and generate insights from various data sources.
+Comprehensive examples showing how to build powerful data analysis agents that can process, analyze, and generate insights from various data sources using the new agent-centric API.
 
 ## Sales Data Analyzer
 
 Analyze sales performance and generate actionable business insights:
 
 ```python
-from erdo import Agent, Step, Tool
-from erdo.actions import llm, codeexec, memory
+from erdo import Agent
+from erdo.actions import llm, codeexec, memory, utils
+from erdo.conditions import IsSuccess, GreaterThan, IsError
 
 sales_analyzer = Agent(
     name="sales_data_analyzer",
@@ -21,11 +22,11 @@ sales_analyzer = Agent(
 )
 
 # Step 1: Data preprocessing and validation
-preprocess_step = Step(
-    agent=sales_analyzer,
-    key="preprocess",
-    actiontype=codeexec.execute(
-        code="""
+preprocess_step = sales_analyzer.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "preprocess.py",
+            "content": """
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -48,12 +49,12 @@ total_revenue = data['amount'].sum()
 unique_customers = data['customer_id'].nunique()
 avg_order_value = data['amount'].mean()
 
-return {
+result = {
     "cleaned_data": data.to_dict('records'),
     "data_quality": {
         "missing_values": missing_data.to_dict(),
         "duplicates": int(duplicate_rows),
-        "date_range": date_range
+        "date_range": [str(date_range[0]), str(date_range[1])]
     },
     "summary_metrics": {
         "total_revenue": float(total_revenue),
@@ -62,33 +63,71 @@ return {
         "total_transactions": len(data)
     }
 }
+
+import json
+print(json.dumps(result))
 """
-    )
+        }],
+        parameters={"data_source": "{{data_source}}"}
+    ),
+    key="preprocess"
 )
 
 # Step 2: Advanced analytics and trend analysis
-analysis_step = Step(
-    agent=sales_analyzer,
-    key="analyze",
-    actiontype=llm.message(
-        model="claude-sonnet-4-20250514",
-        query="Analyze sales data and identify trends, patterns, and insights",
-        tools=[
-            Tool(
-                name="statistical_analysis",
-                description="Perform statistical analysis on sales data",
-                actiontype="codeexec.execute",
-                parameters={
-                    "code": """
-# Advanced statistical analysis
-import scipy.stats as stats
-from sklearn.linear_model import LinearRegression
+analysis_step = sales_analyzer.step(
+    llm.message(
+        model="claude-sonnet-4",
+        system_prompt="You are an expert business analyst. Analyze the provided sales data and identify trends, patterns, and actionable insights.",
+        query="Analyze this sales data: {{preprocess_step.output.summary_metrics}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "required": ["insights", "recommendations", "key_findings"],
+                "properties": {
+                    "insights": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "recommendations": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "key_findings": {
+                        "type": "object",
+                        "properties": {
+                            "revenue_trend": {"type": "string"},
+                            "top_performing_segments": {"type": "array"},
+                            "seasonal_patterns": {"type": "string"}
+                        }
+                    }
+                }
+            }
+        }
+    ),
+    depends_on=preprocess_step,
+    key="analyze"
+)
 
-data = {{steps.preprocess.cleaned_data}}
+# Step 3: Statistical analysis
+stats_step = sales_analyzer.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "statistical_analysis.py",
+            "content": """
+import pandas as pd
+import numpy as np
+from scipy import stats
+from sklearn.linear_model import LinearRegression
+import json
+
+# Load cleaned data
+data = {{preprocess_step.output.cleaned_data}}
 df = pd.DataFrame(data)
 
 # Time series analysis
-monthly_sales = df.groupby('month')['amount'].agg(['sum', 'count', 'mean'])
+df['date'] = pd.to_datetime(df['date'])
+monthly_sales = df.groupby(df['date'].dt.to_period('M'))['amount'].agg(['sum', 'count', 'mean'])
 growth_rate = monthly_sales['sum'].pct_change().mean()
 
 # Customer segmentation
@@ -105,113 +144,122 @@ y = monthly_sales['sum'].values
 model = LinearRegression().fit(X, y)
 trend_slope = model.coef_[0]
 
-return {
+result = {
     "monthly_trends": monthly_sales.to_dict(),
     "growth_rate": float(growth_rate),
     "customer_segments": customer_metrics['segment'].value_counts().to_dict(),
-    "trend_slope": float(trend_slope),
-    "seasonality": detect_seasonality(monthly_sales['sum'])
+    "trend_slope": float(trend_slope)
 }
+
+print(json.dumps(result))
 """
-                }
-            )
-        ],
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "schema": {
-                    "type": "object",
-                    "required": ["insights", "recommendations", "key_findings"],
-                    "properties": {
-                        "insights": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "recommendations": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "key_findings": {
-                            "type": "object",
-                            "properties": {
-                                "revenue_trend": {"type": "string"},
-                                "top_performing_segments": {"type": "array"},
-                                "seasonal_patterns": {"type": "string"}
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        }],
+        parameters={"cleaned_data": "{{preprocess_step.output.cleaned_data}}"}
     ),
-    depends_on=[preprocess_step]
+    depends_on=preprocess_step,
+    key="statistical_analysis"
 )
 
-# Step 3: Generate visualizations and reports
-visualization_step = Step(
-    agent=sales_analyzer,
-    key="visualize",
-    actiontype=codeexec.execute(
-        code="""
+# Step 4: Generate visualizations and reports
+visualization_step = sales_analyzer.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "create_visualizations.py",
+            "content": """
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import pandas as pd
+import json
 
 # Create comprehensive visualizations
-fig = make_subplots(
-    rows=2, cols=2,
-    subplot_titles=['Revenue Trend', 'Customer Segments', 'Monthly Performance', 'Top Products'],
-    specs=[[{"type": "scatter"}, {"type": "bar"}],
-           [{"type": "bar"}, {"type": "pie"}]]
-)
+plt.figure(figsize=(15, 10))
 
-# Revenue trend over time
-monthly_data = {{steps.analyze.statistical_analysis.monthly_trends}}
-fig.add_trace(
-    go.Scatter(x=list(monthly_data.keys()), y=list(monthly_data.values())),
-    row=1, col=1
-)
+# Revenue trend
+plt.subplot(2, 2, 1)
+monthly_data = {{stats_step.output.monthly_trends}}
+plt.plot(range(len(monthly_data['sum'])), list(monthly_data['sum'].values()))
+plt.title('Revenue Trend Over Time')
+plt.xlabel('Month')
+plt.ylabel('Revenue')
 
-# Save visualizations
+# Customer segments
+plt.subplot(2, 2, 2)
+segments = {{stats_step.output.customer_segments}}
+plt.pie(segments.values(), labels=segments.keys(), autopct='%1.1f%%')
+plt.title('Customer Segments')
+
+plt.tight_layout()
 plt.savefig('sales_analysis_dashboard.png', dpi=300, bbox_inches='tight')
 
-return {
+result = {
     "dashboard_created": True,
-    "charts_generated": 4,
+    "charts_generated": 2,
     "file_path": "sales_analysis_dashboard.png"
 }
+
+print(json.dumps(result))
 """
+        }]
     ),
-    depends_on=[analysis_step]
+    depends_on=stats_step,
+    key="visualizations"
 )
 
-# Step 4: Store insights for future reference
-memory_step = Step(
-    agent=sales_analyzer,
-    key="store_insights",
-    actiontype=memory.store(
-        memory={
-            "content": "{{steps.analyze.insights}}",
-            "description": "Sales analysis insights for {{date_range}}",
-            "type": "business_insight",
-            "searchable_texts": [
-                "{{steps.analyze.key_findings.revenue_trend}}",
-                "sales performance",
-                "customer segments"
-            ],
-            "tags": ["sales", "analysis", "{{period}}", "business_intelligence"],
-            "extra": {
-                "metrics": "{{steps.preprocess.summary_metrics}}",
-                "recommendations": "{{steps.analyze.recommendations}}",
-                "dashboard_path": "{{steps.visualize.file_path}}"
-            }
+# Handle successful preprocessing
+@preprocess_step.when(IsSuccess())
+def store_clean_data(result):
+    """Store cleaned data for future use."""
+    return memory.store(memory={
+        "content": result.output.cleaned_data,
+        "description": "Cleaned sales data with quality metrics",
+        "type": "cleaned_sales_data",
+        "tags": ["sales", "cleaned", "preprocessed"],
+        "extra": result.output.data_quality
+    })
+
+# Handle high-quality analysis results
+@analysis_step.when(IsSuccess())
+def store_insights(result):
+    """Store business insights."""
+    return memory.store(memory={
+        "content": result.output.insights,
+        "description": "Sales analysis insights and recommendations",
+        "type": "business_insights",
+        "tags": ["sales", "insights", "analysis"],
+        "extra": {
+            "recommendations": result.output.recommendations,
+            "key_findings": result.output.key_findings
         }
-    ),
-    depends_on=[visualization_step]
-)
+    })
 
-agents = [sales_analyzer]
+# Handle statistical analysis completion
+@stats_step.when(IsSuccess() & GreaterThan("growth_rate", 0))
+def celebrate_growth(result):
+    """Highlight positive growth trends."""
+    return utils.send_status(
+        status="positive_growth",
+        message=f"Excellent! Sales showing {result.output.growth_rate:.2%} growth rate",
+        priority="high"
+    )
+
+# Handle error cases
+@preprocess_step.when(IsError())
+def handle_data_error(error):
+    """Handle data preprocessing errors."""
+    return utils.send_status(
+        status="data_error",
+        message=f"Data preprocessing failed: {error.message}",
+        error_details=error.details
+    )
+
+@analysis_step.when(IsError())
+def handle_analysis_error(error):
+    """Handle analysis errors."""
+    return utils.send_status(
+        status="analysis_error",
+        message=f"Analysis failed: {error.message}",
+        suggestion="Check data quality and try again"
+    )
 ```
 
 <CardGroup cols={2}>
@@ -238,10 +286,8 @@ financial_analyzer = Agent(
 )
 
 # Step 1: Parse financial statements
-parse_financials = Step(
-    agent=financial_analyzer,
-    key="parse",
-    actiontype=llm.message(
+parse_financials = financial_analyzer.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Extract financial data from: {{financial_statements}}",
         response_format={
@@ -282,15 +328,13 @@ parse_financials = Step(
 )
 
 # Step 2: Calculate financial ratios
-calculate_ratios = Step(
-    agent=financial_analyzer,
-    key="ratios",
-    actiontype=codeexec.execute(
+calculate_ratios = financial_analyzer.step(
+    codeexec.execute(
         code="""
 # Extract financial data
-balance_sheet = {{steps.parse.balance_sheet}}
-income_statement = {{steps.parse.income_statement}}
-cash_flow = {{steps.parse.cash_flow}}
+balance_sheet = {{parse.output.balance_sheet}}
+income_statement = {{parse.output.income_statement}}
+cash_flow = {{parse.output.cash_flow}}
 
 # Liquidity ratios
 current_ratio = balance_sheet.get('current_assets', 0) / balance_sheet.get('current_liabilities', 1)
@@ -328,19 +372,19 @@ return {
 }
 """
     ),
-    depends_on=[parse_financials]
+    depends_on=parse_financials,
+    key="ratios"
 )
 
 # Step 3: Financial health assessment
-assessment_step = Step(
-    agent=financial_analyzer,
-    key="assess",
-    actiontype=llm.message(
+assessment_step = financial_analyzer.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Assess financial health based on ratios: {{steps.ratios.content}}",
+        query="Assess financial health based on ratios: {{ratios.output.content}}",
         system_prompt="You are a financial analyst. Provide comprehensive assessment of financial health."
     ),
-    depends_on=[calculate_ratios]
+    depends_on=calculate_ratios,
+    key="assess"
 )
 
 agents.append(financial_analyzer)
@@ -357,10 +401,8 @@ market_researcher = Agent(
 )
 
 # Step 1: Gather market data
-research_step = Step(
-    agent=market_researcher,
-    key="research",
-    actiontype=llm.message(
+research_step = market_researcher.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Research market trends for {{industry}} in {{region}}",
         tools=[
@@ -384,12 +426,10 @@ research_step = Step(
 )
 
 # Step 2: Competitive analysis
-competitive_analysis = Step(
-    agent=market_researcher,
-    key="competitive",
-    actiontype=llm.message(
+competitive_analysis = market_researcher.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Analyze competitive landscape: {{steps.research.content}}",
+        query="Analyze competitive landscape: {{research.output.content}}",
         response_format={
             "Type": "json_schema",
             "Schema": {
@@ -407,19 +447,19 @@ competitive_analysis = Step(
             }
         }
     ),
-    depends_on=[research_step]
+    depends_on=research_step,
+    key="competitive"
 )
 
 # Step 3: SWOT analysis
-swot_analysis = Step(
-    agent=market_researcher,
-    key="swot",
-    actiontype=llm.message(
+swot_analysis = market_researcher.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Generate SWOT analysis for {{company}} in {{industry}}",
         system_prompt="Create comprehensive SWOT analysis based on market research."
     ),
-    depends_on=[competitive_analysis]
+    depends_on=competitive_analysis,
+    key="swot"
 )
 
 agents.append(market_researcher)
@@ -436,10 +476,8 @@ dashboard_generator = Agent(
 )
 
 # Step 1: Data aggregation
-aggregate_data = Step(
-    agent=dashboard_generator,
-    key="aggregate",
-    actiontype=codeexec.execute(
+aggregate_data = dashboard_generator.step(
+    codeexec.execute(
         code="""
 import pandas as pd
 import numpy as np
@@ -481,10 +519,8 @@ return {
 )
 
 # Step 2: Generate visualizations
-create_dashboard = Step(
-    agent=dashboard_generator,
-    key="dashboard",
-    actiontype=codeexec.execute(
+create_dashboard = dashboard_generator.step(
+    codeexec.execute(
         code="""
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -505,8 +541,8 @@ fig = make_subplots(
     ]
 )
 
-metrics = {{steps.aggregate.source_metrics}}
-overall = {{steps.aggregate.overall_performance}}
+metrics = {{aggregate.output.source_metrics}}
+overall = {{aggregate.output.overall_performance}}
 
 # Performance indicators
 fig.add_trace(
@@ -531,16 +567,15 @@ return {
 }
 """
     ),
-    depends_on=[aggregate_data]
+    depends_on=aggregate_data,
+    key="dashboard"
 )
 
 # Step 3: Generate insights and alerts
-insights_step = Step(
-    agent=dashboard_generator,
-    key="insights",
-    actiontype=llm.message(
+insights_step = dashboard_generator.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Generate insights and alerts from performance data: {{steps.aggregate.content}}",
+        query="Generate insights and alerts from performance data: {{aggregate.output.content}}",
         response_format={
             "Type": "json_schema",
             "Schema": {
@@ -556,7 +591,8 @@ insights_step = Step(
             }
         }
     ),
-    depends_on=[create_dashboard]
+    depends_on=create_dashboard,
+    key="insights"
 )
 
 agents.append(dashboard_generator)
@@ -568,10 +604,8 @@ agents.append(dashboard_generator)
   <Tab title="Predictive Analytics">
     ```python
     # Predictive sales forecasting
-    forecast_step = Step(
-        agent=predictor_agent,
-        key="forecast",
-        actiontype=codeexec.execute(
+    forecast_step = predictor_agent.step(
+        codeexec.execute(
             code="""
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.metrics import mean_absolute_error
@@ -602,7 +636,8 @@ agents.append(dashboard_generator)
         'feature_importance': dict(zip(features.columns, model.feature_importances_))
     }
     """
-        )
+        ),
+        key="forecast"
     )
     ```
 
@@ -610,10 +645,8 @@ agents.append(dashboard_generator)
   <Tab title="Anomaly Detection">
     ```python
     # Detect anomalies in data
-    anomaly_detection = Step(
-        agent=anomaly_agent,
-        key="detect_anomalies",
-        actiontype=codeexec.execute(
+    anomaly_detection = anomaly_agent.step(
+        codeexec.execute(
             code="""
     from sklearn.ensemble import IsolationForest
     from sklearn.preprocessing import StandardScaler
@@ -643,134 +676,7 @@ agents.append(dashboard_generator)
         'anomaly_percentage': (len(anomaly_indices) / len(data)) * 100
     }
     """
-        )
+        ),
+        key="detect_anomalies"
     )
     ```
-
-  </Tab>
-  <Tab title="Statistical Testing">
-    ```python
-    # Statistical significance testing
-    statistical_test = Step(
-        agent=stats_agent,
-        key="statistical_test",
-        actiontype=codeexec.execute(
-            code="""
-    from scipy import stats
-    import pandas as pd
-
-    # A/B test analysis
-    group_a = {{control_group_data}}
-    group_b = {{treatment_group_data}}
-
-    # Descriptive statistics
-    stats_a = {
-        'mean': np.mean(group_a),
-        'std': np.std(group_a),
-        'count': len(group_a)
-    }
-
-    stats_b = {
-        'mean': np.mean(group_b),
-        'std': np.std(group_b),
-        'count': len(group_b)
-    }
-
-    # T-test for means
-    t_stat, p_value = stats.ttest_ind(group_a, group_b)
-
-    # Effect size (Cohen's d)
-    pooled_std = np.sqrt(((len(group_a) - 1) * stats_a['std']**2 +
-                         (len(group_b) - 1) * stats_b['std']**2) /
-                        (len(group_a) + len(group_b) - 2))
-    cohens_d = (stats_b['mean'] - stats_a['mean']) / pooled_std
-
-    # Confidence interval for difference
-    diff_mean = stats_b['mean'] - stats_a['mean']
-    se_diff = pooled_std * np.sqrt(1/len(group_a) + 1/len(group_b))
-    ci_lower = diff_mean - 1.96 * se_diff
-    ci_upper = diff_mean + 1.96 * se_diff
-
-    return {
-        'group_a_stats': stats_a,
-        'group_b_stats': stats_b,
-        't_statistic': float(t_stat),
-        'p_value': float(p_value),
-        'significant': p_value < 0.05,
-        'effect_size': float(cohens_d),
-        'difference_ci': [float(ci_lower), float(ci_upper)]
-    }
-    """
-        )
-    )
-    ```
-
-  </Tab>
-</Tabs>
-
-## Best Practices for Data Analysis Agents
-
-<AccordionGroup>
-  <Accordion title="Data Quality">
-    - Always validate input data quality and completeness
-    - Handle missing values and outliers appropriately
-    - Document data transformations and assumptions
-    - Implement data lineage tracking
-    - Use consistent data formats across steps
-  </Accordion>
-
-{" "}
-<Accordion title="Statistical Rigor">
-  - Apply appropriate statistical methods for your data type - Check assumptions
-  before using statistical tests - Calculate and report confidence intervals -
-  Consider multiple testing corrections when appropriate - Validate models with
-  holdout data
-</Accordion>
-
-{" "}
-<Accordion title="Visualization">
-  - Choose appropriate chart types for your data - Include error bars and
-  confidence intervals - Use consistent color schemes and formatting - Make
-  visualizations accessible and interpretable - Provide interactive elements
-  where beneficial
-</Accordion>
-
-  <Accordion title="Business Context">
-    - Translate statistical findings into business insights
-    - Provide actionable recommendations
-    - Consider business constraints and feasibility
-    - Highlight key metrics and KPIs
-    - Include uncertainty and limitations in results
-  </Accordion>
-</AccordionGroup>
-
-<CardGroup cols={2}>
-  <Card
-    title="Financial Analysis"
-    icon="chart-line"
-    href="/examples/financial-analysis"
-  >
-    Deep dive into financial data analysis and ratio calculations
-  </Card>
-  <Card
-    title="Marketing Analytics"
-    icon="bullhorn"
-    href="/examples/marketing-analytics"
-  >
-    Analyze marketing campaigns and customer behavior
-  </Card>
-  <Card
-    title="Operations Analytics"
-    icon="cogs"
-    href="/examples/operations-analytics"
-  >
-    Optimize business operations with data analysis
-  </Card>
-  <Card
-    title="Predictive Models"
-    icon="crystal-ball"
-    href="/examples/predictive-modeling"
-  >
-    Build predictive models for forecasting and planning
-  </Card>
-</CardGroup>

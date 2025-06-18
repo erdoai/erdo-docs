@@ -44,28 +44,23 @@
         ]
       },
       {
-        "group": "Pre-built Bots",
+        "group": "Pre-built Agents",
         "pages": [
-          "bots/security-checker",
-          "bots/data-analyst",
-          "bots/file-analyzer",
-          "bots/data-quality-checker",
-          "bots/integration-analyzer",
-          "bots/data-question-answerer",
-          "bots/memory-manager"
+          "agents/security-checker",
+          "agents/data-analyst",
+          "agents/file-analyzer",
+          "agents/data-quality-checker",
+          "agents/integration-analyzer",
+          "agents/data-question-answerer",
+          "agents/memory-manager"
         ]
       },
       {
         "group": "Advanced",
         "pages": [
-          "advanced/deployment",
-          "advanced/dynamic-actions",
           "advanced/memory-management",
-          "advanced/utility-debugging",
           "advanced/websocket-streaming",
           "advanced/background-tasks",
-          "advanced/billing-usage",
-          "advanced/security",
           "troubleshooting"
         ]
       },

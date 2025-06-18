@@ -454,22 +454,10 @@ Execute actions based on complex conditions:
 ```python
 from erdo._generated.condition import And, Or, IsSuccess, TextContains
 
-conditional_step = Step(
-    agent=agent,
-    key="conditional_action",
-    actiontype=llm.message(
+conditional_step = agent.step(
+    llm.message(
         model="claude-sonnet-4",
         query="{{conditional_query}}"
-    ),
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=And(
-            IsSuccess(step="previous_step"),
-            Or(
-                TextContains(text="{{data_type}}", value="priority"),
-                GreaterThan(number="{{confidence}}", value="0.8")
-            )
-        )
     )
 )
 ```
@@ -479,20 +467,10 @@ conditional_step = Step(
 Process data collections with iteration:
 
 ```python
-iterative_step = Step(
-    agent=agent,
-    key="process_items",
-    actiontype=codeexec.execute(
+iterative_step = agent.step(
+    codeexec.execute(
         code="process_item({{item}})",
         parameters={"item": "{{current_item}}"}
-    ),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="items_list",
-        if_condition=IsAny(
-            key="item.status",
-            value=["pending", "retry"]
-        )
     )
 )
 ```
@@ -502,26 +480,15 @@ iterative_step = Step(
 Implement robust error handling:
 
 ```python
-error_handler = ResultHandler(
-    step=main_step,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        LessThan(number="{{retry_count}}", value="3")
-    )
-)
-
-retry_step = Step(
-    result_handler=error_handler,
-    key="retry",
-    actiontype=utils.echo(
+@main_step.when(IsError() & LessThan("retry_count", 3))
+def retry_on_error(error):
+    return utils.echo(
         data={
             "retry_count": "{{increment retry_count}}",
             "error": "{{error_message}}",
             "next_attempt": "{{add_seconds timestamp 60}}"
         }
     )
-)
 ```
 
 ## Best Practices

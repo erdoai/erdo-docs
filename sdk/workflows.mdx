@@ -23,51 +23,47 @@ research_agent = Agent(
 )
 
 # Step 1: Research topic
-research_step = Step(
-    agent=research_agent,
-    key="research",
-    actiontype=llm.message(
+research_step = research_agent.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Research {{topic}} and gather key information",
         tools=[web_search_tool, web_parser_tool]
-    )
+    ),
+    key="research"
 )
 
 # Step 2: Analyze findings (depends on research)
-analysis_step = Step(
-    agent=research_agent,
-    key="analyze",
-    actiontype=llm.message(
+analysis_step = research_agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Analyze research findings: {{steps.research.content}}",
+        query="Analyze research findings: {{research.output.content}}",
         system_prompt="You are an expert analyst. Provide structured insights."
     ),
-    depends_on=[research_step]
+    key="analyze",
+    depends_on=research_step
 )
 
 # Step 3: Generate report (depends on analysis)
-report_step = Step(
-    agent=research_agent,
-    key="report",
-    actiontype=llm.message(
+report_step = research_agent.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Create comprehensive report from analysis: {{steps.analyze.content}}"
+        query="Create comprehensive report from analysis: {{analyze.output.content}}"
     ),
-    depends_on=[analysis_step]
+    key="report",
+    depends_on=analysis_step
 )
 
 # Step 4: Store insights
-memory_step = Step(
-    agent=research_agent,
-    key="store",
-    actiontype=memory.store(
+memory_step = research_agent.step(
+    memory.store(
         memory={
-            "content": "{{steps.report.content}}",
+            "content": "{{report.output.content}}",
             "description": "Research report on {{topic}}",
             "tags": ["research", "{{topic}}", "report"]
         }
     ),
-    depends_on=[report_step]
+    key="store",
+    depends_on=report_step
 )
 ```
 
@@ -85,40 +81,35 @@ data_processor = Agent(
 )
 
 # These steps can run in parallel
-process_sales_step = Step(
-    agent=data_processor,
-    key="process_sales",
-    actiontype=codeexec.execute(
+process_sales_step = data_processor.step(
+    codeexec.execute(
         code="process_sales_data({{sales_data}})"
-    )
+    ),
+    key="process_sales"
 )
 
-process_marketing_step = Step(
-    agent=data_processor,
-    key="process_marketing",
-    actiontype=codeexec.execute(
+process_marketing_step = data_processor.step(
+    codeexec.execute(
         code="process_marketing_data({{marketing_data}})"
-    )
+    ),
+    key="process_marketing"
 )
 
-process_customer_step = Step(
-    agent=data_processor,
-    key="process_customer",
-    actiontype=codeexec.execute(
+process_customer_step = data_processor.step(
+    codeexec.execute(
         code="process_customer_data({{customer_data}})"
-    )
+    ),
+    key="process_customer"
 )
 
 # Aggregate results after parallel processing
-aggregate_step = Step(
-    agent=data_processor,
-    key="aggregate",
-    actiontype=codeexec.execute(
+aggregate_step = data_processor.step(
+    codeexec.execute(
         code="""
 # Combine results from parallel processing
-sales_results = {{steps.process_sales.output}}
-marketing_results = {{steps.process_marketing.output}}
-customer_results = {{steps.process_customer.output}}
+sales_results = {{process_sales.output}}
+marketing_results = {{process_marketing.output}}
+customer_results = {{process_customer.output}}
 
 combined_insights = aggregate_data_insights(
     sales_results, marketing_results, customer_results
@@ -126,6 +117,7 @@ combined_insights = aggregate_data_insights(
 generate_executive_summary(combined_insights)
 """
     ),
+    key="aggregate",
     depends_on=[process_sales_step, process_marketing_step, process_customer_step]
 )
 ```
@@ -149,10 +141,8 @@ smart_processor = Agent(
 )
 
 # Initial data analysis
-analyze_data_step = Step(
-    agent=smart_processor,
-    key="analyze_data",
-    actiontype=llm.message(
+analyze_data_step = smart_processor.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Analyze data characteristics: {{input_data}}",
         response_format={
@@ -169,46 +159,23 @@ analyze_data_step = Step(
                 }
             }
         }
-    )
+    ),
+    key="analyze_data"
 )
 
 # Simple processing for small datasets
-simple_processing = Step(
-    agent=smart_processor,
-    key="simple_process",
-    actiontype=codeexec.execute(
+@analyze_data_step.when(IsSuccess() & LessThan("data_size", 1000) & TextContains("complexity", "low"))
+def simple_processing(result):
+    return codeexec.execute(
         code="simple_data_processing({{input_data}})"
-    ),
-    depends_on=[analyze_data_step],
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=And(
-            IsSuccess(step="analyze_data"),
-            LessThan(number="{{steps.analyze_data.data_size}}", value="1000"),
-            TextContains(text="{{steps.analyze_data.complexity}}", value="low")
-        )
     )
-)
 
 # Advanced processing for large or complex datasets
-advanced_processing = Step(
-    agent=smart_processor,
-    key="advanced_process",
-    actiontype=codeexec.execute(
+@analyze_data_step.when(IsSuccess() & (GreaterThan("data_size", 1000) | TextContains("complexity", "high")))
+def advanced_processing(result):
+    return codeexec.execute(
         code="advanced_data_processing({{input_data}})"
-    ),
-    depends_on=[analyze_data_step],
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=And(
-            IsSuccess(step="analyze_data"),
-            Or(
-                GreaterThan(number="{{steps.analyze_data.data_size}}", value="1000"),
-                TextContains(text="{{steps.analyze_data.complexity}}", value="high")
-            )
-        )
     )
-)
 ```
 
 ### Dynamic Branching
@@ -223,10 +190,8 @@ content_processor = Agent(
 )
 
 # Classify content
-classify_step = Step(
-    agent=content_processor,
-    key="classify",
-    actiontype=llm.message(
+classify_step = content_processor.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Classify this content: {{content}}",
         response_format={
@@ -243,59 +208,30 @@ classify_step = Step(
                 }
             }
         }
-    )
+    ),
+    key="classify"
 )
 
 # Route to different processing based on classification
-process_text = Step(
-    agent=content_processor,
-    key="process_text",
-    actiontype=llm.message(
+@classify_step.when(TextContains("content_type", "text"))
+def process_text(result):
+    return llm.message(
         model="claude-sonnet-4",
         query="Process text content: {{content}}"
-    ),
-    depends_on=[classify_step],
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=TextContains(
-            text="{{steps.classify.content_type}}",
-            value="text"
-        )
     )
-)
 
-process_image = Step(
-    agent=content_processor,
-    key="process_image",
-    actiontype=codeexec.execute(
+@classify_step.when(TextContains("content_type", "image"))
+def process_image(result):
+    return codeexec.execute(
         code="process_image_content({{content}})"
-    ),
-    depends_on=[classify_step],
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=TextContains(
-            text="{{steps.classify.content_type}}",
-            value="image"
-        )
     )
-)
 
-process_document = Step(
-    agent=content_processor,
-    key="process_document",
-    actiontype=llm.message(
+@classify_step.when(TextContains("content_type", "document"))
+def process_document(result):
+    return llm.message(
         model="claude-sonnet-4",
         query="Extract and summarize document: {{content}}"
-    ),
-    depends_on=[classify_step],
-    execution_mode=ExecutionMode(
-        mode="all",
-        if_condition=TextContains(
-            text="{{steps.classify.content_type}}",
-            value="document"
-        )
     )
-)
 ```
 
 ## Iterative Processing
@@ -312,10 +248,8 @@ email_processor = Agent(
 )
 
 # Process each email in the batch
-process_email_step = Step(
-    agent=email_processor,
-    key="process_email",
-    actiontype=llm.message(
+process_email_step = email_processor.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Process this email: {{email}}",
         response_format={
@@ -333,22 +267,17 @@ process_email_step = Step(
             }
         }
     ),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="emails",  # Iterates over the emails array
-        if_condition=IsSuccess()
-    )
+    key="process_email"
 )
 
 # Generate summary after processing all emails
-summary_step = Step(
-    agent=email_processor,
-    key="summary",
-    actiontype=llm.message(
+summary_step = email_processor.step(
+    llm.message(
         model="claude-sonnet-4",
-        query="Generate summary of processed emails: {{steps.process_email.all_results}}"
+        query="Generate summary of processed emails: {{process_email.output.all_results}}"
     ),
-    depends_on=[process_email_step]
+    key="summary",
+    depends_on=process_email_step
 )
 ```
 
@@ -363,20 +292,11 @@ priority_processor = Agent(
     description="Processes only high-priority items from a collection"
 )
 
-process_priority_item = Step(
-    agent=priority_processor,
-    key="process_item",
-    actiontype=codeexec.execute(
+process_priority_item = priority_processor.step(
+    codeexec.execute(
         code="process_priority_item({{item}})"
     ),
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="items",
-        if_condition=And(
-            IsSuccess(),
-            TextEquals(text="{{item.priority}}", value="high")
-        )
-    )
+    key="process_item"
 )
 ```
 
@@ -396,91 +316,51 @@ resilient_processor = Agent(
 )
 
 # Main processing step
-main_processing = Step(
-    agent=resilient_processor,
-    key="main_process",
-    actiontype=codeexec.execute(
+main_processing = resilient_processor.step(
+    codeexec.execute(
         code="{{generated_code}}",
         parameters={"data": "{{input_data}}"}
-    )
+    ),
+    key="main_process"
 )
 
 # Success handler - normal flow continuation
-success_handler = ResultHandler(
-    step=main_processing,
-    type="final",
-    if_conditions=IsSuccess(),
-    result_handler_order=0
-)
+@main_processing.when(IsSuccess())
+def handle_success(result):
+    return utils.send_status(
+        status="completed",
+        message="Processing completed successfully",
+        data=result.output
+    )
 
 # Retry handler for transient errors
-retry_handler = ResultHandler(
-    step=main_processing,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        LessThan(number="{{retry_count}}", value="3"),
-        TextContains(text="{{error}}", value="timeout")
-    ),
-    result_handler_order=1
-)
-
-# Fallback handler for code generation errors
-fallback_handler = ResultHandler(
-    step=main_processing,
-    type="intermediate",
-    if_conditions=And(
-        IsError(),
-        TextContains(text="{{error}}", value="syntax")
-    ),
-    result_handler_order=2
-)
-
-# Critical error handler
-critical_handler = ResultHandler(
-    step=main_processing,
-    type="final",
-    if_conditions=And(
-        IsError(),
-        GreaterThan(number="{{retry_count}}", value="2")
-    ),
-    result_handler_order=3
-)
-
-# Retry logic with exponential backoff
-retry_step = Step(
-    result_handler=retry_handler,
-    key="retry",
-    actiontype=utils.echo(
+@main_processing.when(IsError() & LessThan("retry_count", 3) & TextContains("error", "timeout"))
+def retry_on_timeout(error):
+    return utils.echo(
         data={
             "retry_count": "{{increment retry_count}}",
             "backoff_time": "{{multiply retry_count 5}}",
             "last_error": "{{error}}"
         }
     )
-)
 
-# Regenerate code on syntax errors
-regenerate_step = Step(
-    result_handler=fallback_handler,
-    key="regenerate",
-    actiontype=llm.message(
+# Fallback handler for code generation errors
+@main_processing.when(IsError() & TextContains("error", "syntax"))
+def regenerate_code(error):
+    return llm.message(
         model="claude-sonnet-4",
         query="Fix the code error: {{error}}\nOriginal code: {{generated_code}}",
         system_prompt="Fix syntax and logical errors in the code."
     )
-)
 
-# Alert on critical failures
-alert_step = Step(
-    result_handler=critical_handler,
-    key="alert",
-    actiontype=utils.send_status(
+# Critical error handler
+@main_processing.when(IsError() & GreaterThan("retry_count", 2))
+def handle_critical_failure(error):
+    return utils.send_status(
         status="error",
         message="Critical processing failure after {{retry_count}} attempts",
         details={"final_error": "{{error}}"}
     )
-)
 ```
 
 ## Advanced Workflow Patterns
@@ -497,57 +377,52 @@ pipeline_orchestrator = Agent(
 )
 
 # Stage 1: Data ingestion and validation
-ingest_data = Step(
-    agent=pipeline_orchestrator,
-    key="ingest",
-    actiontype=bot.invoke(
+ingest_data = pipeline_orchestrator.step(
+    bot.invoke(
         bot_name="data ingestion bot",
         parameters={"source": "{{data_source}}"}
-    )
+    ),
+    key="ingest"
 )
 
 # Stage 2: Data cleaning and preprocessing
-clean_data = Step(
-    agent=pipeline_orchestrator,
-    key="clean",
-    actiontype=bot.invoke(
+clean_data = pipeline_orchestrator.step(
+    bot.invoke(
         bot_name="data cleaner bot",
-        parameters={"raw_data": "{{steps.ingest.processed_data}}"}
+        parameters={"raw_data": "{{ingest.output.processed_data}}"}
     ),
-    depends_on=[ingest_data]
+    key="clean",
+    depends_on=ingest_data
 )
 
 # Stage 3: Feature engineering
-engineer_features = Step(
-    agent=pipeline_orchestrator,
-    key="features",
-    actiontype=bot.invoke(
+engineer_features = pipeline_orchestrator.step(
+    bot.invoke(
         bot_name="feature engineering bot",
-        parameters={"clean_data": "{{steps.clean.cleaned_data}}"}
+        parameters={"clean_data": "{{clean.output.cleaned_data}}"}
     ),
-    depends_on=[clean_data]
+    key="features",
+    depends_on=clean_data
 )
 
 # Stage 4: Model training
-train_model = Step(
-    agent=pipeline_orchestrator,
-    key="train",
-    actiontype=bot.invoke(
+train_model = pipeline_orchestrator.step(
+    bot.invoke(
         bot_name="model training bot",
-        parameters={"features": "{{steps.features.feature_data}}"}
+        parameters={"features": "{{features.output.feature_data}}"}
     ),
-    depends_on=[engineer_features]
+    key="train",
+    depends_on=engineer_features
 )
 
 # Stage 5: Model validation
-validate_model = Step(
-    agent=pipeline_orchestrator,
-    key="validate",
-    actiontype=bot.invoke(
+validate_model = pipeline_orchestrator.step(
+    bot.invoke(
         bot_name="model validation bot",
-        parameters={"model": "{{steps.train.trained_model}}"}
+        parameters={"model": "{{train.output.trained_model}}"}
     ),
-    depends_on=[train_model]
+    key="validate",
+    depends_on=train_model
 )
 ```
 
@@ -563,10 +438,8 @@ adaptive_agent = Agent(
 )
 
 # Analyze requirements and generate workflow plan
-plan_workflow = Step(
-    agent=adaptive_agent,
-    key="plan",
-    actiontype=llm.message(
+plan_workflow = adaptive_agent.step(
+    llm.message(
         model="claude-sonnet-4",
         query="Create processing plan for: {{requirements}}",
         response_format={
@@ -590,27 +463,23 @@ plan_workflow = Step(
                 }
             }
         }
-    )
+    ),
+    key="plan"
 )
 
 # Execute dynamic steps based on plan
-execute_dynamic_step = Step(
-    agent=adaptive_agent,
-    key="execute_dynamic",
-    actiontype=codeexec.execute(
+execute_dynamic_step = adaptive_agent.step(
+    codeexec.execute(
         code="""
 # Execute workflow steps dynamically
-plan = {{steps.plan.steps}}
+plan = {{plan.output.steps}}
 for step in plan:
     if evaluate_condition(step['condition']):
         execute_step(step['name'], step['action'])
 """
     ),
-    depends_on=[plan_workflow],
-    execution_mode=ExecutionMode(
-        mode="iterate_over",
-        data="steps.plan.steps"
-    )
+    key="execute_dynamic",
+    depends_on=plan_workflow
 )
 ```
 
@@ -622,10 +491,8 @@ for step in plan:
   <Tab title="Caching Strategy">
     ```python
     # Implement intelligent caching
-    cached_processor = Step(
-        agent=agent,
-        key="cached_process",
-        actiontype=codeexec.execute(
+    cached_processor = agent.step(
+        codeexec.execute(
             code="""
     # Check cache first
     cache_key = generate_cache_key({{input_params}})
@@ -638,7 +505,8 @@ for step in plan:
         cache_result(cache_key, result)
         return result
     """
-        )
+        ),
+        key="cached_process"
     )
     ```
 
@@ -646,10 +514,8 @@ for step in plan:
   <Tab title="Batch Processing">
     ```python
     # Process items in optimized batches
-    batch_processor = Step(
-        agent=agent,
-        key="batch_process",
-        actiontype=codeexec.execute(
+    batch_processor = agent.step(
+        codeexec.execute(
             code="""
     # Process in optimal batch sizes
     batch_size = calculate_optimal_batch_size({{data_size}})
@@ -661,7 +527,8 @@ for step in plan:
 
     return aggregate_results(results)
     """
-        )
+        ),
+        key="batch_process"
     )
     ```
 
@@ -669,10 +536,8 @@ for step in plan:
   <Tab title="Resource Management">
     ```python
     # Manage computational resources
-    resource_aware_step = Step(
-        agent=agent,
-        key="resource_aware",
-        actiontype=codeexec.execute(
+    resource_aware_step = agent.step(
+        codeexec.execute(
             code="""
     # Adjust processing based on available resources
     available_memory = get_available_memory()
@@ -685,7 +550,8 @@ for step in plan:
 
     set_parallel_workers(min(cpu_cores, data_chunks))
     """
-        )
+        ),
+        key="resource_aware"
     )
     ```
 
@@ -706,10 +572,8 @@ monitored_agent = Agent(
 )
 
 # Add monitoring step
-monitor_start = Step(
-    agent=monitored_agent,
-    key="monitor_start",
-    actiontype=utils.send_status(
+monitor_start = monitored_agent.step(
+    utils.send_status(
         status="started",
         message="Workflow started",
         details={
@@ -717,14 +581,13 @@ monitor_start = Step(
             "input_size": "{{data_size}}",
             "expected_duration": "{{estimated_time}}"
         }
-    )
+    ),
+    key="monitor_start"
 )
 
 # Main processing with progress updates
-main_process = Step(
-    agent=monitored_agent,
-    key="main_process",
-    actiontype=codeexec.execute(
+main_process = monitored_agent.step(
+    codeexec.execute(
         code="""
 # Processing with progress tracking
 total_items = len({{input_data}})
@@ -742,23 +605,23 @@ for item in {{input_data}}:
 return {"processed_count": processed, "success_rate": calculate_success_rate()}
 """
     ),
-    depends_on=[monitor_start]
+    key="main_process",
+    depends_on=monitor_start
 )
 
 # Monitor completion
-monitor_end = Step(
-    agent=monitored_agent,
-    key="monitor_end",
-    actiontype=utils.send_status(
+monitor_end = monitored_agent.step(
+    utils.send_status(
         status="completed",
         message="Workflow completed successfully",
         details={
             "duration": "{{execution_time}}",
-            "processed_items": "{{steps.main_process.processed_count}}",
-            "success_rate": "{{steps.main_process.success_rate}}"
+            "processed_items": "{{main_process.output.processed_count}}",
+            "success_rate": "{{main_process.output.success_rate}}"
         }
     ),
-    depends_on=[main_process]
+    key="monitor_end",
+    depends_on=main_process
 )
 ```
 

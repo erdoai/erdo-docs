@@ -1,164 +1,380 @@
 ---
-title: "Welcome to Erdo"
-description: "Deploy production-ready AI agents in seconds"
+title: "Introduction"
+description: "Welcome to Erdo - Build powerful AI agents with Python"
 ---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Hero Dark"
+/>
 
 # Welcome to Erdo
 
-Erdo is the deployment platform for AI agents. Write agents in Python, deploy with one command. We handle state persistence, monitoring, and scaling so you can focus on building.
+Erdo is a powerful platform for building AI agents that can automate complex workflows, integrate with external services, and make intelligent decisions. With our Python SDK, you can create sophisticated automation that combines language models, code execution, web research, and custom integrations.
+
+## What Makes Erdo Different?
 
 <CardGroup cols={2}>
-  <Card title="Quick Start" icon="rocket" href="/quickstart">
-    Deploy your first agent in under 5 minutes
+  <Card title="Agent-Centric Design" icon="robot">
+    Build workflows with intuitive agent.step() methods and clean result
+    handling
   </Card>
-  <Card title="SDK Reference" icon="code" href="/sdk/overview">
-    Build sophisticated agents with our Python SDK
+  <Card title="Multi-Modal Actions" icon="layers">
+    Combine LLMs, code execution, web search, and memory in single workflows
   </Card>
-  <Card title="Platform Guide" icon="server" href="/platform/overview">
-    Learn about our infrastructure and capabilities
+  <Card title="Smart Result Handling" icon="brain">
+    Use decorators and direct handlers for sophisticated conditional logic
   </Card>
-  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
-    Production-ready patterns and implementations
-  </Card>
-</CardGroup>
-
-## Why Choose Erdo?
-
-<AccordionGroup>
-<Accordion title="From Code to Production in One Command">
-  No Docker, no Kubernetes, no infrastructure. Just `erdo sync` and your agent is live with a production URL.
-</Accordion>
-
-<Accordion title="Persistent State Management">
-  Your agents maintain state across deployments and restarts. Built-in retry
-  handling for failed steps and recovery from interruptions.
-</Accordion>
-
-<Accordion title="Production Infrastructure Built In">
-  Monitoring, logging, event streaming, parallel execution, and resource
-  management. Everything you need to run agents at scale.
-</Accordion>
-
-<Accordion title="Git-Based Workflow">
-  Connect your repo. Push to deploy. Automatic rollbacks, preview branches, and zero-downtime updates.
-</Accordion>
-</AccordionGroup>
-
-## How Erdo Works
-
-1. **Write your agent** using our Python SDK
-2. **Test locally** with `erdo run`
-3. **Deploy to production** with `erdo sync`
-4. **Monitor and iterate** through our dashboard
-
-Your agent automatically gets:
-
-- **Production URL** - `https://your-agent.erdo.ai`
-- **Persistent state** - Survives restarts and redeploys
-- **Automatic retries** - Failed steps retry intelligently
-- **Real-time monitoring** - Logs, metrics, and debugging
-- **API & UI access** - REST API and chat interface
-
-## Core Platform Features
-
-<CardGroup cols={2}>
-  <Card
-    title="State Management"
-    icon="database"
-    href="/platform/state-management"
-  >
-    Distributed state that persists across executions
-  </Card>
-  <Card
-    title="Workflow Engine"
-    icon="diagram-project"
-    href="/platform/workflows"
-  >
-    Parallel execution, conditionals, and human-in-the-loop
-  </Card>
-  <Card title="Monitoring" icon="chart-line" href="/platform/monitoring">
-    Real-time logs, metrics, and performance tracking
-  </Card>
-  <Card title="Integrations" icon="plug" href="/platform/integrations">
-    100+ built-in tools and custom function support
+  <Card title="Production Ready" icon="rocket">
+    Built-in error handling, retry logic, and scalable deployment
   </Card>
 </CardGroup>
 
-## Build Powerful Agents
+## Quick Example
 
-Erdo agents are composed of:
+Here's a complete AI agent that analyzes data and makes intelligent decisions:
 
-1. **[Agents](/concepts/agents)** - Orchestrators that coordinate your workflow
-2. **[Steps](/concepts/steps)** - Individual tasks in your automation
-3. **[Actions](/concepts/actions)** - What each step actually does (LLM calls, web searches, etc.)
-4. **[Tools](/concepts/tools)** - External integrations and custom functions
-5. **[Result Handlers](/concepts/result-handlers)** - Conditional logic based on outcomes
+```python
+from erdo import Agent
+from erdo.actions import llm, memory, codeexec, utils
+from erdo.conditions import IsSuccess, GreaterThan, IsError
 
-## Production Use Cases
+# Create your agent
+data_analyst = Agent(
+    name="smart_data_analyst",
+    description="Analyzes data and provides intelligent insights"
+)
 
-<CardGroup cols={3}>
-  <Card
-    title="Customer Support"
-    icon="headset"
-    href="/examples/support-automation"
-  >
-    Deploy agents that handle tickets with persistent context
-  </Card>
-  <Card title="Data Pipelines" icon="database" href="/examples/data-processing">
-    Process datasets with agents that handle failures gracefully
-  </Card>
-  <Card
-    title="Research Automation"
-    icon="magnifying-glass"
-    href="/examples/research-assistant"
-  >
-    Research agents that gather insights over time
-  </Card>
-  <Card title="Code Review" icon="code-branch" href="/examples/code-review">
-    Automated PR reviews with memory of your codebase
-  </Card>
-  <Card
-    title="Content Workflows"
-    icon="pen-to-square"
-    href="/examples/content-creation"
-  >
-    Multi-stage content creation with approvals
-  </Card>
-  <Card title="Monitoring & Alerts" icon="bell" href="/examples/monitoring">
-    Intelligent alerting with context awareness
-  </Card>
-</CardGroup>
+# Step 1: Analyze the data
+analysis_step = data_analyst.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze this dataset and provide insights: {{dataset}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "insights": {"type": "array"},
+                    "confidence": {"type": "number"},
+                    "recommendations": {"type": "array"}
+                }
+            }
+        }
+    )
+)
 
-## Get Started in 60 Seconds
+# Step 2: Generate code for deeper analysis
+code_generation = data_analyst.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Generate Python code to validate these insights: {{analysis_step.output.insights}}",
+        system_prompt="You are an expert data scientist. Generate clean, efficient Python code."
+    ),
+    depends_on=analysis_step
+)
 
-```bash
-# Install Erdo CLI
-pip install erdo
+# Step 3: Execute the generated code
+code_execution = data_analyst.step(
+    codeexec.execute(
+        code_files=[{
+            "filename": "validation.py",
+            "content": "{{code_generation.output.code}}"
+        }]
+    ),
+    depends_on=code_generation
+)
 
-# Create your first agent
-erdo create customer-support-agent
-cd customer-support-agent
+# Handle high-confidence results with decorator
+@analysis_step.when(IsSuccess() & GreaterThan("confidence", "0.8"))
+def store_high_confidence_insights(result):
+    """Store high-confidence insights for future reference."""
+    return memory.store(memory={
+        "content": result.output.insights,
+        "type": "verified_insights",
+        "tags": ["analysis", "high-confidence", "{{domain}}"],
+        "extra": {
+            "confidence": result.output.confidence,
+            "recommendations": result.output.recommendations
+        }
+    })
 
-# Deploy to production
-erdo sync
+# Handle successful code execution with direct handler
+code_execution.on(
+    IsSuccess(),
+    utils.send_status(
+        status="analysis_complete",
+        message="Data analysis completed successfully"
+    ),
+    memory.store(memory={
+        "content": "{{code_execution.output.result}}",
+        "type": "code_validation_result"
+    })
+)
 
-# ✓ Agent deployed to https://customer-support-agent.erdo.ai
+# Handle errors gracefully
+@code_execution.when(IsError())
+def handle_execution_error(error):
+    """Handle code execution failures with fallback."""
+    return utils.send_status(
+        status="execution_failed",
+        message=f"Code execution failed: {error.message}. Using original analysis.",
+        fallback_data=analysis_step.output.insights
+    )
 ```
 
+## Core Concepts
+
+### Agents
+
+Agents are the main containers for your AI workflows. They orchestrate multiple steps and handle complex decision-making:
+
+```python
+agent = Agent(
+    name="my_automation_agent",
+    description="Automates business processes with AI",
+    visibility="organization"
+)
+```
+
+### Steps
+
+Steps are individual actions within an agent workflow. Each step can perform LLM calls, execute code, search the web, or interact with external services:
+
+```python
+step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="{{user_input}}"
+    ),
+    depends_on=previous_step
+)
+```
+
+### Result Handlers
+
+Handle step outcomes with conditional logic using decorators or direct methods:
+
+```python
+# Decorator approach
+@step.when(IsSuccess() & GreaterThan("score", "0.8"))
+def handle_success(result):
+    return memory.store(memory={"content": result.output.data})
+
+# Direct approach
+step.on(
+    IsSuccess(),
+    utils.send_status(status="completed", message="Processing finished")
+)
+```
+
+### Actions
+
+Actions are the building blocks that define what each step does:
+
+- **LLM Actions**: Generate text, analyze content, make decisions
+- **Code Execution**: Run Python scripts, process data, perform calculations
+- **Memory Operations**: Store and retrieve information across workflows
+- **Web Research**: Search the internet, parse websites, gather information
+- **Utility Actions**: Send notifications, manage state, debug workflows
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Business Process Automation">
+    Automate complex business workflows like invoice processing, customer onboarding, and document analysis:
+    
+    ```python
+    invoice_processor = Agent(name="invoice_processor")
+    
+    extract_step = invoice_processor.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="Extract key information from this invoice: {{invoice_image}}"
+        )
+    )
+    
+    @extract_step.when(IsSuccess())
+    def validate_and_store(result):
+        return memory.store(memory={
+            "content": result.output.invoice_data,
+            "type": "processed_invoice"
+        })
+    ```
+  </Accordion>
+
+  <Accordion title="Data Analysis & Insights">
+    Build intelligent data analysis workflows that combine AI reasoning with code execution:
+    
+    ```python
+    analyst = Agent(name="data_analyst")
+    
+    analysis_step = analyst.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="Analyze trends in this data: {{dataset}}"
+        )
+    )
+    
+    code_step = analyst.step(
+        codeexec.execute(
+            code_files=[{
+                "filename": "analysis.py",
+                "content": "generate_statistical_analysis({{dataset}})"
+            }]
+        ),
+        depends_on=analysis_step
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Content Generation & Management">
+    Create AI-powered content workflows for marketing, documentation, and communication:
+    
+    ```python
+    content_creator = Agent(name="content_creator")
+    
+    research_step = content_creator.step(
+        websearch.search(query="{{topic}} latest trends")
+    )
+    
+    content_step = content_creator.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="Create engaging content about {{topic}} using: {{research_step.output.results}}"
+        ),
+        depends_on=research_step
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Customer Support Automation">
+    Build intelligent customer support agents that understand context and provide personalized responses:
+    
+    ```python
+    support_agent = Agent(name="customer_support")
+    
+    context_step = support_agent.step(
+        memory.search(
+            query="{{customer_message}} {{customer_id}}",
+            limit=5
+        )
+    )
+    
+    response_step = support_agent.step(
+        llm.message(
+            model="claude-sonnet-4",
+            query="{{customer_message}}",
+            context="{{context_step.output.memories}}"
+        ),
+        depends_on=context_step
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Key Features
+
+### Intelligent Decision Making
+
+Agents can make complex decisions based on data analysis, confidence scores, and business rules:
+
+```python
+@decision_step.when(IsSuccess() & GreaterThan("risk_score", "0.7"))
+def escalate_high_risk(result):
+    return utils.send_status(
+        status="escalated",
+        message="High risk detected - human review required"
+    )
+```
+
+### Error Handling & Recovery
+
+Built-in error handling with retry logic and graceful degradation:
+
+```python
+@process_step.when(IsError())
+def retry_with_fallback(error):
+    return codeexec.execute(
+        code_files=[{
+            "filename": "fallback.py",
+            "content": "fallback_processing({{input_data}})"
+        }]
+    )
+```
+
+### Memory & Context Management
+
+Persistent memory across workflow executions for context-aware processing:
+
+```python
+memory_step = agent.step(
+    memory.store(memory={
+        "content": "{{analysis_results}}",
+        "type": "customer_insight",
+        "tags": ["analysis", "{{customer_id}}"]
+    })
+)
+```
+
+### Scalable Deployment
+
+Deploy agents to production with built-in monitoring, logging, and scaling:
+
+```bash
+# Deploy your agent
+erdo sync
+
+# Monitor performance
+erdo logs my_agent
+
+# Scale based on demand
+erdo scale my_agent --instances 5
+```
+
+## Getting Started
+
+<Steps>
+  <Step title="Install Erdo CLI">```bash brew install erdoai/tap/erdo ```</Step>
+  <Step title="Authenticate">```bash erdo login ```</Step>
+  <Step title="Create Your First Agent">
+    ```bash erdo init my-first-agent cd my-first-agent ```
+  </Step>
+  <Step title="Build Your Workflow">
+    Edit the generated Python file to define your agent's workflow with steps
+    and result handlers.
+  </Step>
+  <Step title="Deploy">```bash erdo sync ```</Step>
+</Steps>
+
+## Next Steps
+
 <CardGroup cols={2}>
-  <Card title="5-Minute Tutorial" icon="graduation-cap" href="/quickstart">
-    Build and deploy your first production agent
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Build your first agent in under 10 minutes
   </Card>
-  <Card title="Platform Docs" icon="book" href="/platform/overview">
-    Deep dive into Erdo's infrastructure
+  <Card title="Core Concepts" icon="book" href="/concepts/overview">
+    Understand agents, steps, actions, and result handlers
+  </Card>
+  <Card title="Python SDK" icon="code" href="/sdk/overview">
+    Explore the full SDK capabilities and API reference
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
+    See complete agent implementations for common use cases
   </Card>
 </CardGroup>
 
----
+## Community & Support
 
-<Note>
-  **Coming Soon**: Deploy existing LangGraph, CrewAI, and AutoGen agents
-  directly to Erdo. [Join the waitlist →](https://erdo.ai/waitlist)
-</Note>
+- **Documentation**: Comprehensive guides and API reference
+- **Examples**: Ready-to-use agent templates and patterns
+- **Community**: Join our Discord for support and discussions
+- **GitHub**: Open source tools and community contributions
 
-Need help? Join our [Discord community](https://discord.gg/erdo) • Star us on [GitHub](https://github.com/erdoai) • Read the [Blog](https://erdo.ai/blog)
+Ready to build your first AI agent? Start with our [Quick Start Guide](/quickstart) or explore the [SDK Overview](/sdk/overview) for detailed technical information.

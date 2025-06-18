@@ -19,7 +19,14 @@ Erdo is built around a few key concepts that work together to create powerful AI
   <Card title="Actions" icon="bolt" href="/sdk/actions">
     Specific operations like LLM calls, code execution, or web searches
   </Card>
-  <Card title="Tools" icon="wrench">
+  <Card
+    title="Result Handlers"
+    icon="code-branch"
+    href="/concepts/result-handlers"
+  >
+    Conditional logic that responds to step outcomes and controls workflow flow
+  </Card>
+  <Card title="Tools" icon="wrench" href="/concepts/tools">
     External integrations that extend agent capabilities
   </Card>
 </CardGroup>
@@ -67,7 +74,16 @@ graph TD
 - **Web Research**: Search and parse web content
 - **Utility Actions**: Data transformation and flow control
 
-### 4. Tools & Integrations
+### 4. Result Handlers
+
+**Result Handlers** add conditional logic to your workflows:
+
+- **Conditional Execution**: Run different steps based on outcomes
+- **Error Recovery**: Handle failures and implement retry logic
+- **Dynamic Routing**: Branch workflows based on data or results
+- **Success Actions**: Execute follow-up steps when conditions are met
+
+### 5. Tools & Integrations
 
 **Tools** extend agent capabilities:
 
@@ -88,6 +104,7 @@ graph TD
   </Accordion>
 
 {" "}
+
 <Accordion title="Memory & Learning">
   - Persistent knowledge storage across executions - Semantic search for
   relevant information - Organizational knowledge sharing - Continuous learning
@@ -95,9 +112,12 @@ graph TD
 </Accordion>
 
 {" "}
-<Accordion title="Security & Compliance">
-  - Sandboxed code execution environment - Role-based access controls - Data
-  encryption and privacy protection - Audit logging and compliance tracking
+
+{" "}
+
+<Accordion title="Security Features">
+  - Sandboxed code execution environment - Role-based access controls - Secure
+  credential management - Input validation and safety controls
 </Accordion>
 
   <Accordion title="Scalability & Performance">
@@ -168,9 +188,9 @@ Raw Content → Classification → Extraction → Transformation → Distributio
   </Tab>
   <Tab title="Security">
     - **Input Validation**: Always validate external inputs - **Access
-    Control**: Use appropriate visibility settings - **Secret Management**:
-    Secure API keys and credentials - **Audit Logging**: Track important actions
-    and decisions
+    Control**: Use appropriate visibility settings - **Credential Management**:
+    Use secure storage for API keys - **Resource Limits**: Set appropriate
+    constraints and timeouts
   </Tab>
 </Tabs>
 
