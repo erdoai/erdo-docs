@@ -1,0 +1,123 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Erdo Docs",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373"
+  },
+  "favicon": "/favicon.ico",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": ["introduction", "quickstart", "installation"]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "concepts/overview",
+          "concepts/agents",
+          "concepts/steps",
+          "concepts/actions",
+          "concepts/tools",
+          "concepts/result-handlers"
+        ]
+      },
+      {
+        "group": "Examples & Use Cases",
+        "pages": ["examples/business-automation", "examples/data-analysis"]
+      },
+      {
+        "group": "Python SDK",
+        "pages": ["sdk/overview", "sdk/actions", "sdk/workflows"]
+      },
+      {
+        "group": "CLI Tools",
+        "pages": [
+          "cli/overview",
+          "cli/commands",
+          "cli/login",
+          "cli/development",
+          "cli/deployment"
+        ]
+      },
+      {
+        "group": "Pre-built Bots",
+        "pages": [
+          "bots/security-checker",
+          "bots/data-analyst",
+          "bots/file-analyzer",
+          "bots/data-quality-checker",
+          "bots/integration-analyzer",
+          "bots/data-question-answerer",
+          "bots/memory-manager"
+        ]
+      },
+      {
+        "group": "Advanced",
+        "pages": [
+          "advanced/deployment",
+          "advanced/dynamic-actions",
+          "advanced/memory-management",
+          "advanced/utility-debugging",
+          "advanced/websocket-streaming",
+          "advanced/background-tasks",
+          "advanced/billing-usage",
+          "advanced/security",
+          "troubleshooting"
+        ]
+      },
+      {
+        "group": "Integrations",
+        "pages": ["integrations/overview", "integrations/creating-integrations"]
+      }
+    ]
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "href": "https://github.com/erdoai",
+      "icon": "github"
+    },
+    {
+      "name": "Community",
+      "href": "https://discord.gg/erdo",
+      "icon": "discord"
+    },
+    {
+      "name": "Blog",
+      "href": "https://erdo.ai/blog",
+      "icon": "newspaper"
+    }
+  ],
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Platform",
+        "href": "https://erdo.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://erdo.ai/signup"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/erdoai",
+      "linkedin": "https://linkedin.com/company/erdo-ai"
+    }
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  }
+}

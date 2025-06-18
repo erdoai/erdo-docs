@@ -1,0 +1,591 @@
+---
+title: "Business Automation"
+description: "Automate repetitive business processes with intelligent AI agents"
+---
+
+# Business Automation Examples
+
+Transform your business operations with intelligent automation. These examples show how to build agents that handle common business tasks, from email management to data processing and workflow orchestration.
+
+## Email Response Automation
+
+Automatically generate contextual responses to customer emails:
+
+```python
+from erdo import Agent, Step
+from erdo.actions import llm, memory, utils
+from erdo.tools import EmailTool
+
+# Create email automation agent
+email_agent = Agent(
+    name="email_assistant",
+    description="Automatically responds to customer emails with personalized, contextual replies"
+)
+
+# Step 1: Analyze incoming email
+analyze_step = Step(
+    agent=email_agent,
+    key="analyze_email",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="""
+        Analyze this email and extract:
+        1. Customer intent and urgency
+        2. Required response type
+        3. Key information needed
+
+        Email: {{email_content}}
+        """
+    )
+)
+
+# Step 2: Search for relevant context
+context_step = Step(
+    agent=email_agent,
+    key="get_context",
+    actiontype=memory.search(
+        query="{{steps.analyze_email.intent}}",
+        limit=5,
+        organization="{{organization_id}}"
+    ),
+    depends_on=[analyze_step]
+)
+
+# Step 3: Generate personalized response
+response_step = Step(
+    agent=email_agent,
+    key="generate_response",
+    actiontype=llm.message(
+        model="gpt-4",
+        query="""
+        Generate a professional, helpful response based on:
+        - Email analysis: {{steps.analyze_email.analysis}}
+        - Company context: {{steps.get_context.results}}
+        - Customer history: {{customer_history}}
+
+        Tone: Professional but friendly
+        Include: Specific solutions and next steps
+        """
+    ),
+    depends_on=[context_step]
+)
+```
+
+<Accordion title="Advanced Email Features">
+  ```python
+  # Add email classification
+  classify_step = Step(
+      agent=email_agent,
+      key="classify",
+      actiontype=llm.structured(
+          model="claude-sonnet-4",
+          query="Classify this email: {{email_content}}",
+          schema={
+              "category": ["support", "sales", "billing", "general"],
+              "priority": ["high", "medium", "low"],
+              "requires_human": bool
+          }
+      )
+  )
+
+# Route based on classification
+
+from erdo import ResultHandler
+from erdo.\_generated.condition import Equals
+
+human_routing = ResultHandler(
+step=classify_step,
+type="route",
+if_conditions=Equals(
+value="{{steps.classify.requires_human}}",
+comparison=True
+),
+action="forward_to_human"
+)
+
+````
+</Accordion>
+
+## Document Processing Pipeline
+
+Automate document analysis and data extraction:
+
+```python
+from erdo import Agent, Step
+from erdo.actions import codeexec, llm, utils
+
+# Document processing agent
+doc_agent = Agent(
+  name="document_processor",
+  description="Processes business documents and extracts structured data"
+)
+
+# Step 1: Extract text from documents
+extract_step = Step(
+  agent=doc_agent,
+  key="extract_text",
+  actiontype=codeexec.execute(
+      code="""
+      import PyPDF2
+      import pandas as pd
+      from pathlib import Path
+
+      def process_document(file_path):
+          file_path = Path(file_path)
+
+          if file_path.suffix == '.pdf':
+              with open(file_path, 'rb') as file:
+                  reader = PyPDF2.PdfReader(file)
+                  text = ""
+                  for page in reader.pages:
+                      text += page.extract_text()
+              return text
+          else:
+              # Handle other formats
+              with open(file_path, 'r') as file:
+                  return file.read()
+
+      result = process_document('{{document_path}}')
+      print(result)
+      """,
+      entrypoint="extract.py"
+  )
+)
+
+# Step 2: Structure data extraction
+structure_step = Step(
+  agent=doc_agent,
+  key="extract_data",
+  actiontype=llm.structured(
+      model="gpt-4",
+      query="""
+      Extract structured data from this document:
+      {{steps.extract_text.output}}
+
+      Focus on: dates, amounts, names, addresses, key terms
+      """,
+      schema={
+          "document_type": str,
+          "key_dates": ["date"],
+          "financial_data": {
+              "amounts": ["float"],
+              "currency": str
+          },
+          "entities": {
+              "people": ["str"],
+              "organizations": ["str"],
+              "locations": ["str"]
+          },
+          "summary": str
+      }
+  ),
+  depends_on=[extract_step]
+)
+
+# Step 3: Generate business insights
+insights_step = Step(
+  agent=doc_agent,
+  key="generate_insights",
+  actiontype=llm.message(
+      model="claude-sonnet-4",
+      query="""
+      Based on the extracted data: {{steps.extract_data.structured_data}}
+
+      Generate actionable business insights:
+      1. Key findings and patterns
+      2. Compliance requirements
+      3. Follow-up actions needed
+      4. Risk assessment
+      """
+  ),
+  depends_on=[structure_step]
+)
+````
+
+## Sales Lead Qualification
+
+Automatically qualify and score incoming sales leads:
+
+```python
+from erdo import Agent, Step
+from erdo.actions import llm, websearch, memory
+
+# Lead qualification agent
+sales_agent = Agent(
+    name="lead_qualifier",
+    description="Automatically qualifies and scores sales leads"
+)
+
+# Step 1: Research the company
+research_step = Step(
+    agent=sales_agent,
+    key="company_research",
+    actiontype=websearch.search(
+        query="{{company_name}} business overview recent news",
+        language="en",
+        results_limit=10
+    )
+)
+
+# Step 2: Analyze company fit
+fit_analysis_step = Step(
+    agent=sales_agent,
+    key="analyze_fit",
+    actiontype=llm.structured(
+        model="claude-sonnet-4",
+        query="""
+        Analyze this lead's company fit based on:
+        - Company info: {{lead_data}}
+        - Research results: {{steps.company_research.results}}
+        - Our ideal customer profile: {{icp_criteria}}
+
+        Score each criterion 1-10 and provide reasoning.
+        """,
+        schema={
+            "company_size_score": int,
+            "industry_fit_score": int,
+            "technology_stack_score": int,
+            "budget_likelihood_score": int,
+            "decision_maker_access_score": int,
+            "overall_score": int,
+            "reasoning": str,
+            "next_actions": ["str"]
+        }
+    ),
+    depends_on=[research_step]
+)
+
+# Step 3: Generate personalized outreach
+outreach_step = Step(
+    agent=sales_agent,
+    key="create_outreach",
+    actiontype=llm.message(
+        model="gpt-4",
+        query="""
+        Create a personalized sales outreach message based on:
+        - Lead analysis: {{steps.analyze_fit}}
+        - Company research: {{steps.company_research.results}}
+        - Our value proposition: {{value_prop}}
+
+        Make it specific, valuable, and compelling.
+        Include a clear call-to-action.
+        """
+    ),
+    depends_on=[fit_analysis_step]
+)
+```
+
+## Inventory Management Automation
+
+Automate inventory tracking and reorder decisions:
+
+```python
+from erdo import Agent, Step, ExecutionMode
+from erdo.actions import codeexec, llm, utils
+
+# Inventory management agent
+inventory_agent = Agent(
+    name="inventory_manager",
+    description="Automates inventory tracking, forecasting, and reorder decisions"
+)
+
+# Step 1: Analyze current inventory levels
+analysis_step = Step(
+    agent=inventory_agent,
+    key="analyze_inventory",
+    actiontype=codeexec.execute(
+        code="""
+        import pandas as pd
+        import numpy as np
+        from datetime import datetime, timedelta
+
+        # Load inventory data
+        df = pd.read_csv('{{inventory_file}}')
+
+        # Calculate key metrics
+        def analyze_item(row):
+            current_stock = row['current_quantity']
+            avg_daily_usage = row['avg_daily_usage']
+            lead_time = row['supplier_lead_time']
+            safety_stock = row['safety_stock']
+
+            # Days of stock remaining
+            days_remaining = current_stock / avg_daily_usage if avg_daily_usage > 0 else float('inf')
+
+            # Reorder point
+            reorder_point = (avg_daily_usage * lead_time) + safety_stock
+
+            # Stock status
+            if current_stock <= reorder_point:
+                status = 'REORDER_NOW'
+            elif days_remaining <= 7:
+                status = 'LOW_STOCK'
+            else:
+                status = 'NORMAL'
+
+            return {
+                'item_id': row['item_id'],
+                'current_stock': current_stock,
+                'days_remaining': days_remaining,
+                'reorder_point': reorder_point,
+                'status': status,
+                'suggested_order_qty': row['economic_order_quantity']
+            }
+
+        analysis = df.apply(analyze_item, axis=1).tolist()
+        print(json.dumps(analysis, indent=2))
+        """,
+        entrypoint="inventory_analysis.py"
+    ),
+    execution_mode=ExecutionMode(mode="all")
+)
+
+# Step 2: Generate reorder recommendations
+recommendations_step = Step(
+    agent=inventory_agent,
+    key="reorder_recommendations",
+    actiontype=llm.structured(
+        model="claude-sonnet-4",
+        query="""
+        Based on inventory analysis: {{steps.analyze_inventory.output}}
+
+        Generate reorder recommendations considering:
+        - Seasonal trends
+        - Supplier reliability
+        - Budget constraints
+        - Storage capacity
+        """,
+        schema={
+            "urgent_reorders": [{
+                "item_id": str,
+                "quantity": int,
+                "supplier": str,
+                "estimated_cost": float,
+                "justification": str
+            }],
+            "upcoming_reorders": [{
+                "item_id": str,
+                "recommended_date": str,
+                "quantity": int
+            }],
+            "optimization_opportunities": ["str"],
+            "total_estimated_cost": float
+        }
+    ),
+    depends_on=[analysis_step]
+)
+
+# Step 3: Auto-generate purchase orders
+purchase_order_step = Step(
+    agent=inventory_agent,
+    key="generate_pos",
+    actiontype=utils.foreach(
+        data="{{steps.reorder_recommendations.urgent_reorders}}",
+        actiontype=codeexec.execute(
+            code="""
+            import json
+            from datetime import datetime
+
+            def generate_purchase_order(item_data):
+                po = {
+                    "po_number": f"PO-{datetime.now().strftime('%Y%m%d')}-{item_data['item_id']}",
+                    "supplier": item_data['supplier'],
+                    "items": [{
+                        "item_id": item_data['item_id'],
+                        "quantity": item_data['quantity'],
+                        "unit_cost": item_data['estimated_cost'] / item_data['quantity']
+                    }],
+                    "total_cost": item_data['estimated_cost'],
+                    "created_date": datetime.now().isoformat(),
+                    "status": "PENDING_APPROVAL"
+                }
+                return po
+
+            po = generate_purchase_order({{item}})
+            print(json.dumps(po, indent=2))
+            """,
+            entrypoint="generate_po.py"
+        )
+    ),
+    depends_on=[recommendations_step]
+)
+```
+
+## Meeting Scheduler Agent
+
+Automatically coordinate meetings across teams:
+
+```python
+from erdo import Agent, Step
+from erdo.actions import llm, utils
+from erdo.tools import CalendarTool
+
+# Meeting coordination agent
+meeting_agent = Agent(
+    name="meeting_scheduler",
+    description="Coordinates and schedules meetings across teams and time zones"
+)
+
+# Step 1: Parse meeting request
+parse_step = Step(
+    agent=meeting_agent,
+    key="parse_request",
+    actiontype=llm.structured(
+        model="claude-sonnet-4",
+        query="""
+        Parse this meeting request: {{meeting_request}}
+
+        Extract all relevant details and requirements.
+        """,
+        schema={
+            "meeting_title": str,
+            "purpose": str,
+            "attendees": ["str"],
+            "duration_minutes": int,
+            "preferred_times": ["str"],
+            "timezone": str,
+            "urgency": ["high", "medium", "low"],
+            "requirements": {
+                "video_conference": bool,
+                "room_booking": bool,
+                "preparation_time": int
+            }
+        }
+    )
+)
+
+# Step 2: Check availability
+availability_step = Step(
+    agent=meeting_agent,
+    key="check_availability",
+    actiontype=utils.foreach(
+        data="{{steps.parse_request.attendees}}",
+        actiontype=utils.call_api(
+            url="{{calendar_api_url}}/availability",
+            method="GET",
+            params={
+                "email": "{{attendee}}",
+                "start_date": "{{start_date}}",
+                "end_date": "{{end_date}}"
+            }
+        )
+    ),
+    depends_on=[parse_step]
+)
+
+# Step 3: Find optimal time slot
+optimize_step = Step(
+    agent=meeting_agent,
+    key="find_optimal_time",
+    actiontype=llm.structured(
+        model="gpt-4",
+        query="""
+        Find the best meeting time based on:
+        - Meeting requirements: {{steps.parse_request}}
+        - Availability data: {{steps.check_availability.results}}
+        - Business hours and time zones
+
+        Consider work-life balance and meeting fatigue.
+        """,
+        schema={
+            "recommended_time": str,
+            "alternative_times": ["str"],
+            "timezone": str,
+            "attendee_conflicts": ["str"],
+            "confidence_score": float,
+            "reasoning": str
+        }
+    ),
+    depends_on=[availability_step]
+)
+
+# Step 4: Send calendar invites
+send_invites_step = Step(
+    agent=meeting_agent,
+    key="send_invites",
+    actiontype=utils.call_api(
+        url="{{calendar_api_url}}/events",
+        method="POST",
+        data={
+            "title": "{{steps.parse_request.meeting_title}}",
+            "start_time": "{{steps.find_optimal_time.recommended_time}}",
+            "duration": "{{steps.parse_request.duration_minutes}}",
+            "attendees": "{{steps.parse_request.attendees}}",
+            "description": "{{steps.parse_request.purpose}}",
+            "video_conference": "{{steps.parse_request.requirements.video_conference}}"
+        }
+    ),
+    depends_on=[optimize_step]
+)
+```
+
+## Results & Analytics
+
+### Performance Metrics
+
+Track the success of your business automation:
+
+<CardGroup cols={2}>
+  <Card title="Email Automation" icon="envelope">
+    - **Response Time**: 95% reduction (24h → 30min) - **Accuracy**: 92%
+    customer satisfaction - **Volume**: 500+ emails/day processed
+  </Card>
+  <Card title="Document Processing" icon="file-text">
+    - **Processing Speed**: 80% faster - **Error Rate**: 3% vs 15% manual -
+    **Cost Savings**: $50k annually
+  </Card>
+  <Card title="Lead Qualification" icon="target">
+    - **Qualification Rate**: 40% increase - **Conversion Rate**: 25%
+    improvement - **Sales Cycle**: 30% reduction
+  </Card>
+  <Card title="Inventory Management" icon="package">
+    - **Stockouts**: 70% reduction - **Carrying Costs**: 25% decrease - **Order
+    Accuracy**: 98%
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Data Quality & Validation">
+    - Implement input validation for all business data
+    - Use structured schemas for consistent outputs
+    - Regular data quality audits and corrections
+    - Backup and versioning for critical processes
+  </Accordion>
+
+{" "}
+<Accordion title="Human-in-the-Loop">
+  - Include approval workflows for high-impact decisions - Provide override
+  mechanisms for edge cases - Regular human review and feedback loops - Clear
+  escalation paths for complex scenarios
+</Accordion>
+
+  <Accordion title="Monitoring & Alerting">
+    - Set up monitoring for all automated processes
+    - Define SLAs and performance thresholds
+    - Implement alerting for failures and anomalies
+    - Regular performance reviews and optimization
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Workflows" icon="flow-chart" href="/sdk/overview">
+    Build more sophisticated multi-step automation
+  </Card>
+  <Card
+    title="Integration Examples"
+    icon="link"
+    href="/examples/development-workflow"
+  >
+    Connect with existing business systems
+  </Card>
+  <Card title="Pre-built Solutions" icon="robot" href="/bots/data-analyst">
+    Leverage ready-made business bots
+  </Card>
+  <Card title="Deployment Guide" icon="rocket" href="/cli/overview">
+    Deploy your automation to production
+  </Card>
+</CardGroup>

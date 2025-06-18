@@ -1,0 +1,287 @@
+---
+title: "Installation"
+description: "Install and set up Erdo on your system"
+---
+
+## Overview
+
+Erdo provides multiple ways to get started, depending on your use case and preferences. This guide covers installation of the CLI, SDK, and platform access.
+
+## Erdo CLI
+
+The CLI is the fastest way to build and deploy Erdo agents.
+
+### Homebrew (Recommended)
+
+<CodeGroup>
+
+```bash macOS/Linux
+brew install erdoai/tap/erdo
+```
+
+```bash Update
+brew upgrade erdo
+```
+
+</CodeGroup>
+
+### Manual Installation
+
+Download the latest release for your platform:
+
+<CodeGroup>
+
+```bash macOS (Intel)
+curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-amd64 -o erdo
+chmod +x erdo
+sudo mv erdo /usr/local/bin/
+```
+
+```bash macOS (Apple Silicon)
+curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-arm64 -o erdo
+chmod +x erdo
+sudo mv erdo /usr/local/bin/
+```
+
+```bash Linux (x86_64)
+curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-linux-amd64 -o erdo
+chmod +x erdo
+sudo mv erdo /usr/local/bin/
+```
+
+```bash Windows
+# Download erdo-windows-amd64.exe from GitHub Releases
+# Add to your PATH
+```
+
+</CodeGroup>
+
+### Verify Installation
+
+```bash
+erdo --version
+```
+
+## Python SDK
+
+Install the Erdo Python SDK to build agents programmatically.
+
+<CodeGroup>
+
+```bash pip
+pip install erdo
+```
+
+```bash Poetry
+poetry add erdo
+```
+
+```bash Conda
+conda install -c conda-forge erdo
+```
+
+</CodeGroup>
+
+### Verify SDK Installation
+
+```python
+import erdo
+print(f"Erdo SDK version: {erdo.__version__}")
+```
+
+## Platform Access
+
+### Create Account
+
+1. Go to [erdo.ai](https://erdo.ai)
+2. Sign up for a free account
+3. Verify your email address
+
+### Authentication
+
+Connect your local tools to the platform:
+
+```bash
+erdo login
+```
+
+This will:
+
+- Open your browser for authentication
+- Store your credentials securely
+- Set up API access for the CLI and SDK
+
+### Verify Authentication
+
+```bash
+erdo whoami
+```
+
+## System Requirements
+
+<CardGroup cols={2}>
+  <Card title="Minimum Requirements" icon="computer">
+    - **OS**: macOS 10.15+, Linux, Windows 10+ - **Memory**: 2GB RAM -
+    **Python**: 3.8+ (for SDK) - **Node.js**: 16+ (for development)
+  </Card>
+  <Card title="Recommended" icon="rocket">
+    - **OS**: Latest macOS, Ubuntu 20.04+, Windows 11 - **Memory**: 8GB+ RAM -
+    **Python**: 3.11+ - **Storage**: 10GB+ available space
+  </Card>
+</CardGroup>
+
+## Development Environment
+
+### IDE Setup
+
+<Tabs>
+  <Tab title="VS Code">
+    Install the Erdo extension for enhanced development experience:
+
+    ```bash
+    code --install-extension erdoai.erdo-vscode
+    ```
+
+    Features:
+    - Syntax highlighting for Erdo agent files
+    - IntelliSense and autocomplete
+    - Built-in debugging tools
+    - Agent preview and testing
+
+  </Tab>
+
+  <Tab title="PyCharm">
+    Configure PyCharm for optimal Erdo development:
+
+    1. Install the Erdo plugin from the marketplace
+    2. Configure the Python interpreter to include the Erdo SDK
+    3. Set up code templates for common agent patterns
+
+  </Tab>
+
+  <Tab title="Other IDEs">
+    Most editors work well with Erdo. For best experience:
+
+    - Enable Python language support
+    - Install YAML/JSON syntax highlighting
+    - Configure file associations for `.erdo` files
+
+  </Tab>
+</Tabs>
+
+### Git Configuration
+
+For collaborative development:
+
+```bash
+# Clone agent repositories
+git clone https://github.com/your-org/your-agents.git
+
+# Set up .gitignore for Erdo projects
+echo ".erdo/cache/" >> .gitignore
+echo "*.log" >> .gitignore
+echo ".env.local" >> .gitignore
+```
+
+## Configuration
+
+### Environment Variables
+
+Set up common environment variables:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+export ERDO_API_URL="https://api.erdo.ai"
+export ERDO_LOG_LEVEL="info"
+export ERDO_CACHE_DIR="~/.erdo/cache"
+```
+
+### Configuration File
+
+Create a global configuration file at `~/.erdo/config.yaml`:
+
+```yaml
+# Erdo Configuration
+api:
+  url: "https://api.erdo.ai"
+  timeout: 30
+
+logging:
+  level: "info"
+  format: "structured"
+
+cache:
+  enabled: true
+  ttl: 3600
+
+development:
+  auto_save: true
+  watch_mode: true
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CLI installation fails">
+    **Permission denied errors:**
+    ```bash
+    sudo chmod +x erdo
+    sudo chown $(whoami) erdo
+    ```
+
+    **PATH issues:**
+    ```bash
+    echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+  </Accordion>
+
+  <Accordion title="SDK import errors">
+    **Virtual environment issues:**
+    ```bash
+    python -m venv erdo-env
+    source erdo-env/bin/activate  # On Windows: erdo-env\Scripts\activate
+    pip install erdo
+    ```
+
+    **Dependency conflicts:**
+    ```bash
+    pip install --upgrade erdo
+    pip install --force-reinstall erdo
+    ```
+
+  </Accordion>
+
+  <Accordion title="Authentication problems">
+    **Login failures:**
+    ```bash
+    erdo logout
+    erdo login --force
+    ```
+
+    **Token issues:**
+    ```bash
+    rm ~/.erdo/auth.json
+    erdo login
+    ```
+
+  </Accordion>
+
+  <Accordion title="Performance issues">
+    **Slow operations:**
+    - Clear cache: `erdo cache clear`
+    - Update CLI: `brew upgrade erdo`
+    - Check internet connection
+    - Verify system resources
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you have Erdo installed:
+
+1. **[Follow the Quick Start](/quickstart)** - Build your first agent
+2. **[Explore Examples](/examples/business-automation)** - See real-world use cases
+3. **[Join the Community](https://discord.gg/erdo)** - Get help and share knowledge
+4. **[Read the SDK Docs](/sdk/overview)** - Dive deeper into development

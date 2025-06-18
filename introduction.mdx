@@ -1,0 +1,164 @@
+---
+title: "Welcome to Erdo"
+description: "Deploy production-ready AI agents in seconds"
+---
+
+# Welcome to Erdo
+
+Erdo is the deployment platform for AI agents. Write agents in Python, deploy with one command. We handle state persistence, monitoring, and scaling so you can focus on building.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Deploy your first agent in under 5 minutes
+  </Card>
+  <Card title="SDK Reference" icon="code" href="/sdk/overview">
+    Build sophisticated agents with our Python SDK
+  </Card>
+  <Card title="Platform Guide" icon="server" href="/platform/overview">
+    Learn about our infrastructure and capabilities
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
+    Production-ready patterns and implementations
+  </Card>
+</CardGroup>
+
+## Why Choose Erdo?
+
+<AccordionGroup>
+<Accordion title="From Code to Production in One Command">
+  No Docker, no Kubernetes, no infrastructure. Just `erdo sync` and your agent is live with a production URL.
+</Accordion>
+
+<Accordion title="Persistent State Management">
+  Your agents maintain state across deployments and restarts. Built-in retry
+  handling for failed steps and recovery from interruptions.
+</Accordion>
+
+<Accordion title="Production Infrastructure Built In">
+  Monitoring, logging, event streaming, parallel execution, and resource
+  management. Everything you need to run agents at scale.
+</Accordion>
+
+<Accordion title="Git-Based Workflow">
+  Connect your repo. Push to deploy. Automatic rollbacks, preview branches, and zero-downtime updates.
+</Accordion>
+</AccordionGroup>
+
+## How Erdo Works
+
+1. **Write your agent** using our Python SDK
+2. **Test locally** with `erdo run`
+3. **Deploy to production** with `erdo sync`
+4. **Monitor and iterate** through our dashboard
+
+Your agent automatically gets:
+
+- **Production URL** - `https://your-agent.erdo.ai`
+- **Persistent state** - Survives restarts and redeploys
+- **Automatic retries** - Failed steps retry intelligently
+- **Real-time monitoring** - Logs, metrics, and debugging
+- **API & UI access** - REST API and chat interface
+
+## Core Platform Features
+
+<CardGroup cols={2}>
+  <Card
+    title="State Management"
+    icon="database"
+    href="/platform/state-management"
+  >
+    Distributed state that persists across executions
+  </Card>
+  <Card
+    title="Workflow Engine"
+    icon="diagram-project"
+    href="/platform/workflows"
+  >
+    Parallel execution, conditionals, and human-in-the-loop
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/platform/monitoring">
+    Real-time logs, metrics, and performance tracking
+  </Card>
+  <Card title="Integrations" icon="plug" href="/platform/integrations">
+    100+ built-in tools and custom function support
+  </Card>
+</CardGroup>
+
+## Build Powerful Agents
+
+Erdo agents are composed of:
+
+1. **[Agents](/concepts/agents)** - Orchestrators that coordinate your workflow
+2. **[Steps](/concepts/steps)** - Individual tasks in your automation
+3. **[Actions](/concepts/actions)** - What each step actually does (LLM calls, web searches, etc.)
+4. **[Tools](/concepts/tools)** - External integrations and custom functions
+5. **[Result Handlers](/concepts/result-handlers)** - Conditional logic based on outcomes
+
+## Production Use Cases
+
+<CardGroup cols={3}>
+  <Card
+    title="Customer Support"
+    icon="headset"
+    href="/examples/support-automation"
+  >
+    Deploy agents that handle tickets with persistent context
+  </Card>
+  <Card title="Data Pipelines" icon="database" href="/examples/data-processing">
+    Process datasets with agents that handle failures gracefully
+  </Card>
+  <Card
+    title="Research Automation"
+    icon="magnifying-glass"
+    href="/examples/research-assistant"
+  >
+    Research agents that gather insights over time
+  </Card>
+  <Card title="Code Review" icon="code-branch" href="/examples/code-review">
+    Automated PR reviews with memory of your codebase
+  </Card>
+  <Card
+    title="Content Workflows"
+    icon="pen-to-square"
+    href="/examples/content-creation"
+  >
+    Multi-stage content creation with approvals
+  </Card>
+  <Card title="Monitoring & Alerts" icon="bell" href="/examples/monitoring">
+    Intelligent alerting with context awareness
+  </Card>
+</CardGroup>
+
+## Get Started in 60 Seconds
+
+```bash
+# Install Erdo CLI
+pip install erdo
+
+# Create your first agent
+erdo create customer-support-agent
+cd customer-support-agent
+
+# Deploy to production
+erdo sync
+
+# ✓ Agent deployed to https://customer-support-agent.erdo.ai
+```
+
+<CardGroup cols={2}>
+  <Card title="5-Minute Tutorial" icon="graduation-cap" href="/quickstart">
+    Build and deploy your first production agent
+  </Card>
+  <Card title="Platform Docs" icon="book" href="/platform/overview">
+    Deep dive into Erdo's infrastructure
+  </Card>
+</CardGroup>
+
+---
+
+<Note>
+  **Coming Soon**: Deploy existing LangGraph, CrewAI, and AutoGen agents
+  directly to Erdo. [Join the waitlist →](https://erdo.ai/waitlist)
+</Note>
+
+Need help? Join our [Discord community](https://discord.gg/erdo) • Star us on [GitHub](https://github.com/erdoai) • Read the [Blog](https://erdo.ai/blog)

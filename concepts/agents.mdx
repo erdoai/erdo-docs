@@ -1,0 +1,509 @@
+---
+title: "Agents"
+description: "Understanding agents - the core containers for AI workflows and automation"
+---
+
+# Agents
+
+Agents are the foundational containers for AI workflows in Erdo. They encapsulate the logic, steps, and configuration needed to automate complex tasks using AI models and tools.
+
+## What is an Agent?
+
+An agent represents a complete AI workflow that can:
+
+- Execute multiple steps in sequence or parallel
+- Make decisions based on data and conditions
+- Use external tools and services
+- Handle errors and retry logic
+- Store and retrieve knowledge
+
+<CardGroup cols={2}>
+  <Card title="Single-Purpose Agents" icon="target">
+    Focused on one specific task like data analysis or email processing
+  </Card>
+  <Card title="Multi-Purpose Agents" icon="layers">
+    Handle complex workflows with multiple decision points and actions
+  </Card>
+  <Card title="Orchestrator Agents" icon="sitemap">
+    Coordinate other agents and manage complex pipelines
+  </Card>
+  <Card title="Interactive Agents" icon="comments">
+    Respond to user inputs and maintain conversation context
+  </Card>
+</CardGroup>
+
+## Agent Structure
+
+### Basic Agent Definition
+
+```python
+from erdo import Agent
+
+# Simple agent definition
+my_agent = Agent(
+    name="data_analyzer",
+    description="Analyzes data and generates insights",
+    visibility="public"  # or "private"
+)
+```
+
+### Agent Properties
+
+<Tabs>
+  <Tab title="Core Properties">
+    ```python
+    agent = Agent(
+        name="unique_agent_name",           # Required: Unique identifier
+        description="What this agent does", # Required: Clear description
+        visibility="public",                # public, private, or organization
+        version="1.0.0",                   # Semantic versioning
+        tags=["analysis", "automation"],    # Categorization tags
+        timeout=300                        # Maximum execution time (seconds)
+    )
+    ```
+  </Tab>
+  <Tab title="Advanced Configuration">
+    ```python
+    agent = Agent(
+        name="advanced_agent",
+        description="Advanced agent with custom configuration",
+        visibility="organization",
+        configuration={
+            "max_retries": 3,
+            "parallel_limit": 5,
+            "memory_limit": "2GB",
+            "allowed_models": ["claude-sonnet-4", "gpt-4o"]
+        },
+        metadata={
+            "created_by": "{{user_id}}",
+            "department": "data_science",
+            "cost_center": "analytics"
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Agent Types and Patterns
+
+### Data Processing Agents
+
+Agents focused on analyzing and transforming data:
+
+```python
+data_agent = Agent(
+    name="sales_data_analyzer",
+    description="Analyzes sales data and generates business insights"
+)
+
+# Add data processing steps
+analyze_step = Step(
+    agent=data_agent,
+    key="analyze",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Analyze sales data: {{data}}",
+        system_prompt="You are a business analyst expert"
+    )
+)
+
+# Add code execution for calculations
+calculate_step = Step(
+    agent=data_agent,
+    key="calculate",
+    actiontype=codeexec.execute(
+        code="calculate_sales_metrics({{steps.analyze.insights}})"
+    ),
+    depends_on=[analyze_step]
+)
+```
+
+### Research Agents
+
+Agents that gather and synthesize information:
+
+```python
+research_agent = Agent(
+    name="market_researcher",
+    description="Conducts market research and competitive analysis"
+)
+
+# Research step with web tools
+research_step = Step(
+    agent=research_agent,
+    key="research",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Research {{topic}} in {{industry}}",
+        tools=[
+            Tool(
+                name="web_search",
+                description="Search for market information",
+                actiontype="websearch.search",
+                parameters={"query": "{{query}}"}
+            ),
+            Tool(
+                name="parse_website",
+                description="Extract website content",
+                actiontype="webparser.parse",
+                parameters={"url": "{{url}}"}
+            )
+        ]
+    )
+)
+```
+
+### Automation Agents
+
+Agents that automate business processes:
+
+```python
+automation_agent = Agent(
+    name="email_processor",
+    description="Automates email categorization and response"
+)
+
+# Email classification
+classify_step = Step(
+    agent=automation_agent,
+    key="classify",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Classify this email: {{email_content}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {"type": "string"},
+                        "priority": {"type": "string"},
+                        "requires_response": {"type": "boolean"}
+                    }
+                }
+            }
+        }
+    )
+)
+
+# Conditional response generation
+response_step = Step(
+    agent=automation_agent,
+    key="respond",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Generate response for: {{email_content}}"
+    ),
+    depends_on=[classify_step],
+    execution_mode=ExecutionMode(
+        mode="all",
+        if_condition=TextEquals(
+            text="{{steps.classify.requires_response}}",
+            value="true"
+        )
+    )
+)
+```
+
+## Agent Lifecycle
+
+### Development Phase
+
+<Steps>
+  <Step title="Design">
+    Plan the agent's purpose, inputs, outputs, and workflow steps
+  </Step>
+  <Step title="Implementation">
+    Write the agent code with steps, actions, and error handling
+  </Step>
+  <Step title="Testing">
+    Test locally with sample data and validate functionality
+  </Step>
+  <Step title="Optimization">
+    Refine performance, add monitoring, and improve error handling
+  </Step>
+</Steps>
+
+### Deployment and Management
+
+```python
+# Development workflow
+# 1. Create agent locally
+agent = Agent(name="my_agent", description="...")
+
+# 2. Add steps and logic
+step1 = Step(agent=agent, key="step1", actiontype=...)
+
+# 3. Test locally
+# erdo dev --agent my_agent
+
+# 4. Sync to platform
+# erdo sync
+
+# 5. Monitor and iterate
+# erdo logs my_agent --follow
+```
+
+## Agent Communication
+
+### Agent-to-Agent Communication
+
+Agents can invoke other agents to create complex workflows:
+
+```python
+# Orchestrator agent that coordinates others
+orchestrator = Agent(
+    name="workflow_orchestrator",
+    description="Coordinates multiple specialized agents"
+)
+
+# Invoke data analysis agent
+analysis_step = Step(
+    agent=orchestrator,
+    key="analyze",
+    actiontype=bot.invoke(
+        bot_name="data analyst",
+        parameters={"query": "{{user_query}}"}
+    )
+)
+
+# Invoke report generation agent
+report_step = Step(
+    agent=orchestrator,
+    key="report",
+    actiontype=bot.invoke(
+        bot_name="report generator",
+        parameters={"analysis": "{{steps.analyze.results}}"}
+    ),
+    depends_on=[analysis_step]
+)
+
+# Invoke validation agent
+validate_step = Step(
+    agent=orchestrator,
+    key="validate",
+    actiontype=bot.invoke(
+        bot_name="quality checker",
+        parameters={"report": "{{steps.report.content}}"}
+    ),
+    depends_on=[report_step]
+)
+```
+
+### Data Sharing Between Agents
+
+Agents can share data through various mechanisms:
+
+<Tabs>
+  <Tab title="Memory System">
+    ```python
+    # Store results for other agents
+    store_step = Step(
+        agent=producer_agent,
+        key="store",
+        actiontype=memory.store(
+            memory={
+                "content": "{{analysis_results}}",
+                "tags": ["shared", "analysis", "{{project_id}}"],
+                "searchable_texts": ["{{key_findings}}"]
+            }
+        )
+    )
+
+    # Retrieve shared data in another agent
+    retrieve_step = Step(
+        agent=consumer_agent,
+        key="retrieve",
+        actiontype=memory.search(
+            query="analysis results for {{project_id}}",
+            organization_scope="specific"
+        )
+    )
+    ```
+
+  </Tab>
+  <Tab title="Direct Invocation">
+    ```python
+    # Pass data directly between agents
+    consumer_step = Step(
+        agent=consumer_agent,
+        key="process",
+        actiontype=bot.invoke(
+            bot_name="producer_agent",
+            parameters={"input": "{{shared_data}}"}
+        )
+    )
+    ```
+  </Tab>
+  <Tab title="File System">
+    ```python
+    # Share via file system
+    save_step = Step(
+        agent=producer_agent,
+        key="save",
+        actiontype=codeexec.execute(
+            code="save_results_to_file({{results}}, '{{filename}}')"
+        )
+    )
+
+    load_step = Step(
+        agent=consumer_agent,
+        key="load",
+        actiontype=codeexec.execute(
+            code="load_results_from_file('{{filename}}')"
+        )
+    )
+    ```
+
+  </Tab>
+</Tabs>
+
+## Agent Security and Permissions
+
+### Access Control
+
+Agents can have different visibility and access levels:
+
+```python
+# Public agent - accessible to everyone
+public_agent = Agent(
+    name="public_analyzer",
+    description="Publicly available data analysis",
+    visibility="public"
+)
+
+# Private agent - only accessible to creator
+private_agent = Agent(
+    name="private_processor",
+    description="Personal data processing agent",
+    visibility="private"
+)
+
+# Organization agent - accessible within organization
+org_agent = Agent(
+    name="company_analyzer",
+    description="Company-wide data analysis",
+    visibility="organization"
+)
+```
+
+### Resource Limits
+
+Configure resource constraints for security and performance:
+
+```python
+secure_agent = Agent(
+    name="secure_processor",
+    description="Secure agent with resource limits",
+    configuration={
+        "max_execution_time": 300,      # 5 minutes max
+        "memory_limit": "1GB",          # Memory constraint
+        "cpu_limit": "2 cores",         # CPU constraint
+        "network_access": "restricted", # Limited network access
+        "allowed_domains": [            # Whitelist domains
+            "api.company.com",
+            "data.trusted-source.com"
+        ]
+    }
+)
+```
+
+## Agent Monitoring and Observability
+
+### Built-in Monitoring
+
+Agents automatically provide execution metrics:
+
+```python
+# Add monitoring steps
+monitor_step = Step(
+    agent=agent,
+    key="monitor",
+    actiontype=utils.send_status(
+        status="processing",
+        message="Processing {{current_item}} of {{total_items}}",
+        details={
+            "progress": "{{progress_percentage}}",
+            "eta": "{{estimated_completion}}"
+        }
+    )
+)
+```
+
+### Custom Metrics
+
+Track custom metrics for your agents:
+
+```python
+metrics_step = Step(
+    agent=agent,
+    key="metrics",
+    actiontype=codeexec.execute(
+        code="""
+# Track custom metrics
+track_metric("processing_time", {{execution_time}})
+track_metric("accuracy_score", {{accuracy}})
+track_metric("data_quality", {{quality_score}})
+
+# Log important events
+log_event("agent_execution", {
+    "agent": "{{agent_name}}",
+    "status": "completed",
+    "processed_items": {{item_count}}
+})
+"""
+    )
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Agent Design">
+    **Single Responsibility**: Each agent should have a clear, focused purpose
+
+    **Modular Steps**: Break complex logic into smaller, testable steps
+
+    **Error Handling**: Plan for failure scenarios and implement recovery logic
+
+    **Documentation**: Provide clear descriptions and examples
+
+  </Accordion>
+
+  <Accordion title="Performance">
+    **Resource Management**: Set appropriate limits and timeouts
+
+    **Parallel Processing**: Use parallel execution where beneficial
+
+    **Caching**: Cache expensive operations and API calls
+
+    **Monitoring**: Track performance metrics and execution times
+
+  </Accordion>
+
+  <Accordion title="Security">
+    **Input Validation**: Validate all external inputs and parameters
+
+    **Access Control**: Use appropriate visibility settings
+
+    **Secret Management**: Use encrypted secrets for sensitive data
+
+    **Audit Logging**: Log important actions and decisions
+
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card title="Steps & Actions" icon="list" href="/concepts/steps">
+    Learn about steps - the building blocks of agent workflows
+  </Card>
+  <Card title="Tools & Integrations" icon="wrench" href="/concepts/tools">
+    Discover how to extend agents with external tools
+  </Card>
+  <Card title="Memory System" icon="brain" href="/concepts/memory">
+    Understand how agents store and retrieve knowledge
+  </Card>
+  <Card title="Agent Examples" icon="code" href="/examples">
+    See real-world agent implementations
+  </Card>
+</CardGroup>

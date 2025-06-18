@@ -1,0 +1,705 @@
+---
+title: "CLI Commands Reference"
+description: "Complete reference for all Erdo CLI commands with examples and options"
+---
+
+# CLI Commands Reference
+
+The Erdo CLI provides a comprehensive set of commands for developing, testing, and deploying AI agents. This reference covers all available commands with detailed examples.
+
+## Setup Commands
+
+### configure
+
+Configure the CLI with your Erdo server and workspace settings.
+
+```bash
+erdo configure [flags]
+```
+
+<Tabs>
+  <Tab title="Interactive Mode">
+    ```bash
+    # Run interactive configuration wizard
+    erdo configure
+
+    # Follow prompts to set:
+    # - Server endpoint (e.g., https://api.erdo.ai)
+    # - App path (e.g., ../ or /path/to/erdo)
+    # - Default preferences
+    ```
+
+  </Tab>
+  <Tab title="Non-interactive">
+    ```bash
+    # Set specific endpoint and path
+    erdo configure --endpoint https://api.erdo.ai --app-path ../
+
+    # Use environment variables
+    export ERDO_ENDPOINT=https://api.erdo.ai
+    export ERDO_APP_PATH=../
+    erdo configure
+    ```
+
+  </Tab>
+</Tabs>
+
+**Flags:**
+
+- `-e, --endpoint string` - Erdo server endpoint URL
+- `-p, --app-path string` - Path to Erdo application directory
+- `--reset` - Reset all configuration to defaults
+
+**Examples:**
+
+```bash
+# Production setup
+erdo configure --endpoint https://api.erdo.ai --app-path ./
+
+# Development setup
+erdo configure --endpoint http://localhost:8080 --app-path ../erdo-backend
+
+# Reset configuration
+erdo configure --reset
+```
+
+### login
+
+Authenticate with the Erdo server using OAuth flow.
+
+```bash
+erdo login [flags]
+```
+
+**Process:**
+
+1. Opens browser to authentication page
+2. Complete OAuth flow
+3. Stores authentication token locally
+4. Verifies connection to server
+
+**Flags:**
+
+- `--no-browser` - Display auth URL instead of opening browser
+- `--timeout int` - Authentication timeout in seconds (default 300)
+
+**Examples:**
+
+```bash
+# Standard login
+erdo login
+
+# Server/headless environment
+erdo login --no-browser
+
+# Custom timeout
+erdo login --timeout 600
+```
+
+## Development Commands
+
+### init
+
+Initialize a new agent project with templates and configuration.
+
+```bash
+erdo init [agent-name] [flags]
+```
+
+**Templates Available:**
+
+- `basic` - Simple agent template with single LLM step
+- `data-analysis` - Data analysis workflow with code execution
+- `web-scraper` - Web research and content extraction
+- `multi-step` - Complex workflow with multiple steps
+- `tool-integration` - Agent with external tool integrations
+
+<CardGroup cols={2}>
+  <Card title="Basic Template" icon="rocket">
+    Simple single-step agent for getting started quickly
+  </Card>
+  <Card title="Data Analysis" icon="chart-line">
+    Multi-step workflow for data processing and analysis
+  </Card>
+  <Card title="Web Scraper" icon="globe">
+    Research agent with web search and parsing capabilities
+  </Card>
+  <Card title="Multi-step" icon="list">
+    Complex workflow with conditional logic and error handling
+  </Card>
+</CardGroup>
+
+**Flags:**
+
+- `-t, --template string` - Template to use (default "basic")
+- `--force` - Overwrite existing directory
+- `--no-git` - Skip Git repository initialization
+
+**Examples:**
+
+```bash
+# Basic agent
+erdo init my-first-agent
+
+# Data analysis agent
+erdo init sales-analyzer --template data-analysis
+
+# Web scraper with custom directory
+erdo init research-bot --template web-scraper
+
+# Force overwrite existing
+erdo init my-agent --force
+```
+
+**Generated Structure:**
+
+```
+my-agent/
+├── agent.py              # Main agent implementation
+├── requirements.txt      # Python dependencies
+├── erdo.yaml            # Agent configuration
+├── README.md            # Documentation
+├── tests/               # Test files
+│   └── test_agent.py
+└── .env.example         # Environment variables template
+```
+
+### dev
+
+Run agent locally with hot reload for development and testing.
+
+```bash
+erdo dev [flags]
+```
+
+**Features:**
+
+- Hot reload on file changes
+- Real-time logging and debugging
+- Local testing environment
+- Development server with API endpoints
+
+**Flags:**
+
+- `-a, --agent string` - Agent name to run (required)
+- `-w, --watch bool` - Enable hot reload (default true)
+- `-p, --port int` - Port for development server (default 8080)
+- `--debug` - Enable debug logging
+- `--no-cache` - Disable caching for development
+
+**Examples:**
+
+```bash
+# Start development server
+erdo dev --agent my-agent
+
+# Custom port with debug logging
+erdo dev --agent my-agent --port 3000 --debug
+
+# Disable hot reload for testing
+erdo dev --agent my-agent --watch=false
+
+# Development without caching
+erdo dev --agent my-agent --no-cache
+```
+
+**Development Output:**
+
+```
+🚀 Starting Erdo development server...
+📁 Agent: my-agent
+🌐 Server: http://localhost:8080
+👁️  Watching for changes...
+
+✅ Agent loaded successfully
+🔍 Test endpoint: http://localhost:8080/test
+📊 Logs: http://localhost:8080/logs
+```
+
+### test
+
+Test agents with sample data and validate functionality.
+
+```bash
+erdo test [agent-name] [flags]
+```
+
+**Test Types:**
+
+- **Unit tests** - Test individual steps and components
+- **Integration tests** - Test full agent workflows
+- **Performance tests** - Measure execution time and resource usage
+- **Validation tests** - Verify output formats and data quality
+
+**Flags:**
+
+- `-i, --input string` - Input file or data for testing
+- `-f, --format string` - Input format (json, csv, text)
+- `-v, --verbose` - Verbose output with detailed logs
+- `--timeout int` - Test timeout in seconds (default 300)
+- `--parallel int` - Number of parallel test runs
+
+**Examples:**
+
+```bash
+# Basic functionality test
+erdo test my-agent
+
+# Test with input file
+erdo test my-agent --input test-data.csv --format csv
+
+# Verbose testing with custom timeout
+erdo test my-agent --verbose --timeout 600
+
+# Performance testing with parallel runs
+erdo test my-agent --parallel 5 --input benchmark-data.json
+```
+
+**Test Results:**
+
+```
+🧪 Testing agent: my-agent
+
+✅ Step 1: analyze_data (1.2s)
+✅ Step 2: generate_insights (2.8s)
+✅ Step 3: format_output (0.3s)
+
+📊 Results:
+   Total time: 4.3s
+   Success rate: 100%
+   Memory usage: 45MB
+
+✅ All tests passed!
+```
+
+## Agent Management
+
+### list-bots
+
+List all available bots in the Erdo system.
+
+```bash
+erdo list-bots [flags]
+```
+
+**Flags:**
+
+- `-f, --source string` - Filter by source (app, python, system)
+- `--format string` - Output format (table, json, yaml)
+- `--detailed` - Show detailed information for each bot
+- `--search string` - Search bots by name or description
+
+**Examples:**
+
+```bash
+# List all bots
+erdo list-bots
+
+# Filter Python-based bots
+erdo list-bots --source python
+
+# Detailed view with JSON output
+erdo list-bots --detailed --format json
+
+# Search for specific bots
+erdo list-bots --search "data analysis"
+```
+
+**Sample Output:**
+
+```
+📋 Available Bots
+
+NAME                SOURCE    DESCRIPTION
+data-analyst        app       Analyzes data and generates insights
+security-checker    system    Checks code for security vulnerabilities
+web-scraper         python    Extracts content from websites
+email-processor     app       Processes and categorizes emails
+report-generator    python    Creates automated reports
+
+Total: 5 bots
+```
+
+### export-bot
+
+Export bot definitions to generate Python agent code.
+
+```bash
+erdo export-bot [bot-name] [flags]
+```
+
+**Export Options:**
+
+- Single bot export with dependencies
+- All bots export for backup/migration
+- Formatted Python code with type hints
+- Raw export without formatting
+
+**Flags:**
+
+- `-o, --output string` - Output file (stdout if not specified)
+- `--no-format` - Skip Python code formatting
+- `--install-tools` - Install formatting tools (black, isort, autoflake)
+- `--include-deps` - Include bot dependencies
+- `--template string` - Export template (standard, minimal, advanced)
+
+**Examples:**
+
+```bash
+# Export specific bot
+erdo export-bot data-analyst -o data-analyst.py
+
+# Export all bots
+erdo export-bot -o all-agents.py
+
+# Raw export without formatting
+erdo export-bot my-bot --no-format
+
+# Export with dependencies
+erdo export-bot complex-bot --include-deps -o complex-bot.py
+
+# Install formatting tools first
+erdo export-bot --install-tools
+```
+
+**Exported Code Structure:**
+
+```python
+# Auto-generated by Erdo CLI
+from erdo import Agent, Step, Tool, ResultHandler
+from erdo.actions import llm, codeexec, memory
+
+# Agent: data-analyst
+data_analyst = Agent(
+    name="data_analyst",
+    description="Analyzes data and generates insights",
+    visibility="public"
+)
+
+# Steps and configuration...
+agents = [data_analyst]
+```
+
+### sync
+
+Sync local Python agents to the Erdo platform for execution.
+
+```bash
+erdo sync [flags]
+```
+
+**Sync Process:**
+
+1. Validates agent code and configuration
+2. Uploads agents to platform
+3. Registers or updates agent definitions
+4. Verifies successful deployment
+
+**Flags:**
+
+- `-d, --dry-run` - Show what would be synced without syncing
+- `-s, --name-suffix string` - Suffix for bot names (e.g., '\_dev')
+- `--force` - Force sync even with warnings
+- `--validate-only` - Only validate, don't sync
+
+**Examples:**
+
+```bash
+# Sync all agents
+erdo sync
+
+# Dry run to preview changes
+erdo sync --dry-run
+
+# Development sync with suffix
+erdo sync --name-suffix "_dev"
+
+# Force sync with warnings
+erdo sync --force
+
+# Validation only
+erdo sync --validate-only
+```
+
+**Sync Output:**
+
+```
+🔄 Syncing agents to Erdo platform...
+
+✅ data-analyst: synced (updated)
+✅ web-scraper: synced (new)
+⚠️  email-processor: skipped (validation warnings)
+
+📊 Sync Summary:
+   Synced: 2 agents
+   Skipped: 1 agent
+   Total time: 3.2s
+```
+
+## Advanced Commands
+
+### gen-client
+
+Generate Python client code from action definitions.
+
+```bash
+erdo gen-client [flags]
+```
+
+**Generated Components:**
+
+- Type-safe action interfaces
+- SDK client bindings
+- Validation schemas
+- Documentation and examples
+
+**Flags:**
+
+- `-o, --output string` - Output directory (default: ./generated)
+- `--language string` - Target language (python, typescript)
+- `--include-docs` - Generate documentation
+- `--watch` - Watch for server changes and regenerate
+
+**Examples:**
+
+```bash
+# Generate Python client
+erdo gen-client
+
+# Custom output directory
+erdo gen-client -o ./sdk/generated
+
+# Generate with documentation
+erdo gen-client --include-docs
+
+# Watch mode for development
+erdo gen-client --watch
+```
+
+### logs
+
+View and filter agent execution logs.
+
+```bash
+erdo logs [agent-name] [flags]
+```
+
+**Log Filtering:**
+
+- By agent name or execution ID
+- By log level (debug, info, warn, error)
+- By time range
+- By step or component
+
+**Flags:**
+
+- `-f, --follow` - Follow log output (tail -f style)
+- `--level string` - Filter by log level
+- `--since string` - Show logs since timestamp
+- `--lines int` - Number of lines to show (default 100)
+- `--format string` - Output format (text, json)
+
+**Examples:**
+
+```bash
+# View recent logs
+erdo logs my-agent
+
+# Follow live logs
+erdo logs my-agent --follow
+
+# Filter by error level
+erdo logs my-agent --level error
+
+# Show logs from last hour
+erdo logs my-agent --since "1h ago"
+
+# JSON format for parsing
+erdo logs my-agent --format json --lines 50
+```
+
+### debug
+
+Debug agent execution with detailed tracing.
+
+```bash
+erdo debug [agent-name] [flags]
+```
+
+**Debug Features:**
+
+- Step-by-step execution tracing
+- Variable inspection at each step
+- Performance profiling
+- Error stack traces
+- Interactive debugging session
+
+**Flags:**
+
+- `--step string` - Debug specific step
+- `--breakpoint string` - Set breakpoint at step
+- `--interactive` - Interactive debugging session
+- `--profile` - Enable performance profiling
+
+**Examples:**
+
+```bash
+# Debug full execution
+erdo debug my-agent
+
+# Debug specific step
+erdo debug my-agent --step data_processing
+
+# Interactive debugging
+erdo debug my-agent --interactive
+
+# Performance profiling
+erdo debug my-agent --profile
+```
+
+## Environment Management
+
+### env
+
+Manage environment variables and secrets.
+
+```bash
+erdo env [command] [flags]
+```
+
+**Subcommands:**
+
+- `list` - List environment variables
+- `set` - Set environment variable
+- `unset` - Remove environment variable
+- `sync` - Sync with external secret stores
+
+**Examples:**
+
+```bash
+# List all environment variables
+erdo env list
+
+# Set API key
+erdo env set API_KEY "your-secret-key"
+
+# Remove variable
+erdo env unset OLD_API_KEY
+
+# Sync with external store
+erdo env sync --provider aws-secrets-manager
+```
+
+### config
+
+Manage CLI and agent configuration.
+
+```bash
+erdo config [command] [flags]
+```
+
+**Configuration Commands:**
+
+- `get` - Get configuration value
+- `set` - Set configuration value
+- `list` - List all configuration
+- `reset` - Reset to defaults
+
+**Examples:**
+
+```bash
+# Get current endpoint
+erdo config get endpoint
+
+# Set default template
+erdo config set default-template data-analysis
+
+# List all config
+erdo config list
+
+# Reset configuration
+erdo config reset
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Development Workflow">
+    ```bash
+    # 1. Initialize new agent
+    erdo init my-agent --template data-analysis
+
+    # 2. Start development server
+    erdo dev --agent my-agent --debug
+
+    # 3. Test functionality
+    erdo test my-agent --input sample-data.csv
+
+    # 4. Sync to platform
+    erdo sync --name-suffix "_dev"
+    ```
+
+  </Tab>
+  <Tab title="Production Deployment">
+    ```bash
+    # 1. Validate before sync
+    erdo sync --validate-only
+
+    # 2. Dry run to check changes
+    erdo sync --dry-run
+
+    # 3. Deploy to production
+    erdo sync
+
+    # 4. Monitor logs
+    erdo logs my-agent --follow
+    ```
+
+  </Tab>
+  <Tab title="Troubleshooting">
+    ```bash
+    # Check agent status
+    erdo list-bots --search my-agent
+
+    # View error logs
+    erdo logs my-agent --level error
+
+    # Debug execution
+    erdo debug my-agent --interactive
+
+    # Export for analysis
+    erdo export-bot my-agent -o debug-agent.py
+    ```
+
+  </Tab>
+</Tabs>
+
+<AccordionGroup>
+  <Accordion title="Authentication Issues">
+    - Run `erdo login` to refresh token - Check endpoint configuration with
+    `erdo config get endpoint` - Verify network connectivity to Erdo server
+  </Accordion>
+  <Accordion title="Sync Failures">
+    - Validate code with `erdo sync --validate-only` - Check for syntax errors
+    in agent code - Ensure all dependencies are installed
+  </Accordion>
+  <Accordion title="Development Server Issues">
+    - Check port availability with `erdo dev --port 3001` - Clear cache with
+    `erdo dev --no-cache` - Restart with debug logging: `erdo dev --debug`
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with your first agent
+  </Card>
+  <Card title="Agent Templates" icon="file-code" href="/concepts/templates">
+    Explore available agent templates
+  </Card>
+  <Card title="Development Tips" icon="lightbulb" href="/advanced/development">
+    Learn development best practices
+  </Card>
+  <Card title="Deployment Guide" icon="cloud" href="/advanced/deployment">
+    Deploy agents to production
+  </Card>
+</CardGroup>

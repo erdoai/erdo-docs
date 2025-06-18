@@ -1,0 +1,788 @@
+---
+title: "Utility Actions"
+description: "Learn how to use Erdo's built-in utility actions for debugging, control flow, and data manipulation"
+---
+
+# Utility Actions
+
+Erdo provides a comprehensive set of utility actions for common development tasks including debugging, data manipulation, error handling, and workflow control. These actions help you build robust, debuggable, and maintainable agent workflows.
+
+## Core Utilities
+
+### Echo Action
+
+The echo action is essential for debugging and data flow visualization:
+
+```python
+from erdo.actions import utils
+
+# Basic debugging
+debug_step = Step(
+    agent=analyzer_agent,
+    key="debug_data",
+    actiontype=utils.echo(
+        data={
+            "processed_items": "{{item_count}}",
+            "current_status": "{{workflow_status}}",
+            "results": "{{analysis_output}}"
+        }
+    )
+)
+
+# Complex data structure debugging
+complex_debug = Step(
+    agent=data_agent,
+    key="debug_complex",
+    actiontype=utils.echo(
+        data={
+            "resources_info": """{{- if $.Data.resources -}}
+RESOURCES:
+{{- range $index, $resource := $.Data.resources}}
+Resource {{add $index 1}}:
+- Name: {{truncateString $resource.dataset.name 5000}}
+- Type: {{$resource.dataset.type}}
+{{- if ne $resource.dataset.analysis_summary ""}}
+- Analysis: {{truncateString $resource.dataset.analysis_summary 5000}}
+{{- end}}
+{{- end}}
+{{- else -}}
+No resources available.
+{{- end -}}""",
+            "metadata": {
+                "timestamp": "{{timestamp}}",
+                "user_id": "{{user.id}}",
+                "execution_id": "{{execution.id}}"
+            }
+        }
+    )
+)
+```
+
+<Note>
+  Echo actions are commonly used with `user_output_visibility="hidden"` and
+  `bot_output_visibility="hidden"` for internal debugging without cluttering the
+  user interface.
+</Note>
+
+### JSON Parsing
+
+Parse and validate JSON data with error handling:
+
+```python
+# Basic JSON parsing
+parse_step = Step(
+    agent=data_agent,
+    key="parse_response",
+    actiontype=utils.parse_json(
+        json="{{api_response}}",
+        required_keys=["status", "data", "timestamp"]
+    )
+)
+
+# Robust API response parsing
+api_parse_step = Step(
+    agent=api_agent,
+    key="parse_api_data",
+    actiontype=utils.parse_json(
+        json="{{external_api_response}}",
+        required_keys=[
+            "results",
+            "pagination",
+            "metadata.total_count",
+            "metadata.page_size"
+        ]
+    )
+)
+```
+
+### String Operations
+
+Manipulate and combine strings effectively:
+
+```python
+# String concatenation
+concat_step = Step(
+    agent=prompt_agent,
+    key="build_prompt",
+    actiontype=utils.concat(
+        strings=[
+            "{{base_prompt}}",
+            "\n\nContext: {{context}}",
+            "\n\nData: {{formatted_data}}",
+            "\n\nInstructions: {{specific_instructions}}"
+        ]
+    )
+)
+
+# Dynamic message building
+message_builder = Step(
+    agent=communication_agent,
+    key="build_message",
+    actiontype=utils.concat(
+        strings=[
+            "Analysis Complete!\n\n",
+            "✅ Processed {{item_count}} items\n",
+            "📊 Success rate: {{success_rate}}%\n",
+            "⏱️  Duration: {{execution_time}}\n\n",
+            "Key findings:\n{{key_findings}}"
+        ]
+    )
+)
+```
+
+### Type Casting
+
+Convert data types safely:
+
+```python
+# Number conversion
+cast_step = Step(
+    agent=calculator_agent,
+    key="convert_number",
+    actiontype=utils.cast(
+        value="{{string_number}}",
+        target_type="float"
+    )
+)
+
+# Batch type conversion
+batch_cast_step = Step(
+    agent=data_processor,
+    key="convert_batch",
+    actiontype=utils.cast(
+        value="{{csv_row.price}}",
+        target_type="decimal"
+    ),
+    execution_mode=ExecutionMode(
+        mode="iterate_over",
+        data="csv_rows"
+    )
+)
+```
+
+## Control Flow Actions
+
+### Raise Action
+
+Control workflow execution with sophisticated routing:
+
+```python
+# Simple redirect
+redirect_step = Step(
+    agent=controller_agent,
+    key="check_condition",
+    actiontype=utils.raise_action(
+        status="go_to_step",
+        message="retry_analysis",
+        parameters={
+            "attempt": "{{increment attempt}}",
+            "reason": "data_incomplete"
+        }
+    )
+)
+
+# Error handling with context
+error_handler = Step(
+    agent=error_agent,
+    key="handle_failure",
+    actiontype=utils.raise_action(
+        status="error",
+        message="Critical validation failed",
+        parameters={
+            "error_code": "VALIDATION_FAILED",
+            "failed_checks": "{{validation_errors}}",
+            "recovery_suggestions": [
+                "Check data format",
+                "Verify required fields",
+                "Review data sources"
+            ]
+        }
+    )
+)
+
+# Success with data passing
+success_step = Step(
+    agent=completion_agent,
+    key="complete_successfully",
+    actiontype=utils.raise_action(
+        status="success",
+        message="Analysis completed successfully",
+        parameters={
+            "results": "{{final_results}}",
+            "confidence": "{{confidence_score}}",
+            "recommendations": "{{action_items}}"
+        }
+    )
+)
+```
+
+### Checkpoint Actions
+
+Implement retry logic and attempt tracking:
+
+```python
+# Basic checkpoint
+checkpoint_step = Step(
+    agent=retry_agent,
+    key="checkpoint",
+    actiontype=utils.checkpoint_attempt(
+        loops="{{current_loop}}",
+        attempts="{{retry_count}}"
+    )
+)
+
+# Complex retry with exponential backoff
+retry_checkpoint = Step(
+    agent=resilient_agent,
+    key="retry_checkpoint",
+    actiontype=utils.checkpoint_attempt(
+        loops="{{analysis_loops}}",
+        attempts="{{coalesce attempts 0}}"
+    )
+)
+
+# Use with result handlers for automatic retry
+retry_step = Step(
+    agent=persistent_agent,
+    key="persistent_analysis",
+    actiontype=analysis.create(
+        data="{{dataset}}",
+        method="comprehensive"
+    ),
+    result_handlers=[
+        ResultHandler(
+            step=retry_step,
+            type="intermediate",
+            if_conditions=And(
+                IsError(),
+                LessThan(number="{{attempts}}", value="3")
+            ),
+            steps=[
+                Step(
+                    agent=persistent_agent,
+                    key="increment_checkpoint",
+                    actiontype=utils.checkpoint_attempt(
+                        loops="{{loops}}",
+                        attempts="{{increment attempts}}"
+                    )
+                ),
+                Step(
+                    agent=persistent_agent,
+                    key="retry_analysis",
+                    actiontype=utils.raise_action(
+                        status="go_to_step",
+                        message="persistent_analysis",
+                        parameters={
+                            "retry_delay": "{{exponential_backoff attempts}}"
+                        }
+                    )
+                )
+            ]
+        )
+    ]
+)
+```
+
+### Status Updates
+
+Provide real-time feedback to users:
+
+```python
+# Progress tracking
+progress_step = Step(
+    agent=processor_agent,
+    key="update_progress",
+    actiontype=utils.send_status(
+        status="processing",
+        message="Analyzing {{data_type}}... {{progress}}% complete",
+        details={
+            "current_step": "{{step_name}}",
+            "items_processed": "{{processed_count}}",
+            "total_items": "{{total_count}}",
+            "estimated_time": "{{eta_minutes}} minutes"
+        }
+    )
+)
+
+# Phase transitions
+phase_update = Step(
+    agent=workflow_agent,
+    key="phase_transition",
+    actiontype=utils.send_status(
+        status="phase_change",
+        message="Entering {{next_phase}} phase",
+        details={
+            "completed_phases": "{{completed}}",
+            "remaining_phases": "{{remaining}}",
+            "overall_progress": "{{overall_percent}}%"
+        }
+    )
+)
+
+# Error status with recovery
+error_status = Step(
+    agent=error_agent,
+    key="error_notification",
+    actiontype=utils.send_status(
+        status="error",
+        message="{{error_message}}",
+        details={
+            "error_type": "{{error_classification}}",
+            "recovery_available": "{{can_retry}}",
+            "support_code": "{{incident_id}}"
+        }
+    )
+)
+```
+
+## Error Handling
+
+### Exception Capture
+
+Capture and log exceptions with context:
+
+```python
+# Basic exception handling
+exception_step = Step(
+    agent=error_handler_agent,
+    key="capture_error",
+    actiontype=utils.capture_exception(
+        message="Processing failed for dataset {{dataset_name}}",
+        exception="{{error_details}}",
+        context={
+            "step": "{{current_step}}",
+            "retry_count": "{{retry_count}}",
+            "user_id": "{{user.id}}"
+        }
+    )
+)
+
+# Comprehensive error tracking
+detailed_exception = Step(
+    agent=monitoring_agent,
+    key="detailed_error",
+    actiontype=utils.capture_exception(
+        message="Critical failure in {{workflow_name}}",
+        exception="{{error_stack_trace}}",
+        context={
+            "workflow_id": "{{workflow.id}}",
+            "execution_time": "{{elapsed_time}}",
+            "memory_usage": "{{memory_stats}}",
+            "system_state": "{{system_diagnostics}}",
+            "input_parameters": "{{sanitized_inputs}}"
+        }
+    )
+)
+
+# Exception with recovery suggestions
+recovery_exception = Step(
+    agent=support_agent,
+    key="recoverable_error",
+    actiontype=utils.capture_exception(
+        message="Recoverable error in {{process_name}}",
+        exception="{{error_info}}",
+        context={
+            "recovery_options": [
+                "Retry with different parameters",
+                "Use fallback data source",
+                "Contact support with error code"
+            ],
+            "error_code": "{{incident_number}}",
+            "suggested_action": "{{recovery_suggestion}}"
+        }
+    )
+)
+```
+
+## Advanced Utility Patterns
+
+### Conditional Utilities
+
+Use utilities with complex conditions:
+
+```python
+from erdo._generated.condition import And, Or, IsSuccess, TextContains, GreaterThan
+
+# Conditional debug output
+conditional_debug = Step(
+    agent=debug_agent,
+    key="conditional_debug",
+    actiontype=utils.echo(
+        data={
+            "debug_info": "{{debug_data}}",
+            "execution_context": "{{context}}"
+        }
+    ),
+    execution_mode=ExecutionMode(
+        mode="all",
+        if_condition=And(
+            IsSuccess(step="previous_step"),
+            Or(
+                TextContains(text="{{environment}}", value="development"),
+                GreaterThan(number="{{debug_level}}", value="2")
+            )
+        )
+    )
+)
+
+# Error-specific status updates
+error_status_update = Step(
+    agent=status_agent,
+    key="error_status",
+    actiontype=utils.send_status(
+        status="error_details",
+        message="{{error_description}}",
+        details="{{error_context}}"
+    ),
+    execution_mode=ExecutionMode(
+        mode="all",
+        if_condition=IsError(step="main_process")
+    )
+)
+```
+
+### Batch Processing Utilities
+
+Handle collections of data efficiently:
+
+```python
+# Batch echo for debugging collections
+batch_debug = Step(
+    agent=batch_agent,
+    key="debug_items",
+    actiontype=utils.echo(
+        data={
+            "item_index": "{{index}}",
+            "item_data": "{{item}}",
+            "processing_status": "{{item.status}}"
+        }
+    ),
+    execution_mode=ExecutionMode(
+        mode="iterate_over",
+        data="items_to_process"
+    )
+)
+
+# Progress tracking for long operations
+batch_progress = Step(
+    agent=progress_agent,
+    key="batch_progress",
+    actiontype=utils.send_status(
+        status="batch_processing",
+        message="Processing item {{add index 1}} of {{len items}}",
+        details={
+            "completion_percent": "{{div (mul index 100) (len items)}}",
+            "current_item": "{{item.name}}"
+        }
+    ),
+    execution_mode=ExecutionMode(
+        mode="iterate_over",
+        data="items"
+    )
+)
+```
+
+### Dynamic Parameter Building
+
+Build parameters dynamically:
+
+```python
+# Dynamic prompt construction
+dynamic_prompt = Step(
+    agent=prompt_agent,
+    key="build_dynamic_prompt",
+    actiontype=utils.concat(
+        strings=[
+            "{{base_instructions}}",
+            "{{#if has_context}}\n\nContext: {{context}}{{/if}}",
+            "{{#if has_examples}}\n\nExamples:\n{{examples}}{{/if}}",
+            "{{#if has_constraints}}\n\nConstraints:\n{{constraints}}{{/if}}"
+        ]
+    )
+)
+
+# Configuration assembly
+config_builder = Step(
+    agent=config_agent,
+    key="assemble_config",
+    actiontype=utils.echo(
+        data={
+            "model_config": {
+                "temperature": "{{temperature | default 0.7}}",
+                "max_tokens": "{{max_tokens | default 1000}}",
+                "top_p": "{{top_p | default 0.9}}"
+            },
+            "execution_config": {
+                "timeout": "{{timeout | default 300}}",
+                "retry_count": "{{retry_count | default 3}}",
+                "parallel": "{{parallel | default false}}"
+            },
+            "output_config": {
+                "format": "{{output_format | default 'json'}}",
+                "include_metadata": "{{include_metadata | default true}}"
+            }
+        }
+    )
+)
+```
+
+## Testing and Debugging
+
+### Debug Workflows
+
+Create comprehensive debugging workflows:
+
+```python
+# Debug agent for troubleshooting
+debug_agent = Agent(
+    name="debug_assistant",
+    description="Helps debug and troubleshoot workflow issues",
+    visibility="private"
+)
+
+# Comprehensive debug step
+debug_workflow = Step(
+    agent=debug_agent,
+    key="comprehensive_debug",
+    actiontype=utils.echo(
+        data={
+            "execution_context": {
+                "step_name": "{{current_step}}",
+                "execution_id": "{{execution.id}}",
+                "timestamp": "{{timestamp}}",
+                "user_context": "{{user}}"
+            },
+            "parameter_state": {
+                "input_params": "{{input_parameters}}",
+                "hydrated_params": "{{all_parameters}}",
+                "system_params": "{{system}}"
+            },
+            "workflow_state": {
+                "completed_steps": "{{completed_steps}}",
+                "pending_steps": "{{pending_steps}}",
+                "failed_steps": "{{failed_steps}}"
+            },
+            "data_state": {
+                "available_data": "{{available_data_keys}}",
+                "data_sizes": "{{data_sizes}}",
+                "data_types": "{{data_types}}"
+            }
+        }
+    ),
+    user_output_visibility="hidden",
+    bot_output_visibility="visible",
+    output_content_type="json"
+)
+```
+
+### Performance Monitoring
+
+Track performance metrics:
+
+```python
+# Performance monitoring
+perf_monitor = Step(
+    agent=monitor_agent,
+    key="performance_check",
+    actiontype=utils.echo(
+        data={
+            "performance_metrics": {
+                "execution_time": "{{execution_duration}}",
+                "memory_usage": "{{memory_usage}}",
+                "api_calls": "{{api_call_count}}",
+                "data_processed": "{{data_volume}}"
+            },
+            "resource_usage": {
+                "cpu_time": "{{cpu_time}}",
+                "io_operations": "{{io_ops}}",
+                "network_requests": "{{network_requests}}"
+            },
+            "quality_metrics": {
+                "success_rate": "{{success_rate}}",
+                "error_rate": "{{error_rate}}",
+                "retry_count": "{{total_retries}}"
+            }
+        }
+    )
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Debugging">
+    **Strategic Echo Placement**: Place echo actions at key decision points and data transformations
+
+    **Structured Debug Data**: Use consistent structure for debug information across your workflows
+
+    **Conditional Debugging**: Use execution modes to enable debugging only when needed
+
+    **Hidden Visibility**: Use hidden visibility for debug outputs to avoid UI clutter
+
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    **Comprehensive Context**: Include all relevant context in exception captures
+
+    **Recovery Information**: Provide actionable recovery suggestions in error messages
+
+    **Error Classification**: Use consistent error types and codes for better tracking
+
+    **Graceful Degradation**: Use raise actions to redirect to fallback workflows
+
+  </Accordion>
+
+  <Accordion title="Control Flow">
+    **Clear Naming**: Use descriptive step keys and messages for raise actions
+
+    **Parameter Passing**: Always pass necessary context through raise action parameters
+
+    **Retry Logic**: Implement exponential backoff and maximum retry limits
+
+    **Status Communication**: Keep users informed with regular status updates
+
+  </Accordion>
+
+  <Accordion title="Performance">
+    **Batch Operations**: Use iteration modes for processing collections efficiently
+
+    **Data Validation**: Validate JSON parsing with required keys upfront
+
+    **Memory Management**: Monitor memory usage in long-running workflows
+
+    **Resource Cleanup**: Ensure proper cleanup in error scenarios
+
+  </Accordion>
+</AccordionGroup>
+
+## Integration Examples
+
+### With Result Handlers
+
+Combine utilities with result handlers for robust workflows:
+
+```python
+analysis_step = Step(
+    agent=analyzer_agent,
+    key="analyze_data",
+    actiontype=analysis.create(
+        dataset="{{input_dataset}}",
+        analysis_type="comprehensive"
+    ),
+    result_handlers=[
+        # Success handler with status update
+        ResultHandler(
+            step=analysis_step,
+            type="final",
+            if_conditions=IsSuccess(),
+            steps=[
+                Step(
+                    agent=status_agent,
+                    key="success_status",
+                    actiontype=utils.send_status(
+                        status="completed",
+                        message="Analysis completed successfully",
+                        details={
+                            "insights_found": "{{insights_count}}",
+                            "confidence": "{{confidence_score}}"
+                        }
+                    )
+                ),
+                Step(
+                    agent=completion_agent,
+                    key="return_results",
+                    actiontype=utils.echo(
+                        data={
+                            "analysis_results": "{{analysis_output}}",
+                            "metadata": "{{analysis_metadata}}",
+                            "recommendations": "{{recommendations}}"
+                        }
+                    )
+                )
+            ]
+        ),
+
+        # Error handler with exception capture
+        ResultHandler(
+            step=analysis_step,
+            type="final",
+            if_conditions=IsError(),
+            steps=[
+                Step(
+                    agent=error_agent,
+                    key="capture_analysis_error",
+                    actiontype=utils.capture_exception(
+                        message="Analysis failed for dataset {{dataset_name}}",
+                        exception="{{error_details}}",
+                        context={
+                            "dataset_id": "{{dataset.id}}",
+                            "analysis_type": "comprehensive",
+                            "retry_possible": "{{can_retry}}"
+                        }
+                    )
+                ),
+                Step(
+                    agent=fallback_agent,
+                    key="fallback_analysis",
+                    actiontype=utils.raise_action(
+                        status="go_to_step",
+                        message="simple_analysis",
+                        parameters={
+                            "fallback_mode": True,
+                            "original_error": "{{error_summary}}"
+                        }
+                    )
+                )
+            ]
+        )
+    ]
+)
+```
+
+### With Memory Systems
+
+Integrate utilities with memory for persistence:
+
+```python
+# Debug with memory storage
+debug_with_memory = Step(
+    agent=debug_agent,
+    key="debug_and_store",
+    actiontype=utils.echo(
+        data={
+            "debug_snapshot": {
+                "timestamp": "{{timestamp}}",
+                "workflow_state": "{{workflow}}",
+                "parameters": "{{parameters}}",
+                "performance": "{{performance_metrics}}"
+            }
+        }
+    ),
+    result_handlers=[
+        ResultHandler(
+            step=debug_with_memory,
+            type="final",
+            steps=[
+                Step(
+                    agent=memory_agent,
+                    key="store_debug_info",
+                    actiontype=memory.store(
+                        memory={
+                            "content": "Debug snapshot: {{steps.debug_and_store.debug_snapshot}}",
+                            "type": "debug_snapshot",
+                            "tags": ["debug", "workflow", "{{workflow_name}}"],
+                            "searchable_texts": [
+                                "debug snapshot {{timestamp}}",
+                                "workflow {{workflow_name}}",
+                                "performance metrics"
+                            ]
+                        }
+                    )
+                )
+            ]
+        )
+    ]
+)
+```
+
+Utility actions are the foundation of robust Erdo workflows. Use them strategically to build maintainable, debuggable, and resilient agent systems that provide excellent user experiences even when things go wrong.

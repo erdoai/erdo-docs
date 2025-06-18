@@ -1,0 +1,382 @@
+---
+title: Result Handlers
+description: Process and respond to step execution results with conditional logic
+---
+
+# Result Handlers
+
+Result Handlers in Erdo provide powerful conditional logic to process step execution results. They allow you to define different actions based on success, failure, or specific conditions, enabling sophisticated workflow control and error handling.
+
+## Overview
+
+Result Handlers act as conditional processors that:
+
+- React to step execution outcomes
+- Execute different logic based on conditions
+- Chain multiple handlers for complex workflows
+- Provide error recovery and fallback mechanisms
+
+<CardGroup cols={2}>
+  <Card title="Conditional Execution" icon="code-branch">
+    Execute different logic based on step results
+  </Card>
+  <Card title="Error Recovery" icon="arrow-rotate-left">
+    Handle failures and implement fallback strategies
+  </Card>
+  <Card title="Nested Steps" icon="sitemap">
+    Execute additional steps within handlers
+  </Card>
+  <Card title="Chaining Logic" icon="link">
+    Chain multiple handlers for complex workflows
+  </Card>
+</CardGroup>
+
+## Handler Types
+
+### Final Handlers
+
+Execute when a step completes, regardless of the outcome:
+
+```python
+from erdo import ResultHandler, Step
+from erdo.actions import llm
+
+# Handler that always executes
+cleanup_handler = ResultHandler(
+    step=analysis_step,
+    type="final",
+    if_conditions=IsSuccess(),  # Optional condition
+    result_handler_order=0,
+    output_content_type="text"
+)
+```
+
+### Intermediate Handlers
+
+Execute during step processing for real-time actions:
+
+```python
+# Handler for progress updates
+progress_handler = ResultHandler(
+    step=data_processing_step,
+    type="intermediate",
+    if_conditions=IsSuccess(),
+    result_handler_order=1,
+    output_content_type="text"
+)
+```
+
+## Conditional Logic
+
+Result Handlers use sophisticated condition systems to determine when to execute:
+
+<Tabs>
+  <Tab title="Success Conditions">
+    ```python
+    from erdo._generated.condition import IsSuccess, IsNull, TextEquals
+
+    # Execute on successful completion
+    success_handler = ResultHandler(
+        step=my_step,
+        type="final",
+        if_conditions=IsSuccess(),
+        result_handler_order=0
+    )
+    ```
+
+  </Tab>
+  <Tab title="Failure Conditions">
+    ```python
+    from erdo._generated.condition import Not, IsSuccess
+
+    # Execute on failure
+    error_handler = ResultHandler(
+        step=my_step,
+        type="final",
+        if_conditions=Not(IsSuccess()),
+        result_handler_order=1
+    )
+    ```
+
+  </Tab>
+  <Tab title="Complex Conditions">
+    ```python
+    from erdo._generated.condition import And, Or, GreaterThan, TextEquals
+
+    # Execute on specific conditions
+    conditional_handler = ResultHandler(
+        step=analysis_step,
+        type="final",
+        if_conditions=And(
+            IsSuccess(),
+            GreaterThan(key="confidence_score", value=0.8),
+            TextEquals(text="{{output.status}}", value="complete")
+        ),
+        result_handler_order=0
+    )
+    ```
+
+  </Tab>
+</Tabs>
+
+## Available Conditions
+
+### Basic Conditions
+
+- `IsSuccess()` - Step completed successfully
+- `IsNull(key)` - Value is null or empty
+- `IsAny(key, values)` - Value matches any in list
+- `Not(condition)` - Negates a condition
+
+### Comparison Conditions
+
+- `GreaterThan(key, value)` - Numeric comparison
+- `LessThan(key, value)` - Numeric comparison
+- `TextEquals(text, value)` - String equality
+- `EarlierThan(time, value)` - Time comparison
+
+### Logical Operators
+
+- `And(condition1, condition2, ...)` - All conditions must be true
+- `Or(condition1, condition2, ...)` - Any condition must be true
+
+## Nested Steps
+
+Result Handlers can contain their own steps for complex processing:
+
+```python
+# Handler with nested step
+data_handler = ResultHandler(
+    step=analysis_step,
+    type="final",
+    if_conditions=IsSuccess(),
+    result_handler_order=0,
+    output_content_type="text"
+)
+
+# Nested step within the handler
+validation_step = Step(
+    result_handler=data_handler,
+    key="validation",
+    action=llm.generate(
+        messages=[{
+            "role": "user",
+            "content": "Validate this analysis: {{parent_step.output}}"
+        }]
+    ),
+    user_output_visibility="visible",
+    bot_output_visibility="hidden"
+)
+```
+
+## Execution Order
+
+Result Handlers execute in order based on `result_handler_order`:
+
+```python
+# First handler (order 0)
+immediate_handler = ResultHandler(
+    step=my_step,
+    type="final",
+    if_conditions=IsSuccess(),
+    result_handler_order=0  # Executes first
+)
+
+# Second handler (order 1)
+followup_handler = ResultHandler(
+    step=my_step,
+    type="final",
+    if_conditions=IsSuccess(),
+    result_handler_order=1  # Executes second
+)
+```
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Error Recovery">
+    ```python
+    # Retry logic on failure
+    retry_handler = ResultHandler(
+        step=api_call_step,
+        type="final",
+        if_conditions=Not(IsSuccess()),
+        result_handler_order=0
+    )
+
+    retry_step = Step(
+        result_handler=retry_handler,
+        key="retry_api_call",
+        action=utils.retry(
+            original_action="{{parent_step.action}}",
+            max_attempts=3,
+            delay=5
+        )
+    )
+    ```
+
+  </Accordion>
+  <Accordion title="Data Validation">
+    ```python
+    # Validate results and take action
+    validation_handler = ResultHandler(
+        step=data_processing_step,
+        type="final",
+        if_conditions=And(
+            IsSuccess(),
+            GreaterThan(key="record_count", value=0)
+        ),
+        result_handler_order=0
+    )
+
+    save_step = Step(
+        result_handler=validation_handler,
+        key="save_results",
+        action=storage.save(data="{{parent_step.output}}")
+    )
+    ```
+
+  </Accordion>
+  <Accordion title="Conditional Branching">
+    ```python
+    # Different actions based on results
+    branch_handler = ResultHandler(
+        step=classification_step,
+        type="final",
+        if_conditions=TextEquals(
+            text="{{output.category}}",
+            value="high_priority"
+        ),
+        result_handler_order=0
+    )
+
+    escalate_step = Step(
+        result_handler=branch_handler,
+        key="escalate",
+        action=notification.send(
+            message="High priority issue detected",
+            urgency="high"
+        )
+    )
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Parameter Hydration
+
+Control how parameters are processed within handlers:
+
+```python
+handler = ResultHandler(
+    step=my_step,
+    type="final",
+    if_conditions=IsSuccess(),
+    result_handler_order=0,
+    parameter_hydration_behaviour="inherit"  # or "none", "full"
+)
+```
+
+### Output Visibility
+
+Control what users and bots can see:
+
+```python
+handler = ResultHandler(
+    step=my_step,
+    type="final",
+    if_conditions=IsSuccess(),
+    result_handler_order=0,
+    output_content_type="text"
+)
+
+nested_step = Step(
+    result_handler=handler,
+    key="process_result",
+    action=llm.generate(messages=[...]),
+    user_output_visibility="visible",    # Users can see output
+    bot_output_visibility="hidden"       # Bots cannot see output
+)
+```
+
+### Context Access
+
+Access parent step data and execution context:
+
+```python
+# Access parent step results
+nested_step = Step(
+    result_handler=handler,
+    key="analyze_parent",
+    action=llm.generate(
+        messages=[{
+            "role": "user",
+            "content": "Analyze: {{parent_step.output}}"
+        }]
+    )
+)
+
+# Access execution parameters
+nested_step = Step(
+    result_handler=handler,
+    key="use_parameters",
+    action=utils.transform(
+        data="{{parent_step.output}}",
+        config="{{parameters.config}}"
+    )
+)
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Error Handling">
+    - Always include error handlers for critical steps - Use meaningful error
+    messages and logging - Implement graceful degradation strategies - Test
+    error scenarios thoroughly
+  </Tab>
+  <Tab title="Performance">
+    - Order handlers by priority and frequency - Avoid unnecessary nested steps
+    - Use appropriate visibility settings - Cache expensive operations
+  </Tab>
+  <Tab title="Maintainability">
+    - Use descriptive handler names and keys - Document complex conditional
+    logic - Keep handler logic focused and simple - Group related handlers
+    logically
+  </Tab>
+</Tabs>
+
+## Debugging Result Handlers
+
+### Common Issues
+
+- **Handlers not executing**: Check condition logic and step success state
+- **Wrong execution order**: Verify `result_handler_order` values
+- **Missing context**: Ensure proper parameter hydration settings
+- **Visibility problems**: Check `user_output_visibility` and `bot_output_visibility`
+
+### Debug Techniques
+
+```python
+# Add logging for debugging
+debug_handler = ResultHandler(
+    step=problematic_step,
+    type="final",
+    if_conditions=IsSuccess(),  # Always log
+    result_handler_order=999   # Execute last
+)
+
+log_step = Step(
+    result_handler=debug_handler,
+    key="debug_log",
+    action=utils.log(
+        level="debug",
+        message="Step result: {{parent_step.output}}",
+        context="{{parent_step.context}}"
+    )
+)
+```
+
+Result Handlers are essential for building robust, intelligent agents that can adapt to different scenarios and handle edge cases gracefully.

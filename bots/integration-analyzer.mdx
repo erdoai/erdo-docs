@@ -1,0 +1,202 @@
+---
+title: Integration Analyzer Bot
+description: Analyze and optimize data integrations
+---
+
+# Integration Analyzer Bot
+
+The Integration Analyzer Bot examines integration configurations, analyzes data flow patterns, and provides insights to optimize data pipeline performance and reliability.
+
+## Quick Start
+
+```python
+from erdo.actions import bot
+
+# Analyze an integration
+result = bot.invoke(
+    bot_name="integration analyzer",
+    parameters={
+        "resource": "salesforce_integration"
+    }
+)
+```
+
+## Analysis Areas
+
+<CardGroup cols={2}>
+  <Card title="Configuration Analysis" icon="cog">
+    Reviews integration settings and parameters
+  </Card>
+  <Card title="Performance Metrics" icon="chart-line">
+    Analyzes throughput, latency, and error rates
+  </Card>
+  <Card title="Data Flow Mapping" icon="route">
+    Traces data movement and transformations
+  </Card>
+  <Card title="Security Assessment" icon="shield">
+    Evaluates authentication and data protection
+  </Card>
+</CardGroup>
+
+## Supported Integrations
+
+### Cloud Platforms
+
+- **AWS**: S3, RDS, Redshift, DynamoDB
+- **Google Cloud**: BigQuery, Cloud Storage, Firestore
+- **Azure**: Blob Storage, SQL Database, Cosmos DB
+
+### SaaS Applications
+
+- **CRM**: Salesforce, HubSpot, Pipedrive
+- **Marketing**: Mailchimp, Marketo, Pardot
+- **Analytics**: Google Analytics, Mixpanel, Amplitude
+- **Finance**: Stripe, QuickBooks, Xero
+
+### Databases
+
+- **SQL**: PostgreSQL, MySQL, SQL Server, Oracle
+- **NoSQL**: MongoDB, Cassandra, Redis
+- **Data Warehouses**: Snowflake, BigQuery, Redshift
+
+## Analysis Output
+
+<Tabs>
+  <Tab title="Configuration Review">
+    ```json
+    {
+      "integration_name": "salesforce_crm",
+      "type": "salesforce",
+      "status": "active",
+      "configuration": {
+        "sync_frequency": "hourly",
+        "objects_synced": ["Account", "Contact", "Opportunity"],
+        "fields_mapped": 45,
+        "filters_applied": 3
+      },
+      "recommendations": [
+        "Consider increasing sync frequency for Opportunities",
+        "Add field mapping for CustomField__c"
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Performance Metrics">
+    ```json
+    {
+      "performance": {
+        "avg_sync_time": "3.2 minutes",
+        "success_rate": 0.98,
+        "error_rate": 0.02,
+        "throughput": "1500 records/minute",
+        "last_24h_syncs": 24,
+        "failed_syncs": 1
+      },
+      "bottlenecks": [
+        {
+          "component": "API rate limiting",
+          "impact": "medium",
+          "suggestion": "Implement exponential backoff"
+        }
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Data Quality Issues">
+    ```json
+    {
+      "data_issues": [
+        {
+          "issue": "missing_required_fields",
+          "affected_records": 25,
+          "field": "email",
+          "severity": "high"
+        },
+        {
+          "issue": "data_type_mismatch",
+          "affected_records": 8,
+          "field": "annual_revenue",
+          "severity": "medium"
+        }
+      ]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Integration Health Check">
+    Regular assessment of integration performance, identifying issues before
+    they impact business operations.
+  </Accordion>
+  <Accordion title="Migration Planning">
+    Analyze existing integrations to plan migrations, upgrades, or consolidation
+    efforts.
+  </Accordion>
+  <Accordion title="Performance Optimization">
+    Identify bottlenecks and optimization opportunities to improve data pipeline
+    efficiency.
+  </Accordion>
+  <Accordion title="Compliance Auditing">
+    Verify integrations meet security and compliance requirements for data
+    handling.
+  </Accordion>
+  <Accordion title="Cost Optimization">
+    Analyze API usage patterns and suggest optimizations to reduce integration
+    costs.
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Options
+
+```python
+# Comprehensive integration analysis
+result = bot.invoke(
+    bot_name="integration analyzer",
+    parameters={
+        "resource": "database_integration",
+        "analysis_type": "comprehensive",
+        "include_performance": True,
+        "include_security": True,
+        "time_range": "last_30_days"
+    }
+)
+
+# Quick health check
+result = bot.invoke(
+    bot_name="integration analyzer",
+    parameters={
+        "resource": "api_integration",
+        "analysis_type": "health_check"
+    }
+)
+```
+
+## Optimization Recommendations
+
+The bot provides actionable recommendations:
+
+- **Performance**: Optimize batch sizes, implement caching
+- **Reliability**: Add retry logic, improve error handling
+- **Security**: Update authentication, encrypt sensitive data
+- **Cost**: Reduce API calls, optimize sync schedules
+- **Maintenance**: Update deprecated endpoints, clean up unused fields
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Monitoring Setup">
+    - Implement comprehensive logging - Set up performance alerting - Track key
+    integration metrics - Regular health check scheduling
+  </Tab>
+  <Tab title="Configuration Management">
+    - Use version control for configurations - Document integration dependencies
+    - Maintain staging environments - Implement configuration validation
+  </Tab>
+  <Tab title="Troubleshooting">
+    - Maintain integration runbooks - Implement circuit breakers - Plan for
+    failover scenarios - Regular backup and recovery testing
+  </Tab>
+</Tabs>

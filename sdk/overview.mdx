@@ -1,0 +1,332 @@
+---
+title: "SDK Overview"
+description: "Comprehensive guide to the Erdo Python SDK"
+---
+
+# SDK Overview
+
+The Erdo Python SDK provides a powerful framework for building intelligent AI agents. With simple, intuitive APIs, you can create sophisticated automation workflows that combine language models, web research, code execution, and custom integrations.
+
+## Installation
+
+<CodeGroup>
+
+```bash pip
+pip install erdo
+```
+
+```bash Poetry
+poetry add erdo
+```
+
+```bash Conda
+conda install -c conda-forge erdo
+```
+
+</CodeGroup>
+
+## Quick Start
+
+Here's a simple agent that automates email responses:
+
+```python
+from erdo import Agent, Step
+from erdo.actions import llm
+from erdo.tools import EmailTool
+
+# Create your agent
+agent = Agent(
+    name="email_assistant",
+    description="Automatically responds to emails with context-aware replies"
+)
+
+# Define the automation step
+response_step = Step(
+    agent=agent,
+    key="generate_response",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Generate a professional response to this email: {{email_content}}"
+    )
+)
+
+# Add email integration
+email_tool = EmailTool(
+    smtp_host="smtp.gmail.com",
+    credentials="{{email_credentials}}"
+)
+```
+
+## Core Components
+
+<CardGroup cols={2}>
+  <Card title="Agents" icon="robot" href="/concepts/agents">
+    The main orchestrators that define your automation workflow
+  </Card>
+  <Card title="Steps" icon="list-check" href="/concepts/steps">
+    Individual actions within your agent's process
+  </Card>
+  <Card title="Actions" icon="bolt" href="/concepts/actions">
+    Building blocks that define what each step does
+  </Card>
+  <Card title="Tools" icon="wrench" href="/concepts/tools">
+    External integrations and custom functions
+  </Card>
+</CardGroup>
+
+## Action Types
+
+Erdo provides multiple action types for different use cases:
+
+<AccordionGroup>
+  <Accordion title="Language Model Actions (llm)">
+    ```python
+    from erdo.actions import llm
+
+    # Simple message generation
+    response = llm.message(
+        model="claude-sonnet-4",
+        query="Analyze this data: {{input_data}}"
+    )
+
+    # Structured output with validation
+    analysis = llm.structured(
+        model="gpt-4",
+        query="Extract key insights from {{document}}",
+        schema=AnalysisSchema
+    )
+    ```
+
+  </Accordion>
+
+  <Accordion title="Memory Operations">
+    ```python
+    from erdo.actions import memory
+
+    # Store information
+    memory.store(
+        key="customer_preference",
+        value="{{preferences}}",
+        organization="{{org_id}}"
+    )
+
+    # Search stored memories
+    memory.search(
+        query="{{search_term}}",
+        limit=5,
+        user="{{user_id}}"
+    )
+    ```
+
+  </Accordion>
+
+  <Accordion title="Web Research & Data Collection">
+    ```python
+    from erdo.actions import websearch, webparser
+
+    # Search the web
+    websearch.search(
+        query="{{topic}} latest research",
+        language="en",
+        country="us"
+    )
+
+    # Parse web content
+    webparser.parse(
+        url="{{target_url}}",
+        selectors=["h1", "p", ".content"],
+        extract_links=True
+    )
+    ```
+
+  </Accordion>
+
+  <Accordion title="Code Execution">
+    ```python
+    from erdo.actions import codeexec
+
+    # Execute Python code
+    codeexec.execute(
+        code="""
+        import pandas as pd
+        df = pd.read_csv('{{data_file}}')
+        result = df.describe()
+        print(result)
+        """,
+        entrypoint="analysis.py"
+    )
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Execution Modes
+
+Control when and how steps execute:
+
+```python
+from erdo import ExecutionMode
+from erdo._generated.condition import IsSuccess
+
+# Iterate over data sets
+iterate_step = Step(
+    agent=agent,
+    key="process_files",
+    actiontype=codeexec.execute(code="process_file({{file}})"),
+    execution_mode=ExecutionMode(
+        mode="iterate_over",
+        data="files",
+        if_condition=IsSuccess()
+    )
+)
+```
+
+### Result Handlers
+
+Process step outcomes and control workflow:
+
+```python
+from erdo import ResultHandler
+from erdo._generated.condition import IsSuccess, IsError
+
+success_handler = ResultHandler(
+    step=response_step,
+    type="final",
+    if_conditions=IsSuccess()
+)
+
+error_handler = ResultHandler(
+    step=response_step,
+    type="retry",
+    if_conditions=IsError(),
+    max_retries=3
+)
+```
+
+### Complex Workflows
+
+Build sophisticated multi-step automation:
+
+```python
+# Research workflow
+research_agent = Agent(name="research_assistant")
+
+# Step 1: Search for information
+search_step = Step(
+    agent=research_agent,
+    key="search",
+    actiontype=websearch.search(query="{{research_topic}}")
+)
+
+# Step 2: Analyze findings
+analysis_step = Step(
+    agent=research_agent,
+    key="analyze",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="Analyze these search results: {{steps.search.results}}"
+    ),
+    depends_on=[search_step]
+)
+
+# Step 3: Generate report
+report_step = Step(
+    agent=research_agent,
+    key="report",
+    actiontype=llm.message(
+        model="gpt-4",
+        query="Create a comprehensive report: {{steps.analyze.analysis}}"
+    ),
+    depends_on=[analysis_step]
+)
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Agent Design">
+    - **Single Responsibility**: Each agent should have a clear, focused purpose
+    - **Descriptive Names**: Use clear, descriptive names for agents and steps
+    - **Error Handling**: Always include error handling and retry logic
+    - **Testing**: Test agents with various inputs before deployment
+  </Tab>
+
+{" "}
+<Tab title="Performance">
+  - **Caching**: Use memory actions to cache frequently accessed data -
+  **Parallel Execution**: Use background execution for independent tasks -
+  **Resource Management**: Monitor API usage and implement rate limiting -
+  **Optimization**: Profile and optimize slow operations
+</Tab>
+
+  <Tab title="Security">
+    - **Credential Management**: Store sensitive data securely
+    - **Input Validation**: Validate all external inputs
+    - **Access Control**: Implement proper permissions and visibility settings
+    - **Audit Logging**: Log all agent actions for debugging and compliance
+  </Tab>
+</Tabs>
+
+## Examples by Use Case
+
+<CardGroup cols={3}>
+  <Card
+    title="Business Automation"
+    icon="briefcase"
+    href="/examples/business-automation"
+  >
+    Automate workflows, data processing, and reporting
+  </Card>
+  <Card
+    title="Research Assistant"
+    icon="magnifying-glass"
+    href="/examples/research-assistant"
+  >
+    Gather information and generate insights
+  </Card>
+  <Card
+    title="Development Workflow"
+    icon="code-branch"
+    href="/examples/development-workflow"
+  >
+    Automate code generation and testing
+  </Card>
+  <Card
+    title="Content Creation"
+    icon="pen-to-square"
+    href="/examples/content-creation"
+  >
+    Generate and review content at scale
+  </Card>
+  <Card title="Data Analysis" icon="chart-line" href="/bots/data-analyst">
+    Process and visualize complex datasets
+  </Card>
+  <Card
+    title="Security Scanning"
+    icon="shield-check"
+    href="/bots/security-checker"
+  >
+    Automated security validation and monitoring
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Ready to dive deeper? Explore these resources:
+
+1. **[Quick Start Guide](/quickstart)** - Build your first agent
+2. **[Action Reference](/sdk/actions/llm)** - Detailed action documentation
+3. **[Pre-built Bots](/bots/security-checker)** - Ready-made automation solutions
+4. **[Examples](/examples/business-automation)** - Real-world implementations
+
+## API Reference
+
+For detailed API documentation, including all available methods, parameters, and response formats, see our complete API reference (coming soon).
+
+## Support
+
+- **[GitHub Issues](https://github.com/erdoai/erdo-agents-sdk/issues)** - Bug reports and feature requests
+- **[Discord Community](https://discord.gg/erdo)** - Get help and share knowledge
+- **[Documentation](/)** - Complete guides and tutorials

@@ -1,0 +1,529 @@
+---
+title: "Tools"
+description: "Understanding tools - external integrations that extend agent capabilities"
+---
+
+# Tools
+
+Tools are external integrations that extend your agents' capabilities beyond their built-in actions. They allow agents to interact with APIs, databases, web services, and custom functions to access real-world data and perform specialized operations.
+
+## What is a Tool?
+
+A tool defines:
+
+- **An external capability** that your agent can use
+- **The interface** for interacting with that capability
+- **Input parameters** and expected outputs
+- **Authentication** and configuration requirements
+
+<CardGroup cols={2}>
+  <Card title="Web Tools" icon="globe">
+    Search engines, web scrapers, and content parsers
+  </Card>
+  <Card title="API Tools" icon="api">
+    REST APIs, GraphQL endpoints, and web services
+  </Card>
+  <Card title="Database Tools" icon="database">
+    SQL databases, document stores, and data warehouses
+  </Card>
+  <Card title="Custom Tools" icon="wrench">
+    Your own functions and specialized integrations
+  </Card>
+</CardGroup>
+
+## Tool Definition
+
+### Basic Tool Structure
+
+```python
+from erdo import Tool
+
+# Simple web search tool
+search_tool = Tool(
+    name="web_search",
+    description="Search for information on the web",
+    actiontype="websearch.search",
+    parameters={
+        "query": "{{search_query}}",
+        "num_results": 10
+    }
+)
+
+# API integration tool
+api_tool = Tool(
+    name="get_weather",
+    description="Get current weather for a location",
+    actiontype="api.call",
+    parameters={
+        "url": "https://api.weather.com/v1/current",
+        "method": "GET",
+        "query_params": {
+            "location": "{{location}}",
+            "units": "metric"
+        },
+        "headers": {
+            "Authorization": "Bearer {{weather_api_key}}"
+        }
+    }
+)
+```
+
+### Using Tools in Actions
+
+Tools are typically used within LLM actions to give AI models access to external capabilities:
+
+```python
+from erdo.actions import llm
+from erdo import Tool
+
+# LLM action with multiple tools
+research_action = llm.message(
+    model="claude-sonnet-4",
+    query="Research the latest developments in {{topic}}",
+    tools=[
+        Tool(
+            name="search_web",
+            description="Search for recent information",
+            actiontype="websearch.search",
+            parameters={"query": "{{query}}"}
+        ),
+        Tool(
+            name="parse_content",
+            description="Extract content from web pages",
+            actiontype="webparser.parse",
+            parameters={"url": "{{url}}"}
+        ),
+        Tool(
+            name="academic_search",
+            description="Search academic papers",
+            actiontype="api.call",
+            parameters={
+                "url": "https://api.arxiv.org/query",
+                "query_params": {"search_query": "{{query}}"}
+            }
+        )
+    ]
+)
+```
+
+## Built-in Tool Types
+
+### Web Search Tools
+
+Search the web for information:
+
+```python
+# Basic web search
+web_search = Tool(
+    name="search_engine",
+    description="Search the web for information",
+    actiontype="websearch.search",
+    parameters={
+        "query": "{{search_term}}",
+        "num_results": 10,
+        "time_filter": "past_month",
+        "safe_search": True
+    }
+)
+
+# Site-specific search
+site_search = Tool(
+    name="search_specific_site",
+    description="Search within specific websites",
+    actiontype="websearch.search",
+    parameters={
+        "query": "{{query}} site:{{domain}}",
+        "sites": ["github.com", "stackoverflow.com"]
+    }
+)
+```
+
+### Web Parsing Tools
+
+Extract content from web pages:
+
+```python
+# Web content parser
+content_parser = Tool(
+    name="parse_webpage",
+    description="Extract text content from web pages",
+    actiontype="webparser.parse",
+    parameters={
+        "url": "{{target_url}}",
+        "extract_format": "markdown",
+        "include_links": True,
+        "include_images": False,
+        "css_selector": "article, .content, main"
+    }
+)
+
+# PDF parser
+pdf_parser = Tool(
+    name="parse_pdf",
+    description="Extract text from PDF documents",
+    actiontype="fileparser.parse",
+    parameters={
+        "url": "{{pdf_url}}",
+        "format": "text",
+        "extract_tables": True
+    }
+)
+```
+
+### API Integration Tools
+
+Connect with external APIs:
+
+```python
+# REST API tool
+rest_api = Tool(
+    name="api_request",
+    description="Make REST API requests",
+    actiontype="api.call",
+    parameters={
+        "url": "{{api_endpoint}}",
+        "method": "{{http_method}}",
+        "headers": {
+            "Authorization": "Bearer {{api_token}}",
+            "Content-Type": "application/json"
+        },
+        "body": "{{request_payload}}"
+    }
+)
+
+# GraphQL API tool
+graphql_api = Tool(
+    name="graphql_query",
+    description="Execute GraphQL queries",
+    actiontype="api.graphql",
+    parameters={
+        "endpoint": "{{graphql_endpoint}}",
+        "query": "{{graphql_query}}",
+        "variables": "{{query_variables}}",
+        "headers": {
+            "Authorization": "Bearer {{graphql_token}}"
+        }
+    }
+)
+```
+
+### Database Tools
+
+Query databases and data stores:
+
+```python
+# SQL database tool
+sql_tool = Tool(
+    name="query_database",
+    description="Execute SQL queries",
+    actiontype="database.query",
+    parameters={
+        "connection_string": "{{db_connection}}",
+        "query": "{{sql_query}}",
+        "parameters": "{{query_params}}"
+    }
+)
+
+# Document database tool
+document_db = Tool(
+    name="document_search",
+    description="Search document database",
+    actiontype="database.document_search",
+    parameters={
+        "collection": "{{collection_name}}",
+        "query": "{{search_criteria}}",
+        "limit": 20
+    }
+)
+```
+
+## Custom Tools
+
+### Creating Custom Tools
+
+Define your own tools for specialized operations:
+
+```python
+# Custom calculation tool
+calculator_tool = Tool(
+    name="advanced_calculator",
+    description="Perform complex mathematical calculations",
+    actiontype="codeexec.execute",
+    parameters={
+        "code": """
+import math
+import numpy as np
+
+# Perform calculation
+expression = "{{math_expression}}"
+variables = {{variables}}
+
+# Safe evaluation with math functions
+result = eval(expression, {
+    "__builtins__": {},
+    "math": math,
+    "np": np,
+    **variables
+})
+"""
+    }
+)
+
+# Custom data processing tool
+data_processor = Tool(
+    name="data_transformer",
+    description="Transform data using custom logic",
+    actiontype="codeexec.execute",
+    parameters={
+        "code": """
+import pandas as pd
+import json
+
+# Load data
+data = {{input_data}}
+transformation_rules = {{rules}}
+
+# Apply transformations
+if isinstance(data, dict):
+    df = pd.DataFrame([data])
+else:
+    df = pd.DataFrame(data)
+
+# Apply custom transformations
+for rule in transformation_rules:
+    df = apply_transformation(df, rule)
+
+result = df.to_dict('records')
+"""
+    }
+)
+```
+
+### Tool Libraries
+
+Create reusable tool libraries:
+
+```python
+# Email tools library
+class EmailTools:
+    @staticmethod
+    def send_email():
+        return Tool(
+            name="send_email",
+            description="Send email messages",
+            actiontype="email.send",
+            parameters={
+                "to": "{{recipient}}",
+                "subject": "{{email_subject}}",
+                "body": "{{email_body}}",
+                "attachments": "{{file_attachments}}"
+            }
+        )
+
+    @staticmethod
+    def read_email():
+        return Tool(
+            name="read_email",
+            description="Read emails from inbox",
+            actiontype="email.read",
+            parameters={
+                "mailbox": "{{mailbox_name}}",
+                "filter": "{{email_filter}}",
+                "limit": 10
+            }
+        )
+
+# Social media tools
+class SocialMediaTools:
+    @staticmethod
+    def post_update():
+        return Tool(
+            name="post_social_update",
+            description="Post updates to social media",
+            actiontype="social.post",
+            parameters={
+                "platform": "{{platform}}",
+                "content": "{{post_content}}",
+                "media": "{{media_files}}"
+            }
+        )
+```
+
+## Tool Authentication
+
+### API Keys and Tokens
+
+Secure authentication for external services:
+
+```python
+# Tool with API key authentication
+authenticated_tool = Tool(
+    name="secure_api",
+    description="Access secured API endpoint",
+    actiontype="api.call",
+    parameters={
+        "url": "{{api_endpoint}}",
+        "headers": {
+            "Authorization": "Bearer {{secret:api_token}}",
+            "X-API-Key": "{{secret:api_key}}"
+        }
+    }
+)
+
+# Tool with OAuth authentication
+oauth_tool = Tool(
+    name="oauth_api",
+    description="Access OAuth-protected resource",
+    actiontype="api.call",
+    parameters={
+        "url": "{{api_endpoint}}",
+        "auth_type": "oauth2",
+        "client_id": "{{oauth_client_id}}",
+        "client_secret": "{{secret:oauth_client_secret}}",
+        "token_url": "{{oauth_token_url}}"
+    }
+)
+```
+
+### Database Connections
+
+Secure database access:
+
+```python
+# Database tool with connection string
+db_tool = Tool(
+    name="production_db",
+    description="Query production database",
+    actiontype="database.query",
+    parameters={
+        "connection_string": "{{secret:prod_db_connection}}",
+        "query": "{{sql_query}}",
+        "read_only": True
+    }
+)
+```
+
+## Tool Error Handling
+
+### Retry Configuration
+
+Configure how tools handle failures:
+
+```python
+# Tool with retry logic
+resilient_tool = Tool(
+    name="resilient_api",
+    description="API with automatic retry",
+    actiontype="api.call",
+    parameters={
+        "url": "{{api_endpoint}}",
+        "retry_config": {
+            "max_attempts": 3,
+            "backoff_factor": 2,
+            "retry_on": ["timeout", "5xx_error"]
+        },
+        "timeout": 30
+    }
+)
+```
+
+### Fallback Tools
+
+Provide alternative tools when primary tools fail:
+
+```python
+# Primary search tool
+primary_search = Tool(
+    name="primary_search",
+    description="Primary search engine",
+    actiontype="websearch.search",
+    parameters={"query": "{{query}}"}
+)
+
+# Fallback search tool
+fallback_search = Tool(
+    name="fallback_search",
+    description="Backup search engine",
+    actiontype="websearch.search",
+    parameters={
+        "query": "{{query}}",
+        "engine": "alternative"
+    }
+)
+
+# LLM action with fallback tools
+search_action = llm.message(
+    model="claude-sonnet-4",
+    query="Search for information about {{topic}}",
+    tools=[primary_search],
+    fallback_tools=[fallback_search]
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Tool Design">
+    **Clear Purpose**: Each tool should have a specific, well-defined function
+
+    **Descriptive Names**: Use clear, descriptive names and descriptions
+
+    **Parameter Validation**: Validate inputs and provide helpful error messages
+
+    **Documentation**: Document expected inputs, outputs, and usage patterns
+
+  </Accordion>
+
+  <Accordion title="Security">
+    **Authentication**: Use secure authentication methods
+
+    **Secrets Management**: Store API keys and credentials securely
+
+    **Access Control**: Implement appropriate access restrictions
+
+    **Input Sanitization**: Validate and sanitize all inputs
+
+  </Accordion>
+
+  <Accordion title="Performance">
+    **Timeout Configuration**: Set appropriate timeouts for external calls
+
+    **Rate Limiting**: Respect API rate limits and quotas
+
+    **Caching**: Cache responses when appropriate
+
+    **Error Handling**: Implement robust error handling and retries
+
+  </Accordion>
+
+  <Accordion title="Maintenance">
+    **Version Management**: Track API versions and compatibility
+
+    **Monitoring**: Monitor tool usage and performance
+
+    **Testing**: Test tools regularly to ensure reliability
+
+    **Updates**: Keep tools updated with latest API changes
+
+  </Accordion>
+</AccordionGroup>
+
+## Tool Examples by Use Case
+
+<CardGroup cols={2}>
+  <Card title="Research & Analysis" icon="magnifying-glass">
+    Web search, academic databases, content parsing, data analysis APIs
+  </Card>
+  <Card title="Business Operations" icon="briefcase">
+    CRM systems, email platforms, project management tools, accounting APIs
+  </Card>
+  <Card title="Development Workflows" icon="code">
+    Version control APIs, CI/CD platforms, code analysis tools, deployment
+    services
+  </Card>
+  <Card title="Data Processing" icon="chart-bar">
+    Database connectors, ETL tools, analytics platforms, visualization APIs
+  </Card>
+</CardGroup>
+
+Tools are what make your agents truly powerful by connecting them to the vast ecosystem of external services and data sources. Choose and configure your tools carefully to match your specific use cases and requirements.

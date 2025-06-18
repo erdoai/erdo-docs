@@ -1,0 +1,549 @@
+---
+title: "Security Checker Bot"
+description: "Automated security validation and vulnerability detection"
+---
+
+# Security Checker Bot
+
+The Security Checker bot automatically validates code security, identifies potential vulnerabilities, and ensures compliance with security best practices. It integrates seamlessly into your development workflow to catch issues before they reach production.
+
+## Quick Start
+
+```python
+from erdo.actions import bot
+
+# Invoke the security checker
+security_result = bot.invoke(
+    bot_name="security checker",
+    parameters={
+        "code": "{{code_to_analyze}}",
+        "language": "python",
+        "severity_threshold": "medium"
+    }
+)
+```
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Vulnerability Detection" icon="bug">
+    Identifies SQL injection, XSS, CSRF, and other security vulnerabilities
+  </Card>
+  <Card title="Code Quality Analysis" icon="magnifying-glass">
+    Analyzes code patterns and identifies potential security anti-patterns
+  </Card>
+  <Card title="Dependency Scanning" icon="link">
+    Checks for known vulnerabilities in third-party dependencies
+  </Card>
+  <Card title="Compliance Validation" icon="shield-check">
+    Ensures adherence to security standards (OWASP, CWE, etc.)
+  </Card>
+</CardGroup>
+
+## Supported Languages
+
+<Tabs>
+  <Tab title="Python">
+    - SQL injection detection
+    - Input validation issues
+    - Insecure random number generation
+    - Hardcoded credentials
+    - Pickle deserialization vulnerabilities
+    - Path traversal issues
+  </Tab>
+
+{" "}
+
+<Tab title="JavaScript/TypeScript">
+  - XSS vulnerabilities - Prototype pollution - Insecure authentication -
+  DOM-based vulnerabilities - npm dependency issues - Regex denial of service
+</Tab>
+
+{" "}
+
+<Tab title="Java">
+  - Injection flaws - Deserialization vulnerabilities - XML external entity
+  (XXE) issues - Insecure cryptographic practices - Maven dependency
+  vulnerabilities
+</Tab>
+
+  <Tab title="Go">
+    - Race conditions
+    - Path traversal
+    - SQL injection
+    - Insecure HTTP practices
+    - Goroutine leaks
+    - Dependency vulnerabilities
+  </Tab>
+</Tabs>
+
+## Integration Examples
+
+### CI/CD Pipeline Integration
+
+```python
+from erdo import Agent, Step
+from erdo.actions import bot, codeexec
+from erdo._generated.condition import GreaterThan, IsSuccess
+
+# Security validation agent
+security_agent = Agent(
+    name="ci_security_validator",
+    description="Validates code security in CI/CD pipeline"
+)
+
+# Step 1: Extract code from repository
+extract_step = Step(
+    agent=security_agent,
+    key="extract_code",
+    actiontype=codeexec.execute(
+        code="""
+        import os
+        import subprocess
+
+        # Get changed files in current commit
+        result = subprocess.run(
+            ['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'],
+            capture_output=True,
+            text=True
+        )
+
+        changed_files = result.stdout.strip().split('\n')
+
+        # Read content of changed files
+        file_contents = {}
+        for file_path in changed_files:
+            if file_path.endswith(('.py', '.js', '.java', '.go')):
+                try:
+                    with open(file_path, 'r') as f:
+                        file_contents[file_path] = f.read()
+                except FileNotFoundError:
+                    continue
+
+        print(json.dumps(file_contents))
+        """,
+        entrypoint="extract_code.py"
+    )
+)
+
+# Step 2: Run security analysis
+security_step = Step(
+    agent=security_agent,
+    key="security_analysis",
+    actiontype=bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "code": "{{steps.extract_code.output}}",
+            "scan_type": "comprehensive",
+            "include_dependencies": True,
+            "severity_threshold": "low"
+        }
+    ),
+    depends_on=[extract_step]
+)
+
+# Step 3: Block deployment if critical issues found
+from erdo import ResultHandler
+
+block_deployment = ResultHandler(
+    step=security_step,
+    type="final",
+    if_conditions=GreaterThan(
+        number="{{len (filter security_issues 'eq' 'severity' 'critical')}}",
+        value="0"
+    ),
+    action="fail_build"
+)
+```
+
+### Real-time Code Analysis
+
+```python
+# Real-time security monitoring
+monitoring_agent = Agent(
+    name="security_monitor",
+    description="Continuously monitors code changes for security issues"
+)
+
+# Watch for file changes
+watch_step = Step(
+    agent=monitoring_agent,
+    key="watch_changes",
+    actiontype=codeexec.execute(
+        code="""
+        import time
+        import os
+        from watchdog.observers import Observer
+        from watchdog.events import FileSystemEventHandler
+
+        class CodeChangeHandler(FileSystemEventHandler):
+            def on_modified(self, event):
+                if event.src_path.endswith(('.py', '.js', '.java')):
+                    with open(event.src_path, 'r') as f:
+                        content = f.read()
+
+                    # Trigger security analysis
+                    return {
+                        'file_path': event.src_path,
+                        'content': content,
+                        'timestamp': time.time()
+                    }
+
+        # Set up file watcher
+        observer = Observer()
+        observer.schedule(CodeChangeHandler(), '{{project_path}}', recursive=True)
+        observer.start()
+        """,
+        entrypoint="file_watcher.py"
+    )
+)
+
+# Analyze changes in real-time
+analyze_step = Step(
+    agent=monitoring_agent,
+    key="real_time_analysis",
+    actiontype=bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "code": "{{steps.watch_changes.content}}",
+            "file_path": "{{steps.watch_changes.file_path}}",
+            "scan_type": "quick",
+            "real_time": True
+        }
+    ),
+    depends_on=[watch_step]
+)
+```
+
+### Pre-commit Hook Integration
+
+```python
+# Pre-commit security validation
+precommit_agent = Agent(
+    name="precommit_security",
+    description="Validates security before allowing commits"
+)
+
+# Get staged changes
+staged_step = Step(
+    agent=precommit_agent,
+    key="get_staged_files",
+    actiontype=codeexec.execute(
+        code="""
+        import subprocess
+        import json
+
+        # Get staged files
+        result = subprocess.run(
+            ['git', 'diff', '--cached', '--name-only'],
+            capture_output=True,
+            text=True
+        )
+
+        staged_files = result.stdout.strip().split('\n')
+
+        # Read staged content
+        staged_content = {}
+        for file_path in staged_files:
+            if file_path.endswith(('.py', '.js', '.java', '.go', '.ts')):
+                # Get staged content (not working directory)
+                content_result = subprocess.run(
+                    ['git', 'show', f':{file_path}'],
+                    capture_output=True,
+                    text=True
+                )
+                if content_result.returncode == 0:
+                    staged_content[file_path] = content_result.stdout
+
+        print(json.dumps(staged_content))
+        """,
+        entrypoint="get_staged.py"
+    )
+)
+
+# Quick security scan
+quick_scan_step = Step(
+    agent=precommit_agent,
+    key="quick_scan",
+    actiontype=bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "code": "{{steps.get_staged_files.output}}",
+            "scan_type": "fast",
+            "severity_threshold": "medium",
+            "fail_on_issues": True
+        }
+    ),
+    depends_on=[staged_step]
+)
+```
+
+## Configuration Options
+
+### Scan Types
+
+<AccordionGroup>
+  <Accordion title="Quick Scan">
+    ```python
+    bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "scan_type": "quick",
+            "patterns": ["sql_injection", "xss", "hardcoded_secrets"],
+            "max_scan_time": 30  # seconds
+        }
+    )
+    ```
+    Fast scan focusing on the most critical vulnerabilities.
+  </Accordion>
+
+  <Accordion title="Comprehensive Scan">
+    ```python
+    bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "scan_type": "comprehensive",
+            "include_dependencies": True,
+            "static_analysis": True,
+            "dynamic_analysis": False,
+            "compliance_checks": ["owasp", "cwe"]
+        }
+    )
+    ```
+    Thorough analysis including dependencies and compliance checks.
+  </Accordion>
+
+  <Accordion title="Custom Scan">
+    ```python
+    bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "scan_type": "custom",
+            "rules": {
+                "sql_injection": {"enabled": True, "severity": "high"},
+                "xss": {"enabled": True, "severity": "high"},
+                "csrf": {"enabled": False},
+                "secrets": {"enabled": True, "patterns": ["api_key", "password"]}
+            }
+        }
+    )
+    ```
+    Customizable scan with specific rule configurations.
+  </Accordion>
+</AccordionGroup>
+
+### Severity Levels
+
+- **Critical**: Immediate security threats requiring urgent attention
+- **High**: Significant vulnerabilities that should be fixed soon
+- **Medium**: Moderate security issues to address in next cycle
+- **Low**: Minor security improvements and best practices
+- **Info**: Security-related information and recommendations
+
+## Output Format
+
+The Security Checker bot returns structured results:
+
+```json
+{
+  "scan_id": "scan_20241216_143022",
+  "timestamp": "2024-12-16T14:30:22Z",
+  "summary": {
+    "total_files_scanned": 45,
+    "total_issues_found": 12,
+    "critical_issues": 2,
+    "high_issues": 3,
+    "medium_issues": 5,
+    "low_issues": 2
+  },
+  "issues": [
+    {
+      "id": "SEC-001",
+      "type": "sql_injection",
+      "severity": "critical",
+      "file": "app/models/user.py",
+      "line": 45,
+      "column": 12,
+      "message": "Potential SQL injection vulnerability",
+      "description": "User input is directly concatenated into SQL query without parameterization",
+      "code_snippet": "query = f\"SELECT * FROM users WHERE name = '{user_input}'\"",
+      "recommendation": "Use parameterized queries or ORM methods",
+      "references": [
+        "https://owasp.org/www-community/attacks/SQL_Injection",
+        "CWE-89: SQL Injection"
+      ],
+      "confidence": 0.95
+    }
+  ],
+  "dependencies": {
+    "vulnerable_packages": [
+      {
+        "name": "requests",
+        "version": "2.25.1",
+        "vulnerability": "CVE-2023-32681",
+        "severity": "medium",
+        "recommendation": "Upgrade to version 2.31.0 or later"
+      }
+    ]
+  },
+  "compliance": {
+    "owasp_top_10": {
+      "score": 8.5,
+      "issues": ["A03:2021 – Injection"]
+    },
+    "cwe_coverage": {
+      "checked": 156,
+      "violations": 3
+    }
+  }
+}
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Development Workflow">
+    - Integrate security checks early in development
+    - Use quick scans for rapid feedback
+    - Run comprehensive scans before releases
+    - Establish security baselines and track improvements
+  </Tab>
+
+{" "}
+
+<Tab title="CI/CD Integration">
+  - Block builds with critical security issues - Generate security reports for
+  each build - Track security metrics over time - Automate security
+  notifications
+</Tab>
+
+  <Tab title="Team Collaboration">
+    - Share security findings with development teams
+    - Provide actionable remediation guidance
+    - Train developers on secure coding practices
+    - Regular security review meetings
+  </Tab>
+</Tabs>
+
+## Advanced Features
+
+### Custom Security Rules
+
+```python
+# Define custom security rules
+custom_rules_step = Step(
+    agent=security_agent,
+    key="custom_analysis",
+    actiontype=bot.invoke(
+        bot_name="security checker",
+        parameters={
+            "custom_rules": [
+                {
+                    "name": "company_secret_pattern",
+                    "pattern": r"COMPANY_API_KEY_[A-Za-z0-9]{32}",
+                    "severity": "critical",
+                    "message": "Company API key exposed in code"
+                },
+                {
+                    "name": "debug_mode_check",
+                    "pattern": r"DEBUG\s*=\s*True",
+                    "severity": "medium",
+                    "message": "Debug mode enabled in production code"
+                }
+            ]
+        }
+    )
+)
+```
+
+### Security Metrics Tracking
+
+```python
+# Track security metrics over time
+metrics_step = Step(
+    agent=security_agent,
+    key="track_metrics",
+    actiontype=codeexec.execute(
+        code="""
+        import json
+        from datetime import datetime
+
+        # Store security scan results
+        metrics = {
+            "timestamp": datetime.now().isoformat(),
+            "scan_results": {{steps.security_analysis.results}},
+            "trend_data": {
+                "issues_resolved": 5,
+                "new_issues": 2,
+                "security_score": 8.7
+            }
+        }
+
+        # Save to metrics database
+        with open('security_metrics.json', 'a') as f:
+            f.write(json.dumps(metrics) + '\\n')
+        """,
+        entrypoint="track_metrics.py"
+    ),
+    depends_on=[security_step]
+)
+```
+
+## Integration with Other Bots
+
+<CardGroup cols={2}>
+  <Card title="Code Review Bot" icon="code-review">
+    Combine security analysis with code quality reviews
+  </Card>
+  <Card title="Compliance Bot" icon="clipboard-check">
+    Ensure security findings meet compliance requirements
+  </Card>
+  <Card title="Notification Bot" icon="bell">
+    Alert teams about critical security issues
+  </Card>
+  <Card title="Documentation Bot" icon="book">
+    Generate security documentation and reports
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="False Positives">
+    - Review and tune security rules
+    - Add exclusions for known safe patterns
+    - Adjust severity thresholds
+    - Provide feedback to improve detection
+  </Accordion>
+
+{" "}
+
+<Accordion title="Performance Issues">
+  - Use quick scans for frequent checks - Limit scan scope to changed files -
+  Run comprehensive scans periodically - Optimize rule sets for your codebase
+</Accordion>
+
+  <Accordion title="Integration Problems">
+    - Verify bot permissions and access
+    - Check code format and language detection
+    - Validate input parameters
+    - Review error logs and diagnostic information
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Security Rules" icon="gear">
+    Create organization-specific security patterns
+  </Card>
+  <Card title="Advanced Integration" icon="link">
+    Connect with SIEM and security tools
+  </Card>
+  <Card title="Security Training" icon="graduation-cap">
+    Implement security awareness programs
+  </Card>
+  <Card title="Compliance Automation" icon="shield">
+    Automate security compliance workflows
+  </Card>
+</CardGroup>

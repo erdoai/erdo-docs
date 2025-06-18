@@ -1,0 +1,381 @@
+---
+title: "CLI Overview"
+description: "Complete guide to the Erdo command-line interface"
+---
+
+# CLI Overview
+
+The Erdo CLI is a powerful command-line tool for building, testing, and deploying AI agents. It provides everything you need to work with the Erdo platform from your terminal.
+
+## Installation
+
+<CardGroup cols={2}>
+  <Card title="Homebrew (Recommended)" icon="apple">
+    ```bash brew install erdoai/tap/erdo ```
+  </Card>
+  <Card title="Manual Download" icon="download">
+    Download from [GitHub Releases](https://github.com/erdoai/erdo-cli/releases)
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Configure the CLI">
+    ```bash
+    erdo configure
+    ```
+    Set up your Erdo server connection and preferences.
+  </Step>
+
+{" "}
+<Step title="Login to your account">
+  ```bash erdo login ``` Authenticate with your Erdo platform account.
+</Step>
+
+{" "}
+<Step title="Initialize a new agent">
+  ```bash erdo init my-agent ``` Create a new agent project with boilerplate
+  code.
+</Step>
+
+  <Step title="Start development mode">
+    ```bash
+    erdo dev
+    ```
+    Launch development server with hot reload.
+  </Step>
+</Steps>
+
+## Core Commands
+
+<AccordionGroup>
+  <Accordion title="erdo configure" icon="gear">
+    Configure CLI settings and server connection
+
+    ```bash
+    # Interactive configuration
+    erdo configure
+
+    # Set specific values
+    erdo configure --server https://api.erdo.ai
+    erdo configure --timeout 30
+    ```
+
+  </Accordion>
+
+  <Accordion title="erdo login" icon="sign-in">
+    Authenticate with the Erdo platform
+
+    ```bash
+    # Interactive login
+    erdo login
+
+    # Force re-authentication
+    erdo login --force
+
+    # Check authentication status
+    erdo whoami
+    ```
+
+  </Accordion>
+
+  <Accordion title="erdo init" icon="plus">
+    Initialize new agent projects
+
+    ```bash
+    # Create new agent
+    erdo init my-agent
+
+    # Use specific template
+    erdo init my-agent --template business-automation
+
+    # Initialize in current directory
+    erdo init . --name current-agent
+    ```
+
+  </Accordion>
+
+  <Accordion title="erdo dev" icon="code">
+    Development server with hot reload
+
+    ```bash
+    # Start development mode
+    erdo dev
+
+    # Specify port
+    erdo dev --port 8080
+
+    # Watch specific files
+    erdo dev --watch "*.py,*.yaml"
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Agent Management
+
+### List Agents
+
+```bash
+# List all agents
+erdo list-bots
+
+# Filter by status
+erdo list-bots --status active
+
+# Show detailed information
+erdo list-bots --verbose
+```
+
+### Export & Import
+
+```bash
+# Export agent to local file
+erdo export-bot my-agent --output ./my-agent.py
+
+# Export with dependencies
+erdo export-bot my-agent --include-deps --format zip
+
+# Import agent from file
+erdo import-bot ./my-agent.py
+```
+
+### Sync & Deploy
+
+```bash
+# Sync local changes to platform
+erdo sync
+
+# Deploy specific agent
+erdo deploy my-agent
+
+# Deploy with environment
+erdo deploy my-agent --env production
+```
+
+## Development Features
+
+### Testing
+
+```bash
+# Run agent tests
+erdo test
+
+# Test specific agent
+erdo test --agent my-agent
+
+# Test with custom input
+erdo test --input "test data" --agent my-agent
+
+# Run integration tests
+erdo test --integration
+```
+
+### Code Generation
+
+```bash
+# Generate client code
+erdo gen-client --language python --output ./client
+
+# Generate TypeScript definitions
+erdo gen-client --language typescript --output ./types
+
+# Generate API documentation
+erdo gen-docs --format openapi --output ./docs
+```
+
+### Introspection
+
+```bash
+# Inspect agent structure
+erdo introspect my-agent
+
+# Show agent dependencies
+erdo introspect my-agent --deps
+
+# Export schema
+erdo introspect my-agent --schema --output schema.json
+```
+
+## Configuration
+
+### Global Configuration
+
+The CLI stores configuration in `~/.erdo/config.yaml`:
+
+```yaml
+server:
+  url: "https://api.erdo.ai"
+  timeout: 30
+  retries: 3
+
+auth:
+  method: "oauth"
+  auto_refresh: true
+
+development:
+  auto_save: true
+  watch_mode: true
+  hot_reload: true
+
+logging:
+  level: "info"
+  format: "pretty"
+  file: "~/.erdo/logs/cli.log"
+```
+
+### Project Configuration
+
+Each agent project can have a `.erdo/config.yaml`:
+
+```yaml
+agent:
+  name: "my-agent"
+  version: "1.0.0"
+  description: "My awesome agent"
+
+dependencies:
+  - "security-checker@latest"
+  - "data-analyst@1.2.0"
+
+deployment:
+  environment: "development"
+  auto_deploy: false
+
+development:
+  port: 3000
+  watch: ["*.py", "*.yaml"]
+```
+
+## Environment Variables
+
+Common environment variables:
+
+```bash
+# API Configuration
+export ERDO_API_URL="https://api.erdo.ai"
+export ERDO_API_TOKEN="your-token"
+
+# Development Settings
+export ERDO_DEV_PORT="3000"
+export ERDO_LOG_LEVEL="debug"
+
+# Cache Configuration
+export ERDO_CACHE_DIR="~/.erdo/cache"
+export ERDO_CACHE_TTL="3600"
+```
+
+## Examples
+
+### Basic Workflow
+
+```bash
+# Setup
+erdo configure
+erdo login
+
+# Create and develop
+erdo init email-assistant
+cd email-assistant
+erdo dev
+
+# Test and deploy
+erdo test
+erdo sync
+erdo deploy email-assistant
+```
+
+### Advanced Usage
+
+```bash
+# Create agent with template
+erdo init data-processor --template data-analysis
+
+# Development with custom settings
+erdo dev --port 8080 --watch "src/**/*.py"
+
+# Export for production
+erdo export-bot data-processor \
+  --format production \
+  --include-deps \
+  --output ./dist/
+
+# Deploy with environment variables
+erdo deploy data-processor \
+  --env production \
+  --set API_KEY=secret \
+  --set BATCH_SIZE=1000
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication Issues">
+    ```bash
+    # Clear auth cache
+    rm ~/.erdo/auth.json
+
+    # Re-authenticate
+    erdo login --force
+
+    # Check token status
+    erdo whoami --verbose
+    ```
+
+  </Accordion>
+
+  <Accordion title="Connection Problems">
+    ```bash
+    # Test connectivity
+    erdo configure --test-connection
+
+    # Use different server
+    erdo configure --server https://staging.erdo.ai
+
+    # Check configuration
+    erdo configure --show
+    ```
+
+  </Accordion>
+
+  <Accordion title="Development Issues">
+    ```bash
+    # Clear cache
+    erdo cache clear
+
+    # Reset development environment
+    erdo dev --reset
+
+    # Debug mode
+    erdo dev --debug --verbose
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Command Reference
+
+For detailed information about each command, see:
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/login">
+    Login, logout, and authentication management
+  </Card>
+  <Card title="Agent Development" icon="code-branch" href="/cli/dev">
+    Development server and testing commands
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/cli/sync">
+    Sync, deploy, and export commands
+  </Card>
+  <Card title="Utilities" icon="wrench" href="/cli/configure">
+    Configuration and introspection tools
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- **[Installation Guide](/installation)** - Detailed setup instructions
+- **[Quick Start](/quickstart)** - Build your first agent
+- **[SDK Documentation](/sdk/overview)** - Python SDK reference
+- **[Examples](/examples/business-automation)** - Real-world use cases

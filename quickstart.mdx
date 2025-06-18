@@ -1,0 +1,200 @@
+---
+title: "Quick Start"
+description: "Build your first AI agent with Erdo in under 10 minutes"
+---
+
+## Getting Started
+
+This guide will walk you through creating your first AI agent with Erdo. By the end, you'll have a working agent that can automate tasks and integrate with external services.
+
+<Info>
+  **Prerequisites** You should have Python 3.8+ and access to the Erdo platform
+  ([sign up here](https://erdo.ai))
+</Info>
+
+## Step 1: Install the Erdo CLI
+
+The fastest way to get started is with the Erdo CLI:
+
+<CodeGroup>
+
+```bash Homebrew (Recommended)
+brew install erdoai/tap/erdo
+```
+
+```bash Manual Download
+# Download from GitHub Releases
+curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-amd64 -o erdo
+chmod +x erdo
+mv erdo /usr/local/bin/
+```
+
+</CodeGroup>
+
+Verify the installation:
+
+```bash
+erdo --version
+```
+
+## Step 2: Authenticate
+
+Connect the CLI to your Erdo account:
+
+```bash
+erdo login
+```
+
+This will open your browser to authenticate with your Erdo account.
+
+## Step 3: Create Your First Agent
+
+Let's create a simple task automation agent:
+
+```bash
+erdo init my-first-agent
+cd my-first-agent
+```
+
+This creates a new agent project with the basic structure.
+
+## Step 4: Understanding Agent Structure
+
+Erdo agents are built with these key components:
+
+<AccordionGroup>
+  <Accordion title="Agents - The Main Orchestrator">
+    ```python
+    from erdo import Agent
+
+    agent = Agent(
+        name="task_automator",
+        description="Automates tasks and integrates with external services",
+        visibility="public"
+    )
+    ```
+
+  </Accordion>
+
+  <Accordion title="Steps - Individual Actions">
+    ```python
+    from erdo import Step
+    from erdo.actions import llm
+
+    automation_step = Step(
+        agent=agent,
+        key="automate",
+        actiontype=llm.message(
+            model="claude-sonnet-4",
+            query="Help automate this task: {{task_description}}"
+        )
+    )
+    ```
+
+  </Accordion>
+
+  <Accordion title="Actions - The Building Blocks">
+    ```python
+    from erdo.actions import llm, memory, codeexec, websearch
+
+    # Language model actions
+    llm_action = llm.message(model="claude-sonnet-4", query="{{query}}")
+
+    # Memory operations
+    memory_action = memory.search(query="{{search_term}}", limit=5)
+
+    # Code execution
+    code_action = codeexec.execute(code="print('Hello!')")
+
+    # Web search
+    search_action = websearch.search(query="{{topic}} research")
+    ```
+
+  </Accordion>
+
+  <Accordion title="Tools - External Capabilities">
+    ```python
+    from erdo import Tool
+
+    web_search_tool = Tool(
+        name="search_web",
+        description="Search for information online",
+        actiontype="websearch.search",
+        parameters={"query": "{{query}}"}
+    )
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Step 5: Test Locally
+
+Before deploying to production, test your agent locally:
+
+```bash
+# Run your agent locally for testing
+erdo run --input "Automate my email responses"
+
+# Validate your agent configuration
+erdo validate
+```
+
+## Step 6: Deploy to Production
+
+Once you're satisfied with your local testing, deploy to production:
+
+```bash
+# Deploy your agent to production
+erdo sync
+
+# Your agent is now live at: https://my-first-agent.erdo.ai
+```
+
+Your agent will automatically get:
+
+- A production URL
+- Persistent state across deployments
+- Built-in monitoring and logging
+- API and web interface access
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="SDK Reference" icon="code" href="/sdk/overview">
+    Dive deeper into the Python SDK
+  </Card>
+  <Card title="Pre-built Bots" icon="robot" href="/bots/security-checker">
+    Leverage ready-made automation solutions
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
+    See real-world implementations
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Complete command documentation
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication issues">
+    Make sure you're logged in: `erdo login`
+
+    Check your authentication status: `erdo whoami`
+
+  </Accordion>
+
+  <Accordion title="Agent not deploying">
+    Verify your agent configuration with: `erdo validate`
+
+    Check logs with: `erdo logs --agent my-first-agent`
+
+  </Accordion>
+
+  <Accordion title="CLI command not found">
+    Make sure the CLI is in your PATH or try installing via Homebrew:
+    ```bash
+    brew install erdoai/tap/erdo
+    ```
+  </Accordion>
+</AccordionGroup>

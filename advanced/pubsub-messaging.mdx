@@ -1,0 +1,593 @@
+---
+title: Pub/Sub Messaging
+description: Event-driven architecture with publish/subscribe messaging for scalable, decoupled systems
+---
+
+# Pub/Sub Messaging
+
+Erdo leverages Encore's powerful pub/sub messaging system to create event-driven architectures that enable scalable, decoupled communication between services and components.
+
+## Overview
+
+The pub/sub system allows you to:
+
+- Decouple services through asynchronous messaging
+- Build scalable, event-driven architectures
+- Handle high-throughput message processing
+- Ensure reliable message delivery
+- Process events in the background
+
+<CardGroup cols={2}>
+  <Card title="Event-Driven Architecture" icon="share-nodes">
+    Decouple services with asynchronous messaging
+  </Card>
+  <Card title="Reliable Delivery" icon="shield-check">
+    At-least-once delivery guarantees
+  </Card>
+  <Card title="Scalable Processing" icon="arrows-up-to-line">
+    Handle high-throughput message streams
+  </Card>
+  <Card title="Background Tasks" icon="clock">
+    Process events asynchronously
+  </Card>
+</CardGroup>
+
+## Core Components
+
+### Topics
+
+Topics are message channels that publish events to multiple subscribers:
+
+```go
+package events
+
+import (
+    "encore.dev/pubsub"
+    "encore.dev/types/uuid"
+)
+
+// Define event structure
+type UserCreatedEvent struct {
+    UserID uuid.UUID `json:"userId"`
+    Email  string    `json:"email"`
+}
+
+// Create topic with delivery guarantee
+var UserCreatedTopic = pubsub.NewTopic[*UserCreatedEvent]("user-created", pubsub.TopicConfig{
+    DeliveryGuarantee: pubsub.AtLeastOnce,
+})
+```
+
+### Subscriptions
+
+Subscriptions consume messages from topics:
+
+```go
+// Subscribe to events with handler function
+var _ = pubsub.NewSubscription(
+    UserCreatedTopic, "send-welcome-email",
+    pubsub.SubscriptionConfig[*UserCreatedEvent]{
+        Handler: pubsub.MethodHandler((*EmailService).sendWelcomeEmail),
+    },
+)
+
+func (s *EmailService) sendWelcomeEmail(ctx context.Context, event *UserCreatedEvent) error {
+    // Process the event
+    return s.sendEmail(event.Email, "Welcome to Erdo!")
+}
+```
+
+## Event Types & Patterns
+
+Erdo uses several built-in event types for common operations:
+
+<Tabs>
+  <Tab title="User Events">
+    ```go
+    // User lifecycle events
+    type UserCreatedEvent struct {
+        UserID uuid.UUID `json:"userId"`
+        Email  string    `json:"email"`
+    }
+
+    type InvitationAcceptedEvent struct {
+        OrganizationID string `json:"organizationId"`
+        UserEmail      string `json:"userEmail"`
+        UserName       string `json:"userName"`
+        Role           string `json:"role"`
+    }
+
+    var UserCreatedTopic = pubsub.NewTopic[*UserCreatedEvent]("user-created", pubsub.TopicConfig{
+        DeliveryGuarantee: pubsub.AtLeastOnce,
+    })
+    ```
+
+  </Tab>
+  <Tab title="Dataset Events">
+    ```go
+    // Dataset processing events
+    type DatasetStatusChangedEvent struct {
+        DatasetID uuid.UUID `json:"dataset_id"`
+        Status    string    `json:"status"`
+        UserID    uuid.UUID `json:"user_id"`
+        EventType string    `json:"event_type"`
+    }
+
+    var DatasetStatusChangedTopic = pubsub.NewTopic[*DatasetStatusChangedEvent]("dataset-status-changed", pubsub.TopicConfig{
+        DeliveryGuarantee: pubsub.AtLeastOnce,
+    })
+    ```
+
+  </Tab>
+  <Tab title="Usage Events">
+    ```go
+    // Usage tracking events
+    type UsageEvent struct {
+        OrgID     string    `json:"orgId"`
+        Feature   string    `json:"feature"`
+        Quantity  int32     `json:"quantity"`
+        Timestamp time.Time `json:"timestamp"`
+    }
+
+    var UsageTopic = pubsub.NewTopic[*UsageEvent]("usage", pubsub.TopicConfig{
+        DeliveryGuarantee: pubsub.AtLeastOnce,
+    })
+    ```
+
+  </Tab>
+  <Tab title="Embedding Events">
+    ```go
+    // AI processing events
+    type EmbeddingRequestEvent struct {
+        ID       uuid.UUID `json:"id"`
+        Text     string    `json:"text"`
+        Model    string    `json:"model"`
+        Source   string    `json:"source"`
+        SourceID uuid.UUID `json:"source_id"`
+    }
+
+    type EmbeddingResponseEvent struct {
+        RequestID uuid.UUID `json:"request_id"`
+        Source    string    `json:"source"`
+        SourceID  uuid.UUID `json:"source_id"`
+        Embedding []float32 `json:"embedding"`
+        Dimension int       `json:"dimension"`
+        Error     string    `json:"error,omitempty"`
+    }
+    ```
+
+  </Tab>
+</Tabs>
+
+## Publishing Events
+
+### Simple Publishing
+
+```go
+func createUser(ctx context.Context, email string) error {
+    // Create user in database
+    user, err := db.CreateUser(ctx, email)
+    if err != nil {
+        return err
+    }
+
+    // Publish event asynchronously
+    _, err = events.UserCreatedTopic.Publish(ctx, &events.UserCreatedEvent{
+        UserID: user.ID,
+        Email:  user.Email,
+    })
+
+    return err
+}
+```
+
+### Batch Publishing
+
+```go
+func processMultipleUsers(ctx context.Context, users []User) error {
+    for _, user := range users {
+        // Process each user
+        if err := createUser(ctx, user.Email); err != nil {
+            log.Printf("Failed to create user %s: %v", user.Email, err)
+            continue
+        }
+
+        // Publish individual events
+        _, err := events.UserCreatedTopic.Publish(ctx, &events.UserCreatedEvent{
+            UserID: user.ID,
+            Email:  user.Email,
+        })
+        if err != nil {
+            log.Printf("Failed to publish user created event: %v", err)
+        }
+    }
+    return nil
+}
+```
+
+### Conditional Publishing
+
+```go
+func updateDatasetStatus(ctx context.Context, datasetID uuid.UUID, status string) error {
+    // Update in database
+    err := db.UpdateDatasetStatus(ctx, datasetID, status)
+    if err != nil {
+        return err
+    }
+
+    // Only publish for certain status changes
+    if status == "completed" || status == "failed" {
+        _, err = events.DatasetStatusChangedTopic.Publish(ctx, &events.DatasetStatusChangedEvent{
+            DatasetID: datasetID,
+            Status:    status,
+            UserID:    getCurrentUserID(ctx),
+            EventType: "status_changed",
+        })
+    }
+
+    return err
+}
+```
+
+## Subscription Patterns
+
+### Service Method Handlers
+
+```go
+//encore:service
+type NotificationService struct{}
+
+// Handle user creation events
+var _ = pubsub.NewSubscription(
+    events.UserCreatedTopic, "send-notifications",
+    pubsub.SubscriptionConfig[*events.UserCreatedEvent]{
+        Handler: pubsub.MethodHandler((*NotificationService).handleUserCreated),
+    },
+)
+
+func (s *NotificationService) handleUserCreated(ctx context.Context, event *events.UserCreatedEvent) error {
+    // Send welcome email
+    if err := s.sendWelcomeEmail(ctx, event.Email); err != nil {
+        return fmt.Errorf("failed to send welcome email: %w", err)
+    }
+
+    // Create notification record
+    if err := s.createNotification(ctx, event.UserID, "Welcome!"); err != nil {
+        return fmt.Errorf("failed to create notification: %w", err)
+    }
+
+    return nil
+}
+```
+
+### Multiple Subscribers
+
+```go
+// Multiple services can subscribe to the same topic
+var _ = pubsub.NewSubscription(
+    events.UserCreatedTopic, "update-analytics",
+    pubsub.SubscriptionConfig[*events.UserCreatedEvent]{
+        Handler: pubsub.MethodHandler((*AnalyticsService).trackUserCreation),
+    },
+)
+
+var _ = pubsub.NewSubscription(
+    events.UserCreatedTopic, "setup-onboarding",
+    pubsub.SubscriptionConfig[*events.UserCreatedEvent]{
+        Handler: pubsub.MethodHandler((*OnboardingService).initializeOnboarding),
+    },
+)
+
+var _ = pubsub.NewSubscription(
+    events.UserCreatedTopic, "sync-external-systems",
+    pubsub.SubscriptionConfig[*events.UserCreatedEvent]{
+        Handler: pubsub.MethodHandler((*IntegrationService).syncToExternalSystems),
+    },
+)
+```
+
+## Advanced Patterns
+
+### Event Chaining
+
+Chain events to create complex workflows:
+
+```go
+func (s *BillingService) handleUserCountChange(ctx context.Context, event *events.UserCountEvent) error {
+    // Update subscription seats
+    err := s.updateSubscriptionSeats(ctx, event.OrgID, event.UserCount)
+    if err != nil {
+        return err
+    }
+
+    // Publish billing update event
+    _, err = events.BillingUpdatedTopic.Publish(ctx, &events.BillingUpdatedEvent{
+        OrgID:     event.OrgID,
+        Seats:     event.UserCount,
+        UpdatedAt: time.Now(),
+    })
+
+    return err
+}
+```
+
+### Event Aggregation
+
+Aggregate multiple events for batch processing:
+
+```go
+type EmbeddingBatchProcessor struct {
+    requests    chan *events.EmbeddingRequestEvent
+    maxRequests int
+    timeout     time.Duration
+}
+
+func (bp *EmbeddingBatchProcessor) ProcessEmbeddingRequests(ctx context.Context, event *events.EmbeddingRequestEvent) error {
+    // Add to batch processor
+    select {
+    case bp.requests <- event:
+        return nil
+    case <-ctx.Done():
+        return ctx.Err()
+    }
+}
+
+func (bp *EmbeddingBatchProcessor) processLoop() {
+    var batch []*events.EmbeddingRequestEvent
+    timer := time.NewTimer(bp.timeout)
+
+    for {
+        select {
+        case req := <-bp.requests:
+            batch = append(batch, req)
+            if len(batch) >= bp.maxRequests {
+                bp.processBatch(batch)
+                batch = nil
+            }
+        case <-timer.C:
+            if len(batch) > 0 {
+                bp.processBatch(batch)
+                batch = nil
+            }
+        }
+    }
+}
+```
+
+### Error Handling & Retries
+
+```go
+func (s *IntegrationService) handleDatasetEvent(ctx context.Context, event *events.DatasetStatusChangedEvent) error {
+    // Add retry logic for external API calls
+    return s.retryWithBackoff(ctx, func() error {
+        return s.syncToExternalAPI(ctx, event)
+    }, 3, time.Second)
+}
+
+func (s *IntegrationService) retryWithBackoff(ctx context.Context, fn func() error, maxRetries int, delay time.Duration) error {
+    var err error
+    for i := 0; i < maxRetries; i++ {
+        err = fn()
+        if err == nil {
+            return nil
+        }
+
+        if i < maxRetries-1 {
+            select {
+            case <-time.After(delay * time.Duration(i+1)):
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+        }
+    }
+    return err
+}
+```
+
+## WebSocket Integration
+
+Combine pub/sub with WebSocket streaming for real-time updates:
+
+```go
+func (svc *WebSocketService) handleDatasetStatusChanged(ctx context.Context, event *events.DatasetStatusChangedEvent) error {
+    // Create WebSocket event payload
+    payload := fmt.Sprintf(`{"dataset_id":"%s","status":"%s","event_type":"%s"}`,
+        event.DatasetID.String(), event.Status, event.EventType)
+
+    // Broadcast to WebSocket clients
+    channel := wsTypes.Channel{
+        Type:       wsTypes.ChannelTypeDataset,
+        ResourceID: event.DatasetID.String(),
+    }
+
+    err := websocket.BroadcastEvent(
+        wsTypes.EventType(event.EventType),
+        channel,
+        payload,
+        &event.UserID,
+        nil,
+    )
+
+    if err != nil {
+        log.Printf("Failed to broadcast dataset status change: %v", err)
+        return err
+    }
+
+    return nil
+}
+
+// Subscribe to dataset events for WebSocket broadcasting
+var _ = pubsub.NewSubscription(
+    events.DatasetStatusChangedTopic, "websocket-dataset-status",
+    pubsub.SubscriptionConfig[*events.DatasetStatusChangedEvent]{
+        Handler: pubsub.MethodHandler((*WebSocketService).handleDatasetStatusChanged),
+    },
+)
+```
+
+## Performance Considerations
+
+### High-Throughput Processing
+
+```go
+// Use buffered channels for high-throughput scenarios
+type HighThroughputProcessor struct {
+    eventBuffer chan *events.UsageEvent
+    workers     int
+}
+
+func NewHighThroughputProcessor(workers int) *HighThroughputProcessor {
+    return &HighThroughputProcessor{
+        eventBuffer: make(chan *events.UsageEvent, 10000), // Large buffer
+        workers:     workers,
+    }
+}
+
+func (p *HighThroughputProcessor) ProcessUsageEvent(ctx context.Context, event *events.UsageEvent) error {
+    select {
+    case p.eventBuffer <- event:
+        return nil
+    default:
+        // Buffer full, handle gracefully
+        log.Printf("Usage event buffer full, dropping event for org %s", event.OrgID)
+        return nil
+    }
+}
+
+func (p *HighThroughputProcessor) Start() {
+    for i := 0; i < p.workers; i++ {
+        go p.worker()
+    }
+}
+
+func (p *HighThroughputProcessor) worker() {
+    for event := range p.eventBuffer {
+        if err := p.processEvent(event); err != nil {
+            log.Printf("Failed to process usage event: %v", err)
+        }
+    }
+}
+```
+
+### Message Deduplication
+
+```go
+type DeduplicationService struct {
+    processedEvents sync.Map
+}
+
+func (s *DeduplicationService) handleEvent(ctx context.Context, event *events.UserCreatedEvent) error {
+    // Create unique key for deduplication
+    key := fmt.Sprintf("user_created_%s", event.UserID)
+
+    // Check if already processed
+    if _, exists := s.processedEvents.LoadOrStore(key, time.Now()); exists {
+        log.Printf("Event %s already processed, skipping", key)
+        return nil
+    }
+
+    // Process the event
+    return s.processUserCreation(ctx, event)
+}
+
+// Cleanup old entries periodically
+func (s *DeduplicationService) cleanup() {
+    s.processedEvents.Range(func(key, value interface{}) bool {
+        if time.Since(value.(time.Time)) > time.Hour {
+            s.processedEvents.Delete(key)
+        }
+        return true
+    })
+}
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Event Design">
+    - Keep events immutable and self-contained - Include all necessary context
+    in event data - Use semantic versioning for event schemas - Design for
+    idempotent processing
+  </Tab>
+  <Tab title="Error Handling">
+    - Implement proper retry logic with exponential backoff - Use dead letter
+    queues for failed messages - Log errors with sufficient context for
+    debugging - Handle partial failures gracefully
+  </Tab>
+  <Tab title="Performance">
+    - Batch process events when possible - Use appropriate buffer sizes for high
+    throughput - Monitor message processing latency - Implement circuit breakers
+    for external dependencies
+  </Tab>
+  <Tab title="Monitoring">
+    - Track message publishing and consumption rates - Monitor subscription lag
+    and processing times - Set up alerts for failed message processing - Use
+    distributed tracing for event flows
+  </Tab>
+</Tabs>
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="User Onboarding Flow">
+    ```go
+    // Coordinate multi-step onboarding process
+    var _ = pubsub.NewSubscription(
+        events.UserCreatedTopic, "start-onboarding",
+        pubsub.SubscriptionConfig[*events.UserCreatedEvent]{
+            Handler: pubsub.MethodHandler((*OnboardingService).startOnboarding),
+        },
+    )
+
+    func (s *OnboardingService) startOnboarding(ctx context.Context, event *events.UserCreatedEvent) error {
+        // Step 1: Send welcome email
+        // Step 2: Create default organization
+        // Step 3: Set up sample data
+        // Step 4: Trigger onboarding tour
+        return nil
+    }
+    ```
+
+  </Accordion>
+  <Accordion title="Data Processing Pipeline">
+    ```go
+    // Chain multiple processing steps
+    var _ = pubsub.NewSubscription(
+        events.DataUploadedTopic, "start-processing",
+        pubsub.SubscriptionConfig[*events.DataUploadedEvent]{
+            Handler: pubsub.MethodHandler((*ProcessorService).processData),
+        },
+    )
+
+    func (s *ProcessorService) processData(ctx context.Context, event *events.DataUploadedEvent) error {
+        // Validate data
+        // Transform data
+        // Generate embeddings
+        // Publish completion event
+        return nil
+    }
+    ```
+
+  </Accordion>
+  <Accordion title="Usage Analytics">
+    ```go
+    // Track and aggregate usage metrics
+    var _ = pubsub.NewSubscription(
+        events.UsageTopic, "record-usage",
+        pubsub.SubscriptionConfig[*events.UsageEvent]{
+            Handler: pubsub.MethodHandler((*AnalyticsService).recordUsage),
+        },
+    )
+
+    func (s *AnalyticsService) recordUsage(ctx context.Context, event *events.UsageEvent) error {
+        // Store usage data
+        // Update quotas
+        // Trigger billing calculations
+        return nil
+    }
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+Pub/sub messaging in Erdo enables you to build robust, scalable systems that can handle complex event-driven workflows with reliable message delivery and processing.

@@ -1,0 +1,562 @@
+---
+title: "SDK Actions Reference"
+description: "Complete reference for all available actions in the Erdo Python SDK"
+---
+
+# SDK Actions Reference
+
+Actions are the core building blocks that define what your agents can do. This reference covers all available action types and their parameters.
+
+## LLM Actions
+
+### Message
+
+Generate responses using large language models with tool support.
+
+```python
+from erdo.actions import llm
+
+message_action = llm.message(
+    model="claude-sonnet-4-20250514",
+    query="{{user_input}}",
+    system_prompt="You are a helpful assistant",
+    response_format={
+        "Type": "json_schema",
+        "Schema": {
+            "schema": {
+                "type": "object",
+                "required": ["answer", "confidence"],
+                "properties": {
+                    "answer": {"type": "string"},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                }
+            }
+        }
+    },
+    tools=[search_tool, calculator_tool],
+    temperature=0.7,
+    max_tokens=2000
+)
+```
+
+<CardGroup cols={2}>
+  <Card title="Model Options" icon="brain">
+    - `claude-sonnet-4-20250514` (Latest) - `claude-sonnet-4` - `claude-haiku-4`
+    - `gpt-4o` - `gpt-4o-mini`
+  </Card>
+  <Card title="Response Formats" icon="code">
+    - Text (default) - JSON Schema - Structured outputs - Custom formats
+  </Card>
+</CardGroup>
+
+### Tool Integration
+
+Add tools to enhance LLM capabilities:
+
+```python
+from erdo import Tool
+
+web_search_tool = Tool(
+    name="search_web",
+    description="Search the web for current information",
+    inputschema={
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+            "query": {"type": "string", "description": "Search query"},
+            "num_results": {"type": "number", "default": 5}
+        }
+    },
+    actiontype="websearch.search",
+    parameters={
+        "query": "{{query}}",
+        "num_results": "{{num_results}}"
+    }
+)
+
+calculator_tool = Tool(
+    name="calculate",
+    description="Perform mathematical calculations",
+    inputschema={
+        "type": "object",
+        "required": ["expression"],
+        "properties": {
+            "expression": {"type": "string", "description": "Math expression"}
+        }
+    },
+    actiontype="codeexec.execute",
+    parameters={
+        "code": "result = eval('{{expression}}')\nprint(f'Result: {result}')"
+    }
+)
+```
+
+## Code Execution Actions
+
+### Execute Code
+
+Run Python code in secure sandboxed environments:
+
+```python
+from erdo.actions import codeexec
+
+# Basic execution
+execute_action = codeexec.execute(
+    code="{{generated_code}}",
+    parameters={"data_path": "{{file_path}}"}
+)
+
+# Multi-file execution
+multi_file_action = codeexec.execute(
+    entrypoint="main.py",
+    code_files=[
+        {
+            "filename": "main.py",
+            "content": "{{main_code}}"
+        },
+        {
+            "filename": "utils.py",
+            "content": "{{utility_functions}}"
+        },
+        {
+            "filename": "config.py",
+            "content": "API_KEY = '{{api_key}}'\nDB_URL = '{{db_url}}'"
+        }
+    ],
+    parameters={"batch_size": 1000, "timeout": 300}
+)
+
+# Execution with resources
+resource_action = codeexec.execute(
+    entrypoint="process.py",
+    code_files=[{"filename": "process.py", "content": "{{code}}"}],
+    resources=[
+        {
+            "method": "download",
+            "type": "file",
+            "uri": "{{data_url}}",
+            "filename": "data.csv"
+        },
+        {
+            "method": "upload",
+            "type": "file",
+            "local_path": "results.json",
+            "remote_path": "{{output_path}}"
+        }
+    ],
+    encrypted_secrets='{{api_credentials}}',
+    environment_variables={
+        "ENVIRONMENT": "production",
+        "LOG_LEVEL": "info"
+    }
+)
+```
+
+### Parse File Results
+
+Extract structured data from execution outputs:
+
+```python
+# Parse JSON output
+parse_json_action = codeexec.parse_file_as_json(
+    file="{{execution_files.results_json}}",
+    thread_id="{{thread_id}}"
+)
+
+# Parse CSV output
+parse_csv_action = codeexec.parse_file_as_csv(
+    file="{{execution_files.data_csv}}",
+    delimiter=",",
+    has_header=True
+)
+```
+
+<Accordion title="Security Features">
+  - **Sandboxed execution**: All code runs in isolated containers - **Resource
+  limits**: CPU, memory, and time constraints - **Network isolation**:
+  Controlled external access - **Secret management**: Encrypted credential
+  handling - **File system isolation**: Restricted file access
+</Accordion>
+
+## Web Research Actions
+
+### Web Search
+
+Search the internet for current information:
+
+```python
+from erdo.actions import websearch
+
+search_action = websearch.search(
+    query="{{search_terms}}",
+    language="en",
+    country="US",
+    num_results=10,
+    safe_search=True,
+    time_range="year"  # hour, day, week, month, year
+)
+```
+
+### Web Parser
+
+Extract content from web pages:
+
+```python
+from erdo.actions import webparser
+
+# Basic parsing
+parse_action = webparser.parse(
+    url="{{target_url}}",
+    return_format="markdown",
+    include_images=True,
+    include_links=True
+)
+
+# Advanced parsing with selectors
+advanced_parse_action = webparser.parse(
+    url="{{documentation_url}}",
+    target_selector=".main-content, article",
+    remove_selector="header, footer, .ads, .sidebar",
+    wait_for_selector=".content-loaded",
+    timeout=30,
+    generate_image_alt=True,
+    no_cache=True
+)
+
+# Parse with custom headers
+authenticated_parse_action = webparser.parse(
+    url="{{protected_url}}",
+    headers={
+        "Authorization": "Bearer {{access_token}}",
+        "User-Agent": "ErgoBot/1.0"
+    },
+    cookies={"session": "{{session_id}}"}
+)
+```
+
+<CardGroup cols={2}>
+  <Card title="Supported Formats" icon="file">
+    - HTML to Markdown - Plain text extraction - Structured data (JSON-LD,
+    microdata) - PDF parsing
+  </Card>
+  <Card title="Anti-Bot Handling" icon="shield">
+    - JavaScript rendering - CAPTCHA detection - Rate limiting respect - User
+    agent rotation
+  </Card>
+</CardGroup>
+
+## Memory Actions
+
+### Store Memories
+
+Save knowledge and insights for future use:
+
+```python
+from erdo.actions import memory
+
+store_action = memory.store(
+    memory={
+        "content": "{{analysis_result}}",
+        "description": "Market analysis insights",
+        "type": "insight",
+        "searchable_texts": [
+            "{{key_findings}}",
+            "{{market_segment}}",
+            "{{company_name}}"
+        ],
+        "tags": ["analysis", "market", "{{industry}}"],
+        "is_organization_specific": True,
+        "created_from": "agent_execution",
+        "extra": {
+            "confidence_score": "{{confidence}}",
+            "data_sources": "{{sources}}",
+            "analysis_date": "{{timestamp}}"
+        }
+    }
+)
+```
+
+### Search Memories
+
+Retrieve relevant knowledge from past interactions:
+
+```python
+# Basic search
+search_action = memory.search(
+    query="{{search_query}}",
+    organization_scope="specific",
+    user_scope="any",
+    limit=10,
+    max_distance=0.8
+)
+
+# Multi-query search
+multi_search_action = memory.search_from_queries(
+    queries=[
+        "{{primary_topic}}",
+        "{{secondary_topic}}",
+        "{{related_concepts}}"
+    ],
+    integration_queries=[
+        {
+            "query": "{{integration_search}}",
+            "integration_config_id": "{{config_id}}",
+            "resource_id": "{{resource_id}}"
+        }
+    ],
+    limit=20,
+    organization_scope="all"
+)
+```
+
+### Update Memories
+
+Modify existing knowledge entries:
+
+```python
+update_action = memory.update(
+    id="{{memory_id}}",
+    content="{{updated_content}}",
+    searchable_texts=["{{new_keywords}}"],
+    tags=["{{additional_tags}}"],
+    extra={
+        "last_updated": "{{timestamp}}",
+        "update_reason": "{{reason}}"
+    }
+)
+```
+
+## Bot Actions
+
+### Invoke Pre-built Bots
+
+Use specialized bots for common tasks:
+
+```python
+from erdo.actions import bot
+
+# Data analysis bot
+analysis_action = bot.invoke(
+    bot_name="data analyst",
+    parameters={
+        "query": "{{analysis_request}}",
+        "data_source": "{{dataset}}"
+    }
+)
+
+# Security checker bot
+security_action = bot.invoke(
+    bot_name="security checker",
+    parameters={
+        "code": "{{code_to_check}}",
+        "language": "python",
+        "check_dependencies": True
+    }
+)
+
+# File analyzer bot
+file_analysis_action = bot.invoke(
+    bot_name="file analyzer",
+    parameters={
+        "resource": "{{file_resource}}",
+        "analysis_type": "comprehensive"
+    }
+)
+```
+
+## Utility Actions
+
+### Data Manipulation
+
+Handle data transformation and validation:
+
+```python
+from erdo.actions import utils
+
+# Echo data (debugging and data flow)
+echo_action = utils.echo(
+    data={
+        "processed_items": "{{count}}",
+        "status": "completed",
+        "results": "{{analysis_output}}"
+    }
+)
+
+# Parse JSON
+json_parse_action = utils.parse_json(
+    json="{{api_response}}",
+    required_keys=["status", "data", "timestamp"]
+)
+
+# String concatenation
+concat_action = utils.concat(
+    strings=[
+        "{{base_prompt}}",
+        "\n\nContext: {{context}}",
+        "\n\nData: {{formatted_data}}",
+        "\n\nInstructions: {{instructions}}"
+    ]
+)
+
+# Type casting
+cast_action = utils.cast(
+    value="{{string_number}}",
+    target_type="float"
+)
+```
+
+### Control Flow
+
+Manage execution flow and error handling:
+
+```python
+# Exception handling
+exception_action = utils.capture_exception(
+    message="Processing failed at step {{current_step}}",
+    exception="{{error_details}}",
+    context={"retry_count": "{{retry_count}}"}
+)
+
+# Status updates
+status_action = utils.send_status(
+    status="processing",
+    message="Analyzing {{data_type}}... {{progress}}% complete",
+    details={
+        "current_step": "{{step_name}}",
+        "estimated_time": "{{eta}}"
+    }
+)
+
+# Flow control
+raise_action = utils.raise_action(
+    status="go_to_step",
+    message="retry_analysis",
+    parameters={
+        "attempt": "{{increment attempt}}",
+        "delay": "{{exponential_backoff}}"
+    }
+)
+
+# Checkpoint for retry logic
+checkpoint_action = utils.checkpoint_attempt(
+    loops="{{current_loop}}",
+    attempts="{{retry_count}}",
+    max_attempts=3
+)
+```
+
+## Advanced Action Patterns
+
+### Conditional Execution
+
+Execute actions based on complex conditions:
+
+```python
+from erdo._generated.condition import And, Or, IsSuccess, TextContains
+
+conditional_step = Step(
+    agent=agent,
+    key="conditional_action",
+    actiontype=llm.message(
+        model="claude-sonnet-4",
+        query="{{conditional_query}}"
+    ),
+    execution_mode=ExecutionMode(
+        mode="all",
+        if_condition=And(
+            IsSuccess(step="previous_step"),
+            Or(
+                TextContains(text="{{data_type}}", value="priority"),
+                GreaterThan(number="{{confidence}}", value="0.8")
+            )
+        )
+    )
+)
+```
+
+### Iterative Processing
+
+Process data collections with iteration:
+
+```python
+iterative_step = Step(
+    agent=agent,
+    key="process_items",
+    actiontype=codeexec.execute(
+        code="process_item({{item}})",
+        parameters={"item": "{{current_item}}"}
+    ),
+    execution_mode=ExecutionMode(
+        mode="iterate_over",
+        data="items_list",
+        if_condition=IsAny(
+            key="item.status",
+            value=["pending", "retry"]
+        )
+    )
+)
+```
+
+### Error Recovery
+
+Implement robust error handling:
+
+```python
+error_handler = ResultHandler(
+    step=main_step,
+    type="intermediate",
+    if_conditions=And(
+        IsError(),
+        LessThan(number="{{retry_count}}", value="3")
+    )
+)
+
+retry_step = Step(
+    result_handler=error_handler,
+    key="retry",
+    actiontype=utils.echo(
+        data={
+            "retry_count": "{{increment retry_count}}",
+            "error": "{{error_message}}",
+            "next_attempt": "{{add_seconds timestamp 60}}"
+        }
+    )
+)
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Performance">
+    - Use appropriate models for task complexity - Implement caching for
+    repeated operations - Optimize resource usage in code execution - Limit
+    memory search scope when possible
+  </Tab>
+  <Tab title="Security">
+    - Validate all external inputs - Use encrypted secrets for credentials -
+    Implement proper error handling - Follow principle of least privilege
+  </Tab>
+  <Tab title="Reliability">
+    - Add comprehensive error handling - Implement retry logic with backoff -
+    Use checkpoints for long-running processes - Monitor resource consumption
+  </Tab>
+</Tabs>
+
+<CardGroup cols={2}>
+  <Card title="Action Chaining" icon="link" href="/sdk/workflows">
+    Learn how to chain actions for complex workflows
+  </Card>
+  <Card
+    title="Error Handling"
+    icon="exclamation-triangle"
+    href="/sdk/error-handling"
+  >
+    Master error handling and recovery patterns
+  </Card>
+  <Card title="Performance" icon="tachometer-alt" href="/sdk/performance">
+    Optimize your agents for speed and efficiency
+  </Card>
+  <Card title="Examples" icon="code" href="/examples">
+    See real-world action implementations
+  </Card>
+</CardGroup>

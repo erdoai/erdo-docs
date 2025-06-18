@@ -1,0 +1,194 @@
+---
+title: File Analyzer Bot
+description: Intelligent file analysis and content extraction
+---
+
+# File Analyzer Bot
+
+The File Analyzer Bot provides comprehensive analysis of file contents, structure, and metadata. It automatically detects data types, validates quality, and extracts meaningful insights from various file formats.
+
+## Quick Start
+
+```python
+from erdo.actions import bot
+
+# Analyze a CSV file
+result = bot.invoke(
+    bot_name="file analyzer",
+    parameters={
+        "resource": "sales_data.csv"
+    }
+)
+```
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Format Support" icon="file-lines">
+    Supports CSV, Excel, JSON, Parquet, and more
+  </Card>
+  <Card title="Data Profiling" icon="chart-line">
+    Comprehensive statistical analysis and profiling
+  </Card>
+  <Card title="Schema Detection" icon="table">
+    Automatic schema inference and validation
+  </Card>
+  <Card title="Quality Assessment" icon="check-circle">
+    Data quality metrics and issue detection
+  </Card>
+</CardGroup>
+
+## Supported File Types
+
+- **Delimited Files**: CSV, TSV, pipe-delimited
+- **Spreadsheets**: Excel (.xlsx, .xls), Google Sheets
+- **Structured Data**: JSON, JSONL, XML, YAML
+- **Columnar Formats**: Parquet, ORC, Avro
+- **Databases**: SQLite, database dumps
+
+## Analysis Output
+
+<Tabs>
+  <Tab title="File Metadata">
+    ```json
+    {
+      "filename": "sales_data.csv",
+      "file_size_mb": 2.4,
+      "file_type": "csv",
+      "encoding": "utf-8",
+      "row_count": 10000,
+      "column_count": 12,
+      "last_modified": "2024-01-15T10:30:00Z"
+    }
+    ```
+  </Tab>
+  <Tab title="Column Analysis">
+    ```json
+    {
+      "columns": {
+        "sales_date": {
+          "dtype": "datetime64[ns]",
+          "unique_count": 365,
+          "null_count": 0,
+          "min": "2023-01-01T00:00:00Z",
+          "max": "2023-12-31T23:59:59Z"
+        },
+        "revenue": {
+          "dtype": "float64",
+          "unique_count": 8500,
+          "null_count": 12,
+          "min": 10.50,
+          "max": 95000.00,
+          "mean": 1250.75
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Data Quality">
+    ```json
+    {
+      "quality_score": 0.92,
+      "completeness": 0.95,
+      "validity": 0.98,
+      "consistency": 0.89,
+      "issues": [
+        {
+          "type": "missing_values",
+          "column": "customer_email",
+          "count": 25,
+          "severity": "low"
+        }
+      ]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration Options
+
+<AccordionGroup>
+  <Accordion title="Basic File Analysis">
+    ```python
+    # Simple file analysis
+    result = bot.invoke(
+        bot_name="file analyzer",
+        parameters={
+            "resource": "data.csv"
+        }
+    )
+    ```
+  </Accordion>
+  <Accordion title="Excel Sheet Selection">
+    ```python
+    # Analyze specific Excel sheet
+    result = bot.invoke(
+        bot_name="file analyzer",
+        parameters={
+            "resource": "workbook.xlsx",
+            "sheet_name": "Q4_Sales"
+        }
+    )
+    ```
+  </Accordion>
+  <Accordion title="Custom Analysis Options">
+    ```python
+    # Advanced analysis with options
+    result = bot.invoke(
+        bot_name="file analyzer",
+        parameters={
+            "resource": "large_dataset.csv",
+            "sample_size": 10000,
+            "profile_level": "detailed",
+            "detect_outliers": True
+        }
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+### Data Discovery
+
+- Understand new datasets quickly
+- Identify data types and patterns
+- Assess data quality before processing
+
+### Migration Planning
+
+- Analyze source data structure
+- Identify potential migration issues
+- Plan data transformation strategies
+
+### Quality Monitoring
+
+- Regular data quality assessments
+- Track data drift over time
+- Automated quality reporting
+
+## Performance Features
+
+- **Streaming Analysis**: Handles large files efficiently
+- **Incremental Processing**: Only analyzes changed portions
+- **Memory Optimization**: Smart sampling for large datasets
+- **Parallel Processing**: Concurrent analysis of multiple files
+
+## Best Practices
+
+<Tabs>
+  <Tab title="File Preparation">
+    - Use consistent file naming conventions - Ensure proper encoding (UTF-8
+    recommended) - Include headers in structured files - Document file sources
+    and update schedules
+  </Tab>
+  <Tab title="Analysis Optimization">
+    - Use sampling for very large files (>1GB) - Specify data types when known -
+    Cache analysis results for repeated use - Monitor memory usage with large
+    datasets
+  </Tab>
+  <Tab title="Quality Management">
+    - Establish quality thresholds - Implement automated quality checks - Track
+    quality metrics over time - Document quality issues and resolutions
+  </Tab>
+</Tabs>

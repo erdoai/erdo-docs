@@ -1,0 +1,504 @@
+---
+title: "Actions"
+description: "Understanding actions - the building blocks that define what each step does"
+---
+
+# Actions
+
+Actions are the fundamental building blocks that define what each step in your agent workflow actually does. They represent specific operations that can be performed, from LLM calls to code execution to memory operations.
+
+## What is an Action?
+
+An action specifies:
+
+- **The type of operation** to perform (LLM, code, memory, etc.)
+- **The parameters** needed for the operation
+- **The expected outputs** and data format
+- **How to handle errors** and edge cases
+
+<CardGroup cols={2}>
+  <Card title="LLM Actions" icon="brain">
+    Generate text, analyze content, and make AI-powered decisions
+  </Card>
+  <Card title="Code Execution" icon="code">
+    Run Python code for data processing and calculations
+  </Card>
+  <Card title="Memory Actions" icon="database">
+    Store, search, and retrieve knowledge and data
+  </Card>
+  <Card title="Integration Actions" icon="plug">
+    Connect with external APIs, tools, and services
+  </Card>
+</CardGroup>
+
+## Action Types
+
+### LLM Actions
+
+Language model actions for AI-powered text generation and analysis:
+
+```python
+from erdo.actions import llm
+
+# Basic message generation
+basic_llm = llm.message(
+    model="claude-sonnet-4",
+    query="Analyze this data: {{input_data}}",
+    system_prompt="You are a data analysis expert"
+)
+
+# Structured response with JSON schema
+structured_llm = llm.message(
+    model="claude-sonnet-4",
+    query="Extract key insights from: {{document}}",
+    response_format={
+        "Type": "json_schema",
+        "Schema": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string"},
+                    "key_points": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "sentiment": {"type": "string"},
+                    "confidence": {"type": "number"}
+                }
+            }
+        }
+    }
+)
+
+# LLM with tools
+llm_with_tools = llm.message(
+    model="claude-sonnet-4",
+    query="Research and analyze {{topic}}",
+    tools=[
+        Tool(
+            name="web_search",
+            description="Search for information",
+            actiontype="websearch.search",
+            parameters={"query": "{{query}}"}
+        ),
+        Tool(
+            name="calculator",
+            description="Perform calculations",
+            actiontype="codeexec.execute",
+            parameters={"code": "{{calculation}}"}
+        )
+    ]
+)
+```
+
+### Code Execution Actions
+
+Execute Python code for data processing and calculations:
+
+```python
+from erdo.actions import codeexec
+
+# Basic code execution
+basic_code = codeexec.execute(
+    code="""
+# Process the input data
+data = {{input_data}}
+result = process_data(data)
+print(f"Processed {len(data)} items")
+"""
+)
+
+# Advanced data analysis
+analysis_code = codeexec.execute(
+    code="""
+import pandas as pd
+import numpy as np
+
+# Load and analyze data
+df = pd.read_csv('{{file_path}}')
+summary = df.describe()
+insights = analyze_trends(df)
+
+results = {
+    'summary': summary.to_dict(),
+    'insights': insights
+}
+"""
+)
+```
+
+### Memory Actions
+
+Store, search, and retrieve knowledge and information:
+
+```python
+from erdo.actions import memory
+
+# Store information
+store_memory = memory.store(
+    memory={
+        "content": "{{analysis_results}}",
+        "tags": ["analysis", "{{project_name}}"],
+        "searchable_texts": ["{{key_findings}}"]
+    }
+)
+
+# Search for relevant information
+search_memory = memory.search(
+    query="{{search_query}}",
+    limit=10,
+    organization_scope="specific"
+)
+```
+
+### Web Research Actions
+
+Search and parse web content:
+
+```python
+from erdo.actions import websearch, webparser
+
+# Web search
+web_search = websearch.search(
+    query="{{search_term}} latest developments",
+    num_results=10,
+    time_filter="past_month"
+)
+
+# Parse website content
+parse_content = webparser.parse(
+    url="{{target_url}}",
+    extract_format="markdown",
+    include_links=True,
+    include_images=False
+)
+
+# Comprehensive research action
+research_action = websearch.search(
+    query="{{research_topic}}",
+    sites=["arxiv.org", "scholar.google.com", "nature.com"],
+    content_type="academic"
+)
+```
+
+### Bot Integration Actions
+
+Invoke pre-built bots and other agents:
+
+```python
+from erdo.actions import bot
+
+# Invoke data analyst bot
+data_analysis = bot.invoke(
+    bot_name="data analyst",
+    parameters={
+        "query": "{{analysis_request}}",
+        "data_source": "{{data_connection}}"
+    }
+)
+
+# Security check
+security_check = bot.invoke(
+    bot_name="security checker",
+    parameters={
+        "code": "{{code_to_check}}",
+        "scan_type": "comprehensive"
+    }
+)
+
+# Chain multiple bots
+quality_check = bot.invoke(
+    bot_name="data quality checker",
+    parameters={
+        "output": "{{previous_analysis}}",
+        "validation_rules": "{{quality_rules}}"
+    }
+)
+```
+
+### Utility Actions
+
+Helper actions for workflow control and data manipulation:
+
+```python
+from erdo.actions import utils
+
+# Echo/pass-through data
+echo_action = utils.echo(
+    data={"processed": True, "timestamp": "{{current_time}}"}
+)
+
+# Send status updates
+status_update = utils.send_status(
+    status="processing",
+    message="Analyzing data batch {{batch_number}}",
+    details={
+        "progress": "{{progress_percentage}}",
+        "eta": "{{estimated_completion}}"
+    }
+)
+
+# Capture exceptions
+exception_handler = utils.capture_exception(
+    message="Analysis failed for dataset {{dataset_name}}",
+    exception="{{error_details}}"
+)
+
+# Checkpoint for long-running processes
+checkpoint_action = utils.checkpoint_attempt(
+    loops="{{loop_count}}",
+    attempts="{{attempt_number}}"
+)
+```
+
+## Action Configuration
+
+### Response Formats
+
+Configure how actions return data:
+
+<Tabs>
+  <Tab title="JSON Schema">
+    ```python
+    structured_response = llm.message(
+        model="claude-sonnet-4",
+        query="{{query}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "schema": {
+                    "type": "object",
+                    "required": ["summary", "recommendations"],
+                    "properties": {
+                        "summary": {
+                            "type": "string",
+                            "description": "Brief summary of findings"
+                        },
+                        "recommendations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "action": {"type": "string"},
+                                    "priority": {"type": "string"},
+                                    "impact": {"type": "number"}
+                                }
+                            }
+                        },
+                        "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                        }
+                    }
+                }
+            }
+        }
+    )
+    ```
+  </Tab>
+  <Tab title="Free Text">
+    ```python
+    text_response = llm.message(
+        model="claude-sonnet-4",
+        query="{{query}}",
+        response_format="text"
+    )
+    ```
+  </Tab>
+  <Tab title="Markdown">
+    ```python
+    markdown_response = llm.message(
+        model="claude-sonnet-4",
+        query="Generate a report for {{topic}}",
+        response_format="markdown"
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Error Handling
+
+Configure how actions handle errors:
+
+```python
+# Action with retry configuration
+resilient_action = llm.message(
+    model="claude-sonnet-4",
+    query="{{query}}",
+    retry_config={
+        "max_attempts": 3,
+        "backoff_factor": 2,
+        "retry_on": ["timeout", "rate_limit", "server_error"]
+    },
+    timeout=60
+)
+
+# Action with fallback
+fallback_action = llm.message(
+    model="claude-sonnet-4",
+    query="{{query}}",
+    fallback_model="gpt-4o",
+    fallback_on_error=True
+)
+```
+
+### Performance Optimization
+
+Optimize action performance:
+
+```python
+# Cached action
+cached_action = memory.search(
+    query="{{query}}",
+    cache_ttl=3600,  # Cache for 1 hour
+    cache_key="search_{{query_hash}}"
+)
+
+# Parallelizable action
+parallel_action = codeexec.execute(
+    code="{{processing_code}}",
+    parallel=True,
+    max_workers=4
+)
+
+# Resource-limited action
+limited_action = codeexec.execute(
+    code="{{heavy_computation}}",
+    memory_limit="2GB",
+    cpu_limit="1 core",
+    timeout=300
+)
+```
+
+## Advanced Action Patterns
+
+### Conditional Actions
+
+Actions that execute based on conditions:
+
+```python
+# Action with execution condition
+conditional_action = llm.message(
+    model="claude-sonnet-4",
+    query="{{specialized_query}}",
+    execution_condition="{{data_type}} == 'complex'"
+)
+
+# Multi-path action
+multi_path_action = codeexec.execute(
+    code="""
+if {{condition_a}}:
+    result = process_path_a({{data}})
+elif {{condition_b}}:
+    result = process_path_b({{data}})
+else:
+    result = default_processing({{data}})
+"""
+)
+```
+
+### Dynamic Actions
+
+Actions that adapt based on runtime data:
+
+```python
+# Dynamic model selection
+dynamic_llm = llm.message(
+    model="{{selected_model}}",  # Determined at runtime
+    query="{{dynamic_query}}",
+    system_prompt="{{context_specific_prompt}}"
+)
+
+# Dynamic code generation
+dynamic_code = codeexec.execute(
+    code=generate_code_template("{{operation_type}}", "{{parameters}}")
+)
+```
+
+### Composite Actions
+
+Combine multiple actions:
+
+```python
+# Action sequence
+def composite_analysis(data):
+    # Step 1: Preprocess
+    preprocessed = codeexec.execute(
+        code=f"preprocess_data({data})"
+    )
+
+    # Step 2: Analyze
+    analysis = llm.message(
+        model="claude-sonnet-4",
+        query=f"Analyze: {preprocessed}"
+    )
+
+    # Step 3: Store results
+    stored = memory.store(
+        memory={
+            "content": analysis,
+            "source_data": data
+        }
+    )
+
+    return stored
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Action Design">
+    **Single Responsibility**: Each action should have one clear purpose
+
+    **Error Handling**: Always plan for failure scenarios
+
+    **Documentation**: Clearly describe what the action does and expects
+
+  </Accordion>
+
+  <Accordion title="Performance">
+    **Resource Management**: Set appropriate timeouts and limits
+
+    **Caching**: Cache expensive operations where appropriate
+
+    **Monitoring**: Track action performance and resource usage
+
+  </Accordion>
+
+  <Accordion title="Security">
+    **Input Validation**: Validate all parameters and inputs
+
+    **Secret Management**: Use secure methods for sensitive data
+
+    **Access Control**: Implement appropriate permissions
+
+  </Accordion>
+</AccordionGroup>
+
+## Action Reference
+
+For complete documentation of all available actions, see:
+
+<CardGroup cols={2}>
+  <Card title="LLM Actions" icon="brain" href="/sdk/actions#llm-actions">
+    Complete reference for language model actions
+  </Card>
+  <Card title="Code Execution" icon="code" href="/sdk/actions#code-execution">
+    Guide to running code in your workflows
+  </Card>
+  <Card
+    title="Memory Actions"
+    icon="database"
+    href="/sdk/actions#memory-actions"
+  >
+    Store and retrieve knowledge and data
+  </Card>
+  <Card
+    title="Integration Actions"
+    icon="plug"
+    href="/sdk/actions#integration-actions"
+  >
+    Connect with external tools and services
+  </Card>
+</CardGroup>

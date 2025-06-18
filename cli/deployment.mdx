@@ -1,0 +1,635 @@
+---
+title: "Deployment & Management"
+description: "Complete guide to deploying and managing Erdo agents in production"
+---
+
+# Deployment & Management
+
+Deploy, sync, and manage your Erdo agents across different environments with powerful CLI tools.
+
+## erdo sync
+
+Synchronize your local agent code with the Erdo platform.
+
+### Basic Sync
+
+```bash
+# Sync all changes
+erdo sync
+
+# Sync specific agent
+erdo sync --agent my-agent
+
+# Sync to specific environment
+erdo sync --env production
+
+# Dry run (preview changes)
+erdo sync --dry-run
+```
+
+### Sync Options
+
+| Option       | Description               | Example                              |
+| ------------ | ------------------------- | ------------------------------------ |
+| `--agent`    | Sync specific agent       | `erdo sync --agent data-processor`   |
+| `--env`      | Target environment        | `erdo sync --env staging`            |
+| `--force`    | Force overwrite conflicts | `erdo sync --force`                  |
+| `--dry-run`  | Preview changes only      | `erdo sync --dry-run`                |
+| `--exclude`  | Exclude file patterns     | `erdo sync --exclude "*.log,temp/*"` |
+| `--compress` | Compress before upload    | `erdo sync --compress`               |
+| `--timeout`  | Upload timeout            | `erdo sync --timeout 300`            |
+
+### Conflict Resolution
+
+<Tabs>
+  <Tab title="Automatic Resolution">
+    ```bash
+    # Auto-merge compatible changes
+    erdo sync --auto-merge
+
+    # Keep local version
+    erdo sync --prefer-local
+
+    # Keep remote version
+    erdo sync --prefer-remote
+    ```
+
+  </Tab>
+  <Tab title="Manual Resolution">
+    ```bash
+    # Interactive conflict resolution
+    erdo sync --interactive
+
+    # Show differences
+    erdo sync --show-diff
+
+    # Backup before sync
+    erdo sync --backup
+    ```
+
+  </Tab>
+  <Tab title="Advanced Options">
+    ```bash
+    # Selective sync
+    erdo sync --only-code
+    erdo sync --only-config
+    erdo sync --only-dependencies
+
+    # Incremental sync
+    erdo sync --incremental
+    ```
+
+  </Tab>
+</Tabs>
+
+## erdo deploy
+
+Deploy agents to production environments with advanced configuration options.
+
+### Basic Deployment
+
+```bash
+# Deploy agent to default environment
+erdo deploy my-agent
+
+# Deploy to specific environment
+erdo deploy my-agent --env production
+
+# Deploy with custom configuration
+erdo deploy my-agent --config production.yaml
+```
+
+### Deployment Strategies
+
+<AccordionGroup>
+  <Accordion title="Blue-Green Deployment">
+    ```bash
+    # Deploy to blue environment
+    erdo deploy my-agent --strategy blue-green --slot blue
+
+    # Test blue environment
+    erdo test --env blue --agent my-agent
+
+    # Switch traffic to blue
+    erdo deploy my-agent --switch-to blue
+
+    # Rollback if needed
+    erdo deploy my-agent --rollback
+    ```
+
+  </Accordion>
+
+  <Accordion title="Canary Deployment">
+    ```bash
+    # Deploy canary version (5% traffic)
+    erdo deploy my-agent --strategy canary --traffic 5
+
+    # Monitor canary performance
+    erdo monitor my-agent --env canary
+
+    # Increase canary traffic
+    erdo deploy my-agent --strategy canary --traffic 50
+
+    # Promote to full deployment
+    erdo deploy my-agent --promote-canary
+    ```
+
+  </Accordion>
+
+  <Accordion title="Rolling Deployment">
+    ```bash
+    # Rolling deployment with 3 instances
+    erdo deploy my-agent --strategy rolling --instances 3
+
+    # Rolling with health checks
+    erdo deploy my-agent --strategy rolling --health-check
+
+    # Rolling with custom batch size
+    erdo deploy my-agent --strategy rolling --batch-size 2
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+### Environment Configuration
+
+```bash
+# Set environment variables
+erdo deploy my-agent --set API_KEY=prod123 --set DEBUG=false
+
+# Load from file
+erdo deploy my-agent --env-file .env.production
+
+# Use secrets manager
+erdo deploy my-agent --secrets-from vault://production/my-agent
+
+# Resource limits
+erdo deploy my-agent --memory 2GB --cpu 1000m --timeout 300
+```
+
+### Deployment Validation
+
+<Tabs>
+  <Tab title="Pre-deployment Checks">
+    ```bash
+    # Validate before deployment
+    erdo deploy my-agent --validate-only
+
+    # Security scan
+    erdo deploy my-agent --security-scan
+
+    # Dependency check
+    erdo deploy my-agent --check-deps
+
+    # Performance test
+    erdo deploy my-agent --perf-test
+    ```
+
+  </Tab>
+  <Tab title="Post-deployment Verification">
+    ```bash
+    # Deploy with verification
+    erdo deploy my-agent --verify
+
+    # Custom health check
+    erdo deploy my-agent --health-check-url "/health"
+
+    # Wait for ready
+    erdo deploy my-agent --wait-ready --timeout 300
+
+    # Smoke tests
+    erdo deploy my-agent --smoke-test
+    ```
+
+  </Tab>
+</Tabs>
+
+## erdo list-bots
+
+List and manage agents across all environments.
+
+### Basic Listing
+
+```bash
+# List all agents
+erdo list-bots
+
+# List for specific environment
+erdo list-bots --env production
+
+# Show detailed information
+erdo list-bots --verbose
+
+# Filter by status
+erdo list-bots --status active
+```
+
+### Filtering and Sorting
+
+```bash
+# Filter by tags
+erdo list-bots --tags "data-analysis,automation"
+
+# Filter by owner
+erdo list-bots --owner "team-data"
+
+# Sort by various fields
+erdo list-bots --sort name
+erdo list-bots --sort created_at --order desc
+erdo list-bots --sort usage --order desc
+
+# Search by name pattern
+erdo list-bots --search "*processor*"
+```
+
+### Output Formats
+
+<Tabs>
+  <Tab title="Table Format">
+    ```bash
+    # Default table view
+    erdo list-bots
+
+    # Custom columns
+    erdo list-bots --columns name,status,version,last_run
+
+    # Wide format
+    erdo list-bots --wide
+    ```
+
+  </Tab>
+  <Tab title="JSON/YAML">
+    ```bash
+    # JSON output
+    erdo list-bots --format json
+
+    # YAML output
+    erdo list-bots --format yaml
+
+    # Pretty JSON
+    erdo list-bots --format json --pretty
+    ```
+
+  </Tab>
+  <Tab title="Custom Templates">
+    ```bash
+    # Custom template
+    erdo list-bots --template "{{.Name}}: {{.Status}}"
+
+    # CSV format
+    erdo list-bots --format csv --output agents.csv
+
+    # Excel format
+    erdo list-bots --format xlsx --output agents.xlsx
+    ```
+
+  </Tab>
+</Tabs>
+
+## erdo export-bot
+
+Export agents for backup, sharing, or migration.
+
+### Basic Export
+
+```bash
+# Export single agent
+erdo export-bot my-agent --output ./my-agent.py
+
+# Export with dependencies
+erdo export-bot my-agent --include-deps --output ./my-agent-complete.zip
+
+# Export multiple agents
+erdo export-bot agent1,agent2,agent3 --output ./agents/
+```
+
+### Export Formats
+
+<CardGroup cols={2}>
+  <Card title="Python Script" icon="code">
+    ```bash erdo export-bot my-agent --format python ``` Single Python file with
+    all code
+  </Card>
+  <Card title="ZIP Archive" icon="archive">
+    ```bash erdo export-bot my-agent --format zip --include-deps ``` Complete
+    project structure
+  </Card>
+  <Card title="Docker Image" icon="docker">
+    ```bash erdo export-bot my-agent --format docker --tag my-agent:v1.0 ```
+    Containerized deployment
+  </Card>
+  <Card title="YAML Config" icon="file-code">
+    ```bash erdo export-bot my-agent --format yaml --config-only ```
+    Configuration and metadata only
+  </Card>
+</CardGroup>
+
+### Export Options
+
+| Option            | Description            | Example                 |
+| ----------------- | ---------------------- | ----------------------- |
+| `--include-deps`  | Include dependencies   | `--include-deps`        |
+| `--include-data`  | Include sample data    | `--include-data`        |
+| `--include-tests` | Include test files     | `--include-tests`       |
+| `--minify`        | Minimize output size   | `--minify`              |
+| `--encrypt`       | Encrypt sensitive data | `--encrypt --key mykey` |
+| `--version`       | Specific version       | `--version 1.2.0`       |
+
+### Advanced Export
+
+```bash
+# Export for specific environment
+erdo export-bot my-agent --env production --output ./prod-agent.py
+
+# Export with custom metadata
+erdo export-bot my-agent --metadata '{"team": "data", "project": "analytics"}'
+
+# Export with transformation
+erdo export-bot my-agent --transform remove-secrets --output ./clean-agent.py
+
+# Batch export
+erdo export-bot --all --env production --output ./backup/
+```
+
+## erdo logs
+
+View and analyze agent execution logs and metrics.
+
+### Basic Logging
+
+```bash
+# View recent logs for agent
+erdo logs my-agent
+
+# Follow logs in real-time
+erdo logs my-agent --follow
+
+# Show logs from last hour
+erdo logs my-agent --since 1h
+
+# Show specific number of lines
+erdo logs my-agent --lines 100
+```
+
+### Log Filtering
+
+<Tabs>
+  <Tab title="By Level">
+    ```bash
+    # Error logs only
+    erdo logs my-agent --level error
+
+    # Debug and above
+    erdo logs my-agent --level debug
+
+    # Multiple levels
+    erdo logs my-agent --level error,warn
+    ```
+
+  </Tab>
+  <Tab title="By Time Range">
+    ```bash
+    # Last 24 hours
+    erdo logs my-agent --since 24h
+
+    # Specific time range
+    erdo logs my-agent --since 2024-01-01 --until 2024-01-02
+
+    # Recent executions
+    erdo logs my-agent --executions 5
+    ```
+
+  </Tab>
+  <Tab title="By Content">
+    ```bash
+    # Search for text
+    erdo logs my-agent --grep "error"
+
+    # Regular expression
+    erdo logs my-agent --grep "API.*timeout" --regex
+
+    # Exclude patterns
+    erdo logs my-agent --grep "debug" --invert
+    ```
+
+  </Tab>
+</Tabs>
+
+### Log Analysis
+
+```bash
+# Aggregate error patterns
+erdo logs my-agent --analyze-errors
+
+# Performance metrics
+erdo logs my-agent --metrics --since 7d
+
+# Export logs for analysis
+erdo logs my-agent --format json --output ./logs.json
+
+# Generate log report
+erdo logs my-agent --report --since 30d --output ./report.html
+```
+
+## erdo monitor
+
+Monitor agent performance and health in real-time.
+
+### Real-time Monitoring
+
+```bash
+# Monitor specific agent
+erdo monitor my-agent
+
+# Monitor all agents
+erdo monitor --all
+
+# Dashboard mode
+erdo monitor --dashboard
+
+# Monitor with alerts
+erdo monitor my-agent --alerts
+```
+
+### Metrics and KPIs
+
+<AccordionGroup>
+  <Accordion title="Performance Metrics">
+    ```bash
+    # Execution time metrics
+    erdo monitor my-agent --metrics execution_time
+
+    # Memory usage
+    erdo monitor my-agent --metrics memory
+
+    # Success rate
+    erdo monitor my-agent --metrics success_rate
+
+    # Throughput
+    erdo monitor my-agent --metrics throughput
+    ```
+
+  </Accordion>
+
+  <Accordion title="Business Metrics">
+    ```bash
+    # Custom business metrics
+    erdo monitor my-agent --metrics custom:processed_documents
+
+    # Cost tracking
+    erdo monitor my-agent --metrics cost
+
+    # Usage patterns
+    erdo monitor my-agent --metrics usage_patterns
+    ```
+
+  </Accordion>
+
+  <Accordion title="System Health">
+    ```bash
+    # System resource usage
+    erdo monitor my-agent --metrics system
+
+    # Dependency health
+    erdo monitor my-agent --metrics dependencies
+
+    # Error rates
+    erdo monitor my-agent --metrics error_rate
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+### Alerting
+
+```bash
+# Set up alerts
+erdo monitor my-agent --alert-on error_rate:>5%
+erdo monitor my-agent --alert-on execution_time:>30s
+erdo monitor my-agent --alert-on memory:>1GB
+
+# Alert channels
+erdo monitor my-agent --alerts --email team@company.com
+erdo monitor my-agent --alerts --slack #alerts-channel
+erdo monitor my-agent --alerts --webhook https://hooks.slack.com/...
+```
+
+## Production Management
+
+### Health Checks
+
+```bash
+# Check agent health
+erdo health my-agent
+
+# System-wide health check
+erdo health --all
+
+# Deep health check
+erdo health my-agent --deep
+
+# Generate health report
+erdo health --report --output ./health-report.html
+```
+
+### Maintenance Operations
+
+<Tabs>
+  <Tab title="Scaling">
+    ```bash
+    # Scale agent instances
+    erdo scale my-agent --replicas 5
+
+    # Auto-scaling
+    erdo scale my-agent --auto --min 2 --max 10
+
+    # Scale based on metrics
+    erdo scale my-agent --metric cpu:70% --metric memory:80%
+    ```
+
+  </Tab>
+  <Tab title="Updates">
+    ```bash
+    # Rolling update
+    erdo update my-agent --strategy rolling
+
+    # Update configuration
+    erdo update my-agent --config new-config.yaml
+
+    # Update environment variables
+    erdo update my-agent --set NEW_VAR=value
+    ```
+
+  </Tab>
+  <Tab title="Maintenance">
+    ```bash
+    # Put agent in maintenance mode
+    erdo maintenance my-agent --enable
+
+    # Drain requests
+    erdo maintenance my-agent --drain
+
+    # Disable maintenance mode
+    erdo maintenance my-agent --disable
+    ```
+
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<CardGroup cols={2}>
+  <Card title="Deployment Issues" icon="exclamation-triangle">
+    - Check deployment logs: `erdo logs my-agent --level error` - Validate
+    configuration: `erdo deploy my-agent --validate-only` - Test connectivity:
+    `erdo health my-agent --deep` - Review resource limits: `erdo monitor
+    my-agent --metrics system`
+  </Card>
+  <Card title="Performance Problems" icon="chart-line">
+    - Monitor execution times: `erdo monitor my-agent --metrics execution_time`
+    - Check memory usage: `erdo logs my-agent --metrics memory` - Analyze
+    bottlenecks: `erdo introspect my-agent --bottlenecks` - Scale if needed:
+    `erdo scale my-agent --replicas 3`
+  </Card>
+  <Card title="Sync Conflicts" icon="git-merge">
+    - Preview changes: `erdo sync --dry-run` - Backup first: `erdo sync
+    --backup` - Resolve interactively: `erdo sync --interactive` - Force if
+    necessary: `erdo sync --force`
+  </Card>
+  <Card title="Monitoring Alerts" icon="bell">
+    - Check recent logs: `erdo logs my-agent --since 1h --level error` - View
+    metrics: `erdo monitor my-agent --dashboard` - Analyze trends: `erdo logs
+    my-agent --report --since 7d` - Update thresholds: `erdo monitor my-agent
+    --alert-on error_rate:>10%`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+### Deployment Pipeline
+
+```bash
+# 1. Local testing
+erdo test --agent my-agent --type integration
+
+# 2. Sync to staging
+erdo sync --env staging
+erdo deploy my-agent --env staging
+
+# 3. Staging validation
+erdo test --env staging --agent my-agent --type e2e
+
+# 4. Production deployment
+erdo deploy my-agent --env production --strategy canary
+
+# 5. Monitor and verify
+erdo monitor my-agent --env production --alerts
+```
+
+### Monitoring Strategy
+
+- Set up comprehensive alerts for key metrics
+- Monitor both technical and business KPIs
+- Use dashboards for real-time visibility
+- Regular health checks and maintenance windows
+- Log retention and analysis for troubleshooting

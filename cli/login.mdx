@@ -1,0 +1,373 @@
+---
+title: "Authentication Commands"
+description: "Complete guide to Erdo CLI authentication and account management"
+---
+
+# Authentication Commands
+
+Manage your authentication and account settings with the Erdo CLI.
+
+## erdo login
+
+Authenticate with the Erdo platform to access your account and agents.
+
+### Basic Usage
+
+```bash
+# Interactive login
+erdo login
+
+# Force re-authentication (clears existing tokens)
+erdo login --force
+
+# Login with specific server
+erdo login --server https://api.erdo.ai
+```
+
+### Authentication Methods
+
+<Tabs>
+  <Tab title="OAuth (Recommended)">
+    ```bash
+    # OAuth login (opens browser)
+    erdo login --method oauth
+
+    # OAuth with custom callback port
+    erdo login --method oauth --port 8080
+    ```
+
+  </Tab>
+  <Tab title="API Token">
+    ```bash
+    # Login with API token
+    erdo login --token YOUR_API_TOKEN
+
+    # Set token from environment variable
+    export ERDO_API_TOKEN="your_token_here"
+    erdo login --token $ERDO_API_TOKEN
+    ```
+
+  </Tab>
+  <Tab title="SSO">
+    ```bash
+    # Single Sign-On login
+    erdo login --method sso --provider google
+    erdo login --method sso --provider github
+    erdo login --method sso --provider microsoft
+    ```
+  </Tab>
+</Tabs>
+
+### Command Options
+
+| Option         | Description             | Example                                       |
+| -------------- | ----------------------- | --------------------------------------------- |
+| `--force`      | Force re-authentication | `erdo login --force`                          |
+| `--server`     | Specify server URL      | `erdo login --server https://staging.erdo.ai` |
+| `--method`     | Authentication method   | `erdo login --method oauth`                   |
+| `--token`      | Use API token           | `erdo login --token abc123`                   |
+| `--port`       | OAuth callback port     | `erdo login --port 8080`                      |
+| `--timeout`    | Login timeout (seconds) | `erdo login --timeout 60`                     |
+| `--no-browser` | Skip browser opening    | `erdo login --no-browser`                     |
+
+### Examples
+
+<CodeGroup>
+```bash First Time Setup
+# Configure CLI and login
+erdo configure --server https://api.erdo.ai
+erdo login
+
+# Verify authentication
+
+erdo whoami
+
+````
+
+```bash Team/Enterprise
+# Login to enterprise instance
+erdo login --server https://erdo.mycompany.com --method sso --provider okta
+
+# Use service account token
+erdo login --token $SERVICE_ACCOUNT_TOKEN --server https://api.erdo.ai
+````
+
+```bash Development
+# Login to staging environment
+erdo login --server https://staging.erdo.ai --force
+
+# Login with extended timeout
+erdo login --timeout 120
+```
+
+</CodeGroup>
+
+## erdo logout
+
+Log out from the Erdo platform and clear stored authentication.
+
+```bash
+# Logout from current server
+erdo logout
+
+# Logout and clear all cached data
+erdo logout --clear-cache
+
+# Logout from specific server
+erdo logout --server https://staging.erdo.ai
+```
+
+### Options
+
+| Option          | Description                          |
+| --------------- | ------------------------------------ |
+| `--clear-cache` | Clear all cached authentication data |
+| `--server`      | Logout from specific server          |
+| `--all`         | Logout from all configured servers   |
+
+## erdo whoami
+
+Display current authentication status and user information.
+
+```bash
+# Basic user info
+erdo whoami
+
+# Detailed information
+erdo whoami --verbose
+
+# Check specific server
+erdo whoami --server https://api.erdo.ai
+
+# Output as JSON
+erdo whoami --format json
+```
+
+### Output Information
+
+<AccordionGroup>
+  <Accordion title="Basic Output">
+    ```
+    User: john.doe@company.com
+    Organization: Acme Corp
+    Server: https://api.erdo.ai
+    Plan: Professional
+    Status: Active
+    ```
+  </Accordion>
+
+  <Accordion title="Verbose Output">
+    ```
+    User Information:
+      Email: john.doe@company.com
+      Name: John Doe
+      ID: user_abc123
+
+    Organization:
+      Name: Acme Corp
+      ID: org_xyz789
+      Role: Admin
+
+    Authentication:
+      Method: OAuth
+      Server: https://api.erdo.ai
+      Token Expires: 2024-12-31 23:59:59 UTC
+      Last Login: 2024-01-15 10:30:00 UTC
+
+    Subscription:
+      Plan: Professional
+      Status: Active
+      Agents Limit: 100
+      Storage Limit: 10GB
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## erdo token
+
+Manage API tokens for programmatic access.
+
+### Create Token
+
+```bash
+# Create new token
+erdo token create --name "CI/CD Pipeline"
+
+# Create token with specific permissions
+erdo token create --name "Read Only" --permissions read
+
+# Create token with expiration
+erdo token create --name "Temporary" --expires 7d
+```
+
+### List Tokens
+
+```bash
+# List all tokens
+erdo token list
+
+# List with details
+erdo token list --verbose
+
+# Filter by status
+erdo token list --status active
+```
+
+### Revoke Token
+
+```bash
+# Revoke specific token
+erdo token revoke --id token_123
+
+# Revoke by name
+erdo token revoke --name "Old Token"
+
+# Revoke all tokens
+erdo token revoke --all
+```
+
+### Token Options
+
+| Option          | Description        | Example                      |
+| --------------- | ------------------ | ---------------------------- |
+| `--name`        | Token display name | `--name "Production Deploy"` |
+| `--permissions` | Token permissions  | `--permissions read,write`   |
+| `--expires`     | Expiration time    | `--expires 30d`              |
+| `--scope`       | Token scope        | `--scope organization`       |
+
+## Authentication Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Login Failures">
+    **Common Issues:**
+    - Invalid credentials
+    - Network connectivity
+    - Server configuration
+
+    **Solutions:**
+    ```bash
+    # Test connectivity
+    erdo configure --test-connection
+
+    # Clear auth cache
+    rm ~/.erdo/auth.json
+
+    # Force re-authentication
+    erdo login --force
+
+    # Check server status
+    curl -I https://api.erdo.ai/health
+    ```
+
+  </Accordion>
+
+  <Accordion title="Token Issues">
+    **Common Issues:**
+    - Expired tokens
+    - Insufficient permissions
+    - Rate limiting
+
+    **Solutions:**
+    ```bash
+    # Check token status
+    erdo whoami --verbose
+
+    # Refresh token
+    erdo login --force
+
+    # Create new token with correct permissions
+    erdo token create --name "New Token" --permissions admin
+    ```
+
+  </Accordion>
+
+  <Accordion title="SSO Problems">
+    **Common Issues:**
+    - Browser not opening
+    - Callback URL issues
+    - Provider configuration
+
+    **Solutions:**
+    ```bash
+    # Manual browser login
+    erdo login --no-browser
+    # Then visit the provided URL manually
+
+    # Use different callback port
+    erdo login --port 9090
+
+    # Contact admin for SSO configuration
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Token Management" icon="key">
+    - Use specific token permissions - Set appropriate expiration dates - Rotate
+    tokens regularly - Store tokens securely
+  </Card>
+  <Card title="Environment Security" icon="shield">
+    - Use environment variables for tokens - Don't commit tokens to version
+    control - Use different tokens per environment - Monitor token usage
+  </Card>
+  <Card title="Access Control" icon="lock">
+    - Follow principle of least privilege - Use organization-scoped tokens -
+    Regular access reviews - Revoke unused tokens
+  </Card>
+  <Card title="Monitoring" icon="eye">
+    - Monitor login attempts - Track token usage - Set up alerts for suspicious
+    activity - Regular security audits
+  </Card>
+</CardGroup>
+
+## Configuration Files
+
+### Authentication Config
+
+The CLI stores authentication data in `~/.erdo/auth.json`:
+
+```json
+{
+  "servers": {
+    "https://api.erdo.ai": {
+      "user": {
+        "email": "user@company.com",
+        "id": "user_123",
+        "name": "John Doe"
+      },
+      "organization": {
+        "id": "org_456",
+        "name": "Acme Corp",
+        "role": "admin"
+      },
+      "auth": {
+        "method": "oauth",
+        "token": "encrypted_token_data",
+        "expires_at": "2024-12-31T23:59:59Z",
+        "refresh_token": "encrypted_refresh_token"
+      }
+    }
+  },
+  "default_server": "https://api.erdo.ai"
+}
+```
+
+### Environment Variables
+
+```bash
+# Authentication
+export ERDO_API_TOKEN="your_token_here"
+export ERDO_SERVER_URL="https://api.erdo.ai"
+
+# OAuth Configuration
+export ERDO_OAUTH_CLIENT_ID="your_client_id"
+export ERDO_OAUTH_CALLBACK_PORT="8080"
+
+# SSO Configuration
+export ERDO_SSO_PROVIDER="okta"
+export ERDO_SSO_DOMAIN="company.okta.com"
+```

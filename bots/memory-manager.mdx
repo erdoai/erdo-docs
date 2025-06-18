@@ -1,0 +1,310 @@
+---
+title: Memory Manager Bots
+description: Store, search, and interpret memories for intelligent workflows
+---
+
+# Memory Manager Bots
+
+Erdo provides specialized bots for managing memories - contextual information that agents can store, retrieve, and build upon across conversations and workflows.
+
+## Available Memory Bots
+
+<CardGroup cols={2}>
+  <Card
+    title="Interpret and Store Memories"
+    icon="brain"
+    href="#interpret-and-store-memories"
+  >
+    Analyzes code and output to create and update memories
+  </Card>
+  <Card title="Search Memories" icon="magnifying-glass" href="#search-memories">
+    Finds relevant memories using intelligent queries
+  </Card>
+</CardGroup>
+
+## Interpret and Store Memories
+
+The Interpret and Store Memories bot analyzes code execution results, conversation context, and data outputs to create structured memories that can be referenced later.
+
+### Quick Start
+
+```python
+from erdo.actions import bot
+
+# Store analysis results as memories
+result = bot.invoke(
+    bot_name="interpret and store memories",
+    parameters={
+        "code": "df.groupby('category').sum()",
+        "output": "Electronics: $50000, Clothing: $30000",
+        "context": "Monthly sales analysis by category"
+    }
+)
+```
+
+### What Gets Stored
+
+<AccordionGroup>
+  <Accordion title="Code Insights">
+    - Successful analysis patterns - Effective data transformations - Useful
+    function combinations - Performance optimizations
+  </Accordion>
+  <Accordion title="Data Patterns">
+    - Dataset characteristics - Column relationships - Business metrics
+    definitions - Quality issues and solutions
+  </Accordion>
+  <Accordion title="Business Context">
+    - User preferences - Domain-specific terminology - Reporting requirements -
+    Decision criteria
+  </Accordion>
+  <Accordion title="Error Solutions">
+    - Common problem resolutions - Debugging approaches - Workaround strategies
+    - Prevention techniques
+  </Accordion>
+</AccordionGroup>
+
+### Configuration
+
+```python
+# Store memories with specific categorization
+result = bot.invoke(
+    bot_name="interpret and store memories",
+    parameters={
+        "content": "Customer churn analysis revealed 15% monthly churn rate",
+        "category": "business_metrics",
+        "context": "Q4 2024 analysis",
+        "importance": "high",
+        "tags": ["churn", "customers", "retention"]
+    }
+)
+
+# Store technical insights
+result = bot.invoke(
+    bot_name="interpret and store memories",
+    parameters={
+        "code": "pd.read_csv('data.csv', parse_dates=['date'])",
+        "insight": "Always parse date columns for time series analysis",
+        "category": "technical_tips",
+        "applies_to": ["pandas", "data_loading"]
+    }
+)
+```
+
+## Search Memories
+
+The Search Memories bot finds relevant memories using natural language queries, helping agents leverage past insights and learned patterns.
+
+### Quick Start
+
+```python
+from erdo.actions import bot
+
+# Search for relevant memories
+result = bot.invoke(
+    bot_name="search memories",
+    parameters={
+        "query": "How to handle missing customer data?",
+        "limit": 5
+    }
+)
+```
+
+### Search Capabilities
+
+<Tabs>
+  <Tab title="Semantic Search">
+    ```python
+    # Find conceptually related memories
+    result = bot.invoke(
+        bot_name="search memories",
+        parameters={
+            "query": "sales performance analysis",
+            "search_type": "semantic",
+            "include_similar": True
+        }
+    )
+    ```
+  </Tab>
+  <Tab title="Technical Search">
+    ```python
+    # Find specific technical solutions
+    result = bot.invoke(
+        bot_name="search memories",
+        parameters={
+            "query": "pandas groupby error handling",
+            "category": "technical_tips",
+            "min_relevance": 0.8
+        }
+    )
+    ```
+  </Tab>
+  <Tab title="Context-Aware Search">
+    ```python
+    # Search within specific business context
+    result = bot.invoke(
+        bot_name="search memories",
+        parameters={
+            "query": "quarterly reporting insights",
+            "context": "financial_analysis",
+            "time_range": "last_6_months"
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Search Filters
+
+- **Category**: Filter by memory type (business_metrics, technical_tips, etc.)
+- **Time Range**: Recent memories or historical insights
+- **Importance Level**: High-priority memories first
+- **Tags**: Specific topic areas
+- **User Context**: Personal or team-specific memories
+
+## Memory Types
+
+### Business Intelligence Memories
+
+- Key metrics and their definitions
+- Recurring analysis patterns
+- Decision-making criteria
+- Performance benchmarks
+
+### Technical Memories
+
+- Successful code patterns
+- Error resolutions
+- Data processing techniques
+- Integration solutions
+
+### Process Memories
+
+- Workflow optimizations
+- User preferences
+- Reporting templates
+- Automation triggers
+
+## Integration Patterns
+
+<AccordionGroup>
+  <Accordion title="Agent Workflows">
+    ```python
+    # Store insights during analysis
+    analysis_result = analyze_data(dataset)
+
+    # Store the insight for future use
+    memory_result = bot.invoke(
+        bot_name="interpret and store memories",
+        parameters={
+            "content": analysis_result.insight,
+            "context": analysis_result.context,
+            "category": "data_insights"
+        }
+    )
+    ```
+
+  </Accordion>
+  <Accordion title="Context Building">
+    ```python
+    # Search for relevant context before analysis
+    relevant_memories = bot.invoke(
+        bot_name="search memories",
+        parameters={
+            "query": f"analysis of {dataset_name}",
+            "limit": 3
+        }
+    )
+
+    # Use memories to inform analysis
+    analysis_context = relevant_memories.memories
+    ```
+
+  </Accordion>
+  <Accordion title="Learning Loops">
+    ```python
+    # Continuous improvement pattern
+    def analyze_with_learning(query, dataset):
+        # Search for relevant memories
+        memories = search_memories(query)
+
+        # Perform analysis with context
+        result = analyze_data(dataset, context=memories)
+
+        # Store new insights
+        store_memories(result.insights)
+
+        return result
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+### Memory Organization
+
+- Use consistent categorization schemes
+- Include relevant tags for discoverability
+- Set appropriate importance levels
+- Regular cleanup of outdated memories
+
+### Search Optimization
+
+- Use specific, descriptive queries
+- Leverage category filters for focus
+- Combine multiple search approaches
+- Validate memory relevance before use
+
+### Privacy and Security
+
+- Respect data governance policies
+- Avoid storing sensitive information
+- Implement access controls
+- Regular audit of stored memories
+
+## Advanced Features
+
+<Tabs>
+  <Tab title="Memory Relationships">
+    ```python
+    # Create connected memories
+    result = bot.invoke(
+        bot_name="interpret and store memories",
+        parameters={
+            "content": "Sales increased after marketing campaign",
+            "related_memories": ["campaign_analysis_123", "sales_metrics_456"],
+            "relationship_type": "causal"
+        }
+    )
+    ```
+  </Tab>
+  <Tab title="Temporal Context">
+    ```python
+    # Time-aware memory storage
+    result = bot.invoke(
+        bot_name="interpret and store memories",
+        parameters={
+            "content": "Q4 shows seasonal sales spike",
+            "temporal_context": {
+                "period": "Q4",
+                "year": 2024,
+                "seasonality": "high"
+            }
+        }
+    )
+    ```
+  </Tab>
+  <Tab title="Confidence Scoring">
+    ```python
+    # Store memories with confidence levels
+    result = bot.invoke(
+        bot_name="interpret and store memories",
+        parameters={
+            "content": "Customer churn prediction model accuracy: 85%",
+            "confidence": 0.85,
+            "validation_method": "cross_validation"
+        }
+    )
+    ```
+  </Tab>
+</Tabs>

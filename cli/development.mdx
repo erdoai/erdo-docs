@@ -1,0 +1,504 @@
+---
+title: "Development Commands"
+description: "Complete guide to Erdo CLI development and testing commands"
+---
+
+# Development Commands
+
+Build, test, and iterate on your Erdo agents with powerful development tools.
+
+## erdo dev
+
+Start a development server with hot reload for rapid agent development.
+
+### Basic Usage
+
+```bash
+# Start development mode
+erdo dev
+
+# Specify custom port
+erdo dev --port 8080
+
+# Development with verbose logging
+erdo dev --verbose
+
+# Development with custom config
+erdo dev --config ./custom-config.yaml
+```
+
+### Advanced Options
+
+| Option        | Description             | Example                           |
+| ------------- | ----------------------- | --------------------------------- |
+| `--port`      | Development server port | `erdo dev --port 3000`            |
+| `--host`      | Server host binding     | `erdo dev --host 0.0.0.0`         |
+| `--watch`     | File patterns to watch  | `erdo dev --watch "*.py,*.yaml"`  |
+| `--no-reload` | Disable hot reload      | `erdo dev --no-reload`            |
+| `--debug`     | Enable debug mode       | `erdo dev --debug`                |
+| `--env`       | Environment file        | `erdo dev --env .env.development` |
+| `--timeout`   | Request timeout         | `erdo dev --timeout 60`           |
+
+### Development Features
+
+<Tabs>
+  <Tab title="Hot Reload">
+    ```bash
+    # Auto-reload on file changes
+    erdo dev --watch "src/**/*.py"
+
+    # Watch specific patterns
+    erdo dev --watch "*.py,*.yaml,*.json"
+
+    # Exclude patterns
+    erdo dev --watch "*.py" --exclude "__pycache__,*.pyc"
+    ```
+
+  </Tab>
+  <Tab title="Live Testing">
+    ```bash
+    # Development with auto-testing
+    erdo dev --auto-test
+
+    # Test on file changes
+    erdo dev --test-on-change
+
+    # Continuous integration mode
+    erdo dev --ci-mode
+    ```
+
+  </Tab>
+  <Tab title="Environment Management">
+    ```bash
+    # Development with staging environment
+    erdo dev --env staging
+
+    # Load environment variables
+    erdo dev --env-file .env.local
+
+    # Override specific variables
+    erdo dev --set API_KEY=test123 --set DEBUG=true
+    ```
+
+  </Tab>
+</Tabs>
+
+### Development Workflow
+
+<Steps>
+  <Step title="Initialize Project">
+    ```bash erdo init my-agent cd my-agent ```
+  </Step>
+  <Step title="Start Development">
+    ```bash erdo dev --port 3000 --watch "*.py" ```
+  </Step>
+  <Step title="Live Testing">
+    ```bash # In another terminal erdo test --agent my-agent --watch ```
+  </Step>
+  <Step title="Deploy When Ready">
+    ```bash erdo sync erdo deploy my-agent ```
+  </Step>
+</Steps>
+
+## erdo test
+
+Run comprehensive tests for your agents with various testing modes.
+
+### Basic Testing
+
+```bash
+# Test all agents
+erdo test
+
+# Test specific agent
+erdo test --agent data-processor
+
+# Test with custom input
+erdo test --agent email-classifier --input "Hello world"
+
+# Test with input file
+erdo test --agent document-parser --input-file ./test-data.json
+```
+
+### Test Types
+
+<AccordionGroup>
+  <Accordion title="Unit Tests">
+    ```bash
+    # Run unit tests for individual steps
+    erdo test --type unit --agent my-agent
+
+    # Test specific step
+    erdo test --type unit --agent my-agent --step analyze_data
+
+    # Test with mock data
+    erdo test --type unit --mock-llm --mock-tools
+    ```
+
+  </Accordion>
+
+  <Accordion title="Integration Tests">
+    ```bash
+    # Full integration testing
+    erdo test --type integration --agent my-agent
+
+    # Test agent interactions
+    erdo test --type integration --agents agent1,agent2
+
+    # Test with real services
+    erdo test --type integration --no-mocks
+    ```
+
+  </Accordion>
+
+  <Accordion title="End-to-End Tests">
+    ```bash
+    # Complete workflow testing
+    erdo test --type e2e --agent my-agent
+
+    # Test multiple scenarios
+    erdo test --type e2e --scenarios ./test-scenarios/
+
+    # Production-like testing
+    erdo test --type e2e --env production-test
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+### Test Configuration
+
+```bash
+# Test with custom configuration
+erdo test --config ./test-config.yaml
+
+# Test with specific model
+erdo test --model claude-sonnet-4 --agent my-agent
+
+# Test with resource limits
+erdo test --memory-limit 1GB --timeout 300
+
+# Parallel testing
+erdo test --parallel 4 --agents agent1,agent2,agent3
+```
+
+### Test Reports
+
+<Tabs>
+  <Tab title="Console Output">
+    ```bash
+    # Verbose test output
+    erdo test --verbose --agent my-agent
+
+    # Quiet mode (errors only)
+    erdo test --quiet --agent my-agent
+
+    # JSON output
+    erdo test --format json --agent my-agent
+    ```
+
+  </Tab>
+  <Tab title="File Reports">
+    ```bash
+    # Generate JUnit XML report
+    erdo test --report junit --output ./test-results.xml
+
+    # HTML report
+    erdo test --report html --output ./test-report.html
+
+    # Coverage report
+    erdo test --coverage --output ./coverage/
+    ```
+
+  </Tab>
+  <Tab title="Continuous Testing">
+    ```bash
+    # Watch mode for tests
+    erdo test --watch --agent my-agent
+
+    # Auto-test on file changes
+    erdo test --watch --pattern "*.py" --agent my-agent
+
+    # CI/CD integration
+    erdo test --ci --format junit --coverage
+    ```
+
+  </Tab>
+</Tabs>
+
+## erdo init
+
+Create new agent projects with templates and scaffolding.
+
+### Project Creation
+
+```bash
+# Basic agent creation
+erdo init my-agent
+
+# Create with template
+erdo init data-processor --template data-analysis
+
+# Initialize in current directory
+erdo init . --name current-project
+
+# Create with custom configuration
+erdo init my-agent --config ./agent-template.yaml
+```
+
+### Available Templates
+
+<CardGroup cols={2}>
+  <Card title="Data Analysis" icon="chart-bar">
+    ```bash erdo init data-agent --template data-analysis ``` For data
+    processing and analytics workflows
+  </Card>
+  <Card title="Business Automation" icon="cog">
+    ```bash erdo init automation-agent --template business-automation ``` For
+    process automation and workflow management
+  </Card>
+  <Card title="Research Assistant" icon="search">
+    ```bash erdo init research-agent --template research ``` For information
+    gathering and analysis
+  </Card>
+  <Card title="Content Processing" icon="file-text">
+    ```bash erdo init content-agent --template content-processing ``` For
+    document analysis and content generation
+  </Card>
+</CardGroup>
+
+### Template Options
+
+```bash
+# List available templates
+erdo init --list-templates
+
+# Create custom template
+erdo init my-agent --template custom --template-path ./my-template/
+
+# Template with dependencies
+erdo init my-agent --template data-analysis --include-deps
+
+# Template with example data
+erdo init my-agent --template research --include-examples
+```
+
+### Project Structure
+
+```
+my-agent/
+├── agent.py              # Main agent definition
+├── steps/                # Individual step implementations
+│   ├── __init__.py
+│   ├── data_processing.py
+│   └── analysis.py
+├── tests/               # Test files
+│   ├── test_agent.py
+│   └── test_steps.py
+├── config/              # Configuration files
+│   ├── development.yaml
+│   └── production.yaml
+├── data/               # Sample data and examples
+│   └── sample_input.json
+├── requirements.txt    # Python dependencies
+├── .erdo/             # Erdo configuration
+│   └── config.yaml
+└── README.md          # Project documentation
+```
+
+## erdo introspect
+
+Analyze and understand agent structure and dependencies.
+
+### Basic Introspection
+
+```bash
+# Inspect agent structure
+erdo introspect my-agent
+
+# Show step dependencies
+erdo introspect my-agent --dependencies
+
+# Analyze data flow
+erdo introspect my-agent --data-flow
+
+# Show resource usage
+erdo introspect my-agent --resources
+```
+
+### Advanced Analysis
+
+<Tabs>
+  <Tab title="Schema Analysis">
+    ```bash
+    # Export agent schema
+    erdo introspect my-agent --schema --output schema.json
+
+    # Validate schema
+    erdo introspect my-agent --validate-schema
+
+    # Compare schemas
+    erdo introspect my-agent --compare-schema ./baseline-schema.json
+    ```
+
+  </Tab>
+  <Tab title="Performance Analysis">
+    ```bash
+    # Analyze performance characteristics
+    erdo introspect my-agent --performance
+
+    # Identify bottlenecks
+    erdo introspect my-agent --bottlenecks
+
+    # Resource optimization suggestions
+    erdo introspect my-agent --optimize
+    ```
+
+  </Tab>
+  <Tab title="Security Analysis">
+    ```bash
+    # Security audit
+    erdo introspect my-agent --security
+
+    # Check permissions
+    erdo introspect my-agent --permissions
+
+    # Vulnerability scan
+    erdo introspect my-agent --vulnerabilities
+    ```
+
+  </Tab>
+</Tabs>
+
+### Output Formats
+
+```bash
+# JSON output
+erdo introspect my-agent --format json
+
+# YAML output
+erdo introspect my-agent --format yaml
+
+# Markdown documentation
+erdo introspect my-agent --format markdown --output ./docs/
+
+# Visual diagram
+erdo introspect my-agent --diagram --output ./agent-diagram.svg
+```
+
+## erdo gen-client
+
+Generate client code and documentation for your agents.
+
+### Client Generation
+
+```bash
+# Generate Python client
+erdo gen-client --language python --output ./client/
+
+# Generate TypeScript client
+erdo gen-client --language typescript --output ./client/
+
+# Generate Go client
+erdo gen-client --language go --output ./client/
+```
+
+### Generation Options
+
+| Option            | Description         | Example                         |
+| ----------------- | ------------------- | ------------------------------- |
+| `--language`      | Target language     | `--language python`             |
+| `--output`        | Output directory    | `--output ./generated/`         |
+| `--agents`        | Specific agents     | `--agents agent1,agent2`        |
+| `--include-tests` | Generate test files | `--include-tests`               |
+| `--package-name`  | Package name        | `--package-name my-erdo-client` |
+| `--version`       | Client version      | `--version 1.0.0`               |
+
+### Documentation Generation
+
+```bash
+# Generate API documentation
+erdo gen-client --docs --format openapi --output ./docs/
+
+# Generate SDK documentation
+erdo gen-client --docs --format markdown --output ./docs/
+
+# Generate interactive docs
+erdo gen-client --docs --format interactive --output ./docs/
+```
+
+## Development Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Fast Iteration" icon="refresh">
+    - Use `erdo dev` with hot reload - Write tests early and often - Use mock
+    data for faster testing - Monitor resource usage during development
+  </Card>
+  <Card title="Testing Strategy" icon="check-circle">
+    - Unit test individual steps - Integration test agent workflows - End-to-end
+    test complete scenarios - Use CI/CD for automated testing
+  </Card>
+  <Card title="Code Quality" icon="code">
+    - Use introspection for analysis - Follow naming conventions - Document
+    agent purpose and usage - Regular security audits
+  </Card>
+  <Card title="Performance" icon="zap">
+    - Profile agent execution - Optimize step dependencies - Use parallel
+    execution where possible - Monitor production metrics
+  </Card>
+</CardGroup>
+
+## Common Development Workflows
+
+### Feature Development
+
+```bash
+# 1. Create feature branch
+git checkout -b feature/new-analysis-step
+
+# 2. Start development server
+erdo dev --watch "*.py" --auto-test
+
+# 3. Implement and test
+# Edit agent.py, add new step...
+
+# 4. Run comprehensive tests
+erdo test --agent my-agent --type integration
+
+# 5. Deploy to staging
+erdo sync --env staging
+erdo deploy my-agent --env staging
+```
+
+### Debug Workflow
+
+```bash
+# 1. Enable debug mode
+erdo dev --debug --verbose
+
+# 2. Run with tracing
+erdo test --agent my-agent --trace --verbose
+
+# 3. Analyze logs
+erdo logs --agent my-agent --level debug
+
+# 4. Introspect for issues
+erdo introspect my-agent --performance --bottlenecks
+```
+
+### Production Deployment
+
+```bash
+# 1. Final testing
+erdo test --type e2e --env production-test
+
+# 2. Generate documentation
+erdo gen-client --docs --format openapi
+
+# 3. Security audit
+erdo introspect my-agent --security
+
+# 4. Deploy to production
+erdo sync --env production
+erdo deploy my-agent --env production
+```
