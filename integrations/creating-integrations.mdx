@@ -5,41 +5,18 @@ description: "Learn how to build custom integrations for new data sources and AP
 
 # Creating Custom Integrations
 
-This guide walks you through creating custom integrations for data sources not yet supported by Erdo. You'll learn how to implement authentication, resource discovery, and data access patterns.
+Learn how to build custom integrations for data sources not yet supported by Erdo. This guide covers authentication, resource discovery, and data access patterns.
 
-## Integration Development Process
+## Integration Types
 
-### 1. Planning Your Integration
+Erdo supports several integration patterns:
 
-Before coding, plan your integration architecture:
+- **API Integration**: For REST/GraphQL APIs
+- **Database Integration**: For SQL/NoSQL databases
+- **File Integration**: For file-based data sources
+- **Streaming Integration**: For real-time data feeds
 
-<Steps>
-  <Step title="Identify Data Sources">
-    Determine what data your integration will access:
-    - API endpoints and their data structures
-    - Database tables and relationships
-    - File formats and storage locations
-    - Authentication requirements
-  </Step>
-
-{" "}
-<Step title="Choose Integration Type">
-  Select the appropriate integration pattern: - **API Integration**: For
-  REST/GraphQL APIs - **Database Integration**: For SQL/NoSQL databases - **File
-  Integration**: For file-based data sources - **Streaming Integration**: For
-  real-time data feeds
-</Step>
-
-  <Step title="Design Resource Discovery">
-    Plan how resources will be discovered:
-    - What constitutes a "resource" in your system
-    - How to enumerate available resources
-    - Metadata to capture for each resource
-    - Relationships between resources
-  </Step>
-</Steps>
-
-### 2. Implementation Structure
+## File Structure
 
 Organize your integration code following Erdo conventions:
 
@@ -49,28 +26,24 @@ backend/integration/providers/
 │   ├── provider.go          # Main provider implementation
 │   ├── auth.go             # Authentication logic
 │   ├── discovery.go        # Resource discovery
-│   ├── query_engine.go     # Data access engine
 │   └── types.go            # Service-specific types
 ```
 
-## Creating API Integrations
+## Basic API Integration
 
-### Basic API Provider
+### Provider Implementation
 
-Start with a basic API provider structure:
+Create the main provider structure:
 
 ```go
 package your_service
 
 import (
     "context"
-    "fmt"
     "net/http"
 
     "encore.app/backend/integration/provider"
     providerTypes "encore.app/backend/integration/provider/types"
-    integrationTypes "encore.app/backend/integration/types"
-    resourceTypes "encore.app/backend/resource/types"
 )
 
 type YourServiceProvider struct {
@@ -92,24 +65,13 @@ func NewYourServiceProvider(config *integrationTypes.IntegrationConfig, integrat
     }
 }
 
-func (p *YourServiceProvider) GetAuth() auth.Auth {
-    return auth.NewOAuthAuth(p.GetConfig(), p.GetIntegration(), p.GetDataset(), p.GetDB())
-}
-
 func (p *YourServiceProvider) VerifyConnection(ctx context.Context) error {
-    // Implement connection verification
-    credentials, _, err := p.GetAuth().GetCredentials(ctx)
-    if err != nil {
-        return err
-    }
-
-    // Test API endpoint
+    // Test API connectivity
     req, err := http.NewRequestWithContext(ctx, "GET", "https://api.yourservice.com/health", nil)
     if err != nil {
         return err
     }
 
-    // Apply authentication
     if err := p.GetAuth().PrepareRequest(ctx, req); err != nil {
         return err
     }
@@ -120,51 +82,29 @@ func (p *YourServiceProvider) VerifyConnection(ctx context.Context) error {
     }
     defer resp.Body.Close()
 
-    if resp.StatusCode != 200 {
-        return fmt.Errorf("API returned status %d", resp.StatusCode)
-    }
-
     return nil
 }
 ```
 
-### Authentication Implementation
+### Authentication
 
-Implement OAuth 2.0 authentication:
+Implement authentication for your service:
 
 ```go
-// Custom OAuth implementation
-type YourServiceOAuth struct {
+type YourServiceAuth struct {
     auth.BaseAuth
 }
 
-func NewYourServiceOAuth(config *integrationTypes.IntegrationConfig, integration *db.Integration, dataset *datasetDB.IntegrationDataset, serviceDB *sqldb.Database) auth.Auth {
-    return &YourServiceOAuth{
-        BaseAuth: auth.BaseAuth{
-            Config:      config,
-            Integration: integration,
-            Dataset:     dataset,
-            DB:          serviceDB,
-        },
-    }
-}
-
-func (a *YourServiceOAuth) PrepareRequest(ctx context.Context, req *http.Request) error {
-    credentials, schema, err := a.GetCredentials(ctx)
+func (a *YourServiceAuth) PrepareRequest(ctx context.Context, req *http.Request) error {
+    credentials, _, err := a.GetCredentials(ctx)
     if err != nil {
         return err
     }
 
-    accessToken, exists := credentials["access_token"]
-    if !exists || accessToken == "" {
-        return fmt.Errorf("missing access token")
+    // Apply authentication (example: Bearer token)
+    if token := credentials["access_token"]; token != "" {
+        req.Header.Set("Authorization", "Bearer "+token)
     }
-
-    // Apply authentication header
-    req.Header.Set("Authorization", "Bearer "+accessToken)
-
-    // Add any custom headers from schema
-    a.addHeadersFromSchema(req, credentials, schema)
 
     return nil
 }
@@ -172,46 +112,12 @@ func (a *YourServiceOAuth) PrepareRequest(ctx context.Context, req *http.Request
 
 ### Resource Discovery
 
-Implement resource discovery for your API:
+Implement resource discovery:
 
 ```go
 func (p *YourServiceProvider) GetDatasetResources(ctx context.Context) ([]*resourceTypes.ResourceWithRelatedResources, error) {
-    config := p.GetConfig()
-    if config.DatasetResourceDiscoveryConfig == nil {
-        return []*resourceTypes.ResourceWithRelatedResources{}, nil
-    }
-
-    // Get credentials
-    credentials, _, err := p.GetAuth().GetCredentials(ctx)
-    if err != nil {
-        return nil, err
-    }
-
-    var allResources []*resourceTypes.ResourceWithRelatedResources
-
-    // Process each resource type
-    for _, resourceType := range config.DatasetResourceDiscoveryConfig.ResourceTypes {
-        resources, err := p.fetchResourcesOfType(ctx, resourceType, credentials)
-        if err != nil {
-            return nil, err
-        }
-        allResources = append(allResources, resources...)
-    }
-
-    return allResources, nil
-}
-
-func (p *YourServiceProvider) fetchResourcesOfType(ctx context.Context, resourceType integrationTypes.ResourceTypeConfig, credentials map[string]string) ([]*resourceTypes.ResourceWithRelatedResources, error) {
-    // Build API URL
-    url, err := p.executeTemplate(resourceType.URLTemplate, credentials)
-    if err != nil {
-        return nil, err
-    }
-
-    fullURL := config.BaseURL + url
-
-    // Make API request
-    req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+    // Fetch available resources from the API
+    req, err := http.NewRequestWithContext(ctx, "GET", "https://api.yourservice.com/resources", nil)
     if err != nil {
         return nil, err
     }
@@ -226,237 +132,158 @@ func (p *YourServiceProvider) fetchResourcesOfType(ctx context.Context, resource
     }
     defer resp.Body.Close()
 
-    // Parse response
-    var responseData interface{}
-    if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
-        return nil, err
-    }
+    // Parse response and create resource objects
+    var resources []*resourceTypes.ResourceWithRelatedResources
+    // ... parsing logic ...
 
-    // Extract resources using JSONPath
-    return p.extractResources(responseData, resourceType)
+    return resources, nil
 }
 ```
 
-## Creating Database Integrations
+## Database Integration
 
-### Database Provider
+### SQL Database Provider
 
-For database integrations, implement a database provider:
+For SQL databases, implement the database provider pattern:
 
 ```go
-type YourDatabaseProvider struct {
+type SQLProvider struct {
     *providerTypes.BaseProvider
-    queryEngine QueryEngine
-}
-
-func NewYourDatabaseProvider(config *integrationTypes.IntegrationConfig, integration *db.Integration, dataset *datasetDB.IntegrationDataset, serviceDB *sqldb.Database) *YourDatabaseProvider {
-    return &YourDatabaseProvider{
-        BaseProvider: &providerTypes.BaseProvider{
-            Config:      config,
-            Integration: integration,
-            Dataset:     dataset,
-            DB:          serviceDB,
-        },
-    }
-}
-
-func (p *YourDatabaseProvider) GetDatasetResources(ctx context.Context) ([]*resourceTypes.ResourceWithRelatedResources, error) {
-    // Get selected schemas from dataset
-    selectedSchemas, err := p.getSelectedSchemas()
-    if err != nil {
-        return nil, err
-    }
-
-    if len(selectedSchemas) == 0 {
-        return []*resourceTypes.ResourceWithRelatedResources{}, nil
-    }
-
-    // Create query engine
-    engine, err := p.getQueryEngine()
-    if err != nil {
-        return nil, err
-    }
-
-    // Create resource discoverer
-    discoverer := resource_discovery.NewSQLResourceDiscoverer(p, engine)
-
-    config := map[string]any{
-        "selectedSchemas": selectedSchemas,
-    }
-
-    return discoverer.DiscoverResources(ctx, config)
-}
-```
-
-### Custom Query Engine
-
-Implement a query engine for your database:
-
-```go
-type YourDatabaseEngine struct {
     db *sql.DB
 }
 
-func NewYourDatabaseEngine(connectionString string) (*YourDatabaseEngine, error) {
-    db, err := sql.Open("your_driver", connectionString)
-    if err != nil {
-        return nil, err
-    }
-
-    if err := db.Ping(); err != nil {
-        return nil, err
-    }
-
-    return &YourDatabaseEngine{db: db}, nil
+func (p *SQLProvider) VerifyConnection(ctx context.Context) error {
+    return p.db.PingContext(ctx)
 }
 
-func (e *YourDatabaseEngine) ExecuteQuery(ctx context.Context, query string, params ...interface{}) (*providerTypes.QueryResult, error) {
-    rows, err := e.db.QueryContext(ctx, query, params...)
+func (p *SQLProvider) GetDatasetResources(ctx context.Context) ([]*resourceTypes.ResourceWithRelatedResources, error) {
+    // Query information schema to discover tables
+    query := `
+        SELECT table_name, table_schema
+        FROM information_schema.tables
+        WHERE table_type = 'BASE TABLE'
+    `
+
+    rows, err := p.db.QueryContext(ctx, query)
     if err != nil {
         return nil, err
     }
     defer rows.Close()
 
-    // Get column names
-    columns, err := rows.Columns()
-    if err != nil {
-        return nil, err
-    }
-
-    // Parse rows
-    var result [][]interface{}
+    var resources []*resourceTypes.ResourceWithRelatedResources
     for rows.Next() {
-        values := make([]interface{}, len(columns))
-        valuePtrs := make([]interface{}, len(columns))
-
-        for i := range values {
-            valuePtrs[i] = &values[i]
+        var tableName, schema string
+        if err := rows.Scan(&tableName, &schema); err != nil {
+            continue
         }
 
-        if err := rows.Scan(valuePtrs...); err != nil {
-            return nil, err
+        resource := &resourceTypes.ResourceWithRelatedResources{
+            Resource: resourceTypes.Resource{
+                Name: tableName,
+                Type: "table",
+                Config: map[string]interface{}{
+                    "schema": schema,
+                },
+            },
         }
-
-        result = append(result, values)
+        resources = append(resources, resource)
     }
 
-    return &providerTypes.QueryResult{
-        Columns: columns,
-        Rows:    result,
-    }, nil
-}
-
-func (e *YourDatabaseEngine) GetSchemas(ctx context.Context) ([]providerTypes.Schema, error) {
-    query := "SELECT schema_name, description FROM information_schema.schemata"
-    result, err := e.ExecuteQuery(ctx, query)
-    if err != nil {
-        return nil, err
-    }
-
-    var schemas []providerTypes.Schema
-    for _, row := range result.Rows {
-        if len(row) >= 1 {
-            schema := providerTypes.Schema{
-                Name: fmt.Sprintf("%v", row[0]),
-            }
-            if len(row) >= 2 && row[1] != nil {
-                schema.Description = fmt.Sprintf("%v", row[1])
-            }
-            schemas = append(schemas, schema)
-        }
-    }
-
-    return schemas, nil
+    return resources, nil
 }
 ```
 
-## Integration Configuration
+## File Integration
+
+### File System Provider
+
+For file-based integrations:
+
+```go
+type FileProvider struct {
+    *providerTypes.BaseProvider
+    basePath string
+}
+
+func (p *FileProvider) GetDatasetResources(ctx context.Context) ([]*resourceTypes.ResourceWithRelatedResources, error) {
+    var resources []*resourceTypes.ResourceWithRelatedResources
+
+    err := filepath.Walk(p.basePath, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+
+        // Only include supported file types
+        if p.isSupportedFile(path) {
+            resource := &resourceTypes.ResourceWithRelatedResources{
+                Resource: resourceTypes.Resource{
+                    Name: info.Name(),
+                    Type: "file",
+                    Config: map[string]interface{}{
+                        "path": path,
+                        "size": info.Size(),
+                    },
+                },
+            }
+            resources = append(resources, resource)
+        }
+
+        return nil
+    })
+
+    return resources, err
+}
+
+func (p *FileProvider) isSupportedFile(path string) bool {
+    ext := strings.ToLower(filepath.Ext(path))
+    supportedExts := []string{".csv", ".json", ".xlsx", ".txt"}
+
+    for _, supported := range supportedExts {
+        if ext == supported {
+            return true
+        }
+    }
+    return false
+}
+```
+
+## Configuration
+
+### Integration Config
+
+Define your integration configuration:
+
+```yaml
+# config/integrations/your_service.yaml
+name: "Your Service"
+type: "api"
+auth_type: "oauth2"
+endpoints:
+  base_url: "https://api.yourservice.com"
+  auth_url: "https://auth.yourservice.com/oauth/authorize"
+  token_url: "https://auth.yourservice.com/oauth/token"
+scopes:
+  - "read:data"
+  - "read:metadata"
+resource_discovery:
+  enabled: true
+  endpoints:
+    - path: "/tables"
+      type: "table"
+    - path: "/views"
+      type: "view"
+```
 
 ### Provider Registration
 
-Register your provider in the provider factory:
+Register your provider in the integration system:
 
 ```go
-// In backend/integration/provider/provider.go
-
-func GetProvider(config *integrationTypes.IntegrationConfig, integration *db.Integration, dataset *datasetDB.IntegrationDataset, serviceDB *sqldb.Database) (types.Provider, error) {
-    switch config.IntegrationConfig.Key {
-    case "your_service":
-        return your_service.NewYourServiceProvider(config, integration, dataset, serviceDB), nil
-    case "your_database":
-        return your_database.NewYourDatabaseProvider(config, integration, dataset, serviceDB), nil
-    // ... existing providers
-    default:
-        return nil, fmt.Errorf("unknown integration type: %s", config.IntegrationConfig.Key)
-    }
-}
-```
-
-### Integration Sync Configuration
-
-Add your integration to the sync system:
-
-```go
-// In backend/integration/sync/integrations.go
-
-var DefaultIntegrations = []IntegrationConfig{
-    // ... existing integrations
-    {
-        IntegrationConfig: db.InsertIntegrationConfigParams{
-            Name:        "Your Service",
-            Key:         "your_service",
-            Type:        db.IntegrationTypeApi,
-            AuthTypes:   []db.AuthType{db.AuthTypeOauth2},
-            Status:      db.IntegrationConfigStatusActive,
-            Description: types.NullString("Connect to Your Service for data analysis"),
-            ProviderID:  uuidPtr(providersToIdMap["your_provider"]),
-
-            // OAuth configuration
-            AuthUrl:      types.NullString("https://auth.yourservice.com/oauth2/authorize"),
-            TokenUrl:     types.NullString("https://auth.yourservice.com/oauth2/token"),
-            ClientID:     types.NullString(secrets["YourServiceClientID"].(string)),
-            ClientSecret: types.NullString(secrets["YourServiceClientSecret"].(string)),
-
-            AvailableScopes: []string{
-                "read:data",
-                "read:metadata",
-            },
-
-            DocumentationUrl: types.NullString("https://docs.yourservice.com/api"),
-
-            // Resource discovery configuration
-            DatasetResourceDiscoveryConfig: types.NullJSON(integrationTypes.DatasetResourceDiscoveryConfig{
-                MinResourcesRequired: 1,
-                BaseURL:             "https://api.yourservice.com/v1",
-                ResourceTypes: []integrationTypes.ResourceTypeConfig{
-                    {
-                        Type:        "dataset",
-                        URLTemplate: "/datasets",
-                        Method:      "GET",
-                        IDPath:      "$.data[*].id",
-                        NamePath:    "$.data[*].name",
-                        DescriptionPath: "$.data[*].description",
-                    },
-                },
-            }),
-
-            // Credential schema
-            CredentialSchema: types.NullJSON(integrationTypes.DefaultOAuthSchema),
-
-            // UI configuration
-            UiConfig: types.NullJSON(integrationTypes.UIConfig{
-                BrandLogoIcon: integrationTypes.UIConfigIcon{
-                    Set:  "custom",
-                    Name: "your-service",
-                },
-                BrandColor:  "#FF6B35",
-                ButtonStyle: "brand",
-            }),
-        },
-        ProviderCredentials: types.Dict{
-            "api_key": secrets["YourServiceAPIKey"],
-        },
-    },
+// In your provider package
+func init() {
+    provider.RegisterProvider("your_service", func(config *integrationTypes.IntegrationConfig, integration *db.Integration, dataset *datasetDB.IntegrationDataset, serviceDB *sqldb.Database) provider.Provider {
+        return NewYourServiceProvider(config, integration, dataset, serviceDB)
+    })
 }
 ```
 
@@ -464,288 +291,122 @@ var DefaultIntegrations = []IntegrationConfig{
 
 ### Unit Tests
 
-Create comprehensive unit tests:
+Create comprehensive tests for your integration:
 
 ```go
 func TestYourServiceProvider_VerifyConnection(t *testing.T) {
-    // Create test provider
-    provider := setupTestProvider(t)
+    // Setup test provider
+    provider := NewYourServiceProvider(testConfig, testIntegration, testDataset, testDB)
 
-    // Test successful connection
+    // Mock HTTP client for testing
+    provider.client = &http.Client{
+        Transport: &mockTransport{
+            response: &http.Response{
+                StatusCode: 200,
+                Body:       ioutil.NopCloser(strings.NewReader(`{"status": "ok"}`)),
+            },
+        },
+    }
+
+    // Test connection verification
     err := provider.VerifyConnection(context.Background())
     assert.NoError(t, err)
-
-    // Test with invalid credentials
-    provider.mockInvalidCredentials()
-    err = provider.VerifyConnection(context.Background())
-    assert.Error(t, err)
-}
-
-func TestYourServiceProvider_GetDatasetResources(t *testing.T) {
-    provider := setupTestProvider(t)
-
-    // Mock API responses
-    provider.mockResourceDiscoveryResponse()
-
-    resources, err := provider.GetDatasetResources(context.Background())
-    assert.NoError(t, err)
-    assert.Len(t, resources, 3)
-
-    // Verify resource structure
-    resource := resources[0]
-    assert.Equal(t, "dataset_1", resource.Resource.Key)
-    assert.Equal(t, "Test Dataset", resource.Resource.Name)
-    assert.Equal(t, resourceTypes.ResourceTypeDataset, resource.Resource.Type)
 }
 ```
 
 ### Integration Tests
 
-Test against real API endpoints:
+Test against real APIs (with test credentials):
 
 ```go
-func TestYourServiceIntegration(t *testing.T) {
+func TestYourServiceProvider_Integration(t *testing.T) {
     if testing.Short() {
         t.Skip("Skipping integration test")
     }
 
-    // Load test credentials
-    config := loadTestConfig(t)
-    provider := setupRealProvider(t, config)
+    // Use test credentials
+    config := &integrationTypes.IntegrationConfig{
+        Credentials: map[string]string{
+            "client_id":     os.Getenv("TEST_CLIENT_ID"),
+            "client_secret": os.Getenv("TEST_CLIENT_SECRET"),
+        },
+    }
 
-    // Test connection
+    provider := NewYourServiceProvider(config, nil, nil, nil)
+
+    // Test real API calls
     err := provider.VerifyConnection(context.Background())
-    require.NoError(t, err)
-
-    // Test resource discovery
-    resources, err := provider.GetDatasetResources(context.Background())
-    require.NoError(t, err)
-    require.Greater(t, len(resources), 0)
-
-    // Test data access
-    if len(resources) > 0 {
-        resource := resources[0]
-        data, err := provider.QueryResource(context.Background(), resource.Resource)
-        require.NoError(t, err)
-        require.NotEmpty(t, data)
-    }
-}
-```
-
-## Deployment & Maintenance
-
-### Configuration Management
-
-Manage integration configuration through environment variables:
-
-```go
-// Secrets configuration
-var secrets struct {
-    YourServiceClientID     string
-    YourServiceClientSecret string
-    YourServiceAPIKey      string
-    YourServiceWebhookSecret string
-}
-```
-
-### Monitoring & Observability
-
-Add monitoring to your integration:
-
-```go
-func (p *YourServiceProvider) VerifyConnection(ctx context.Context) error {
-    start := time.Now()
-    defer func() {
-        duration := time.Since(start)
-        metrics.RecordIntegrationLatency("your_service", "verify_connection", duration)
-    }()
-
-    // Connection logic
-    err := p.doVerifyConnection(ctx)
-    if err != nil {
-        metrics.RecordIntegrationError("your_service", "verify_connection", err)
-        return err
-    }
-
-    metrics.RecordIntegrationSuccess("your_service", "verify_connection")
-    return nil
-}
-```
-
-### Error Handling
-
-Implement comprehensive error handling:
-
-```go
-type YourServiceError struct {
-    Code    string `json:"code"`
-    Message string `json:"message"`
-    Details map[string]interface{} `json:"details,omitempty"`
-}
-
-func (e YourServiceError) Error() string {
-    return fmt.Sprintf("YourService API error [%s]: %s", e.Code, e.Message)
-}
-
-func (p *YourServiceProvider) handleAPIError(resp *http.Response) error {
-    var apiError YourServiceError
-    if err := json.NewDecoder(resp.Body).Decode(&apiError); err != nil {
-        return fmt.Errorf("API returned status %d", resp.StatusCode)
-    }
-
-    // Map to Erdo error types
-    switch apiError.Code {
-    case "UNAUTHORIZED":
-        return &errs.Error{
-            Code:    errs.Unauthenticated,
-            Message: "Invalid or expired credentials",
-        }
-    case "RATE_LIMITED":
-        return &errs.Error{
-            Code:    errs.ResourceExhausted,
-            Message: "API rate limit exceeded",
-        }
-    case "NOT_FOUND":
-        return &errs.Error{
-            Code:    errs.NotFound,
-            Message: apiError.Message,
-        }
-    default:
-        return &errs.Error{
-            Code:    errs.Internal,
-            Message: apiError.Message,
-        }
-    }
+    assert.NoError(t, err)
 }
 ```
 
 ## Best Practices
 
-<AccordionGroup>
-  <Accordion title="Security">
-    **Credential Security**: Never log or expose credentials in plain text
+### Error Handling
 
-    **Token Management**: Implement proper token refresh and rotation
-
-    **Input Validation**: Validate all external inputs and API responses
-
-    **Error Handling**: Don't expose sensitive information in error messages
-
-  </Accordion>
-
-  <Accordion title="Performance">
-    **Connection Pooling**: Reuse HTTP connections when possible
-
-    **Pagination**: Handle large result sets with proper pagination
-
-    **Caching**: Cache static metadata and expensive operations
-
-    **Timeouts**: Set appropriate timeouts for all network operations
-
-  </Accordion>
-
-  <Accordion title="Reliability">
-    **Retry Logic**: Implement exponential backoff for transient failures
-
-    **Circuit Breakers**: Prevent cascading failures with circuit breaker patterns
-
-    **Health Checks**: Regular health checks to detect integration issues
-
-    **Graceful Degradation**: Handle partial failures gracefully
-
-  </Accordion>
-
-  <Accordion title="Maintainability">
-    **Code Organization**: Follow consistent patterns and naming conventions
-
-    **Documentation**: Document API quirks and integration-specific behavior
-
-    **Testing**: Comprehensive unit and integration test coverage
-
-    **Monitoring**: Log important events and metrics for debugging
-
-  </Accordion>
-</AccordionGroup>
-
-## Common Patterns
-
-### Handling Pagination
+Implement robust error handling:
 
 ```go
-func (p *YourServiceProvider) fetchAllPages(ctx context.Context, url string) ([]interface{}, error) {
-    var allData []interface{}
-    nextURL := url
-
-    for nextURL != "" {
-        resp, err := p.makeRequest(ctx, nextURL)
-        if err != nil {
-            return nil, err
-        }
-
-        // Extract data and next page URL
-        data := resp["data"].([]interface{})
-        allData = append(allData, data...)
-
-        // Check for next page
-        if pagination, ok := resp["pagination"].(map[string]interface{}); ok {
-            if next, exists := pagination["next_url"]; exists && next != nil {
-                nextURL = next.(string)
-            } else {
-                nextURL = ""
-            }
-        } else {
-            nextURL = ""
-        }
+func (p *YourServiceProvider) handleAPIError(resp *http.Response) error {
+    if resp.StatusCode >= 400 {
+        body, _ := ioutil.ReadAll(resp.Body)
+        return fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
     }
-
-    return allData, nil
+    return nil
 }
 ```
 
 ### Rate Limiting
+
+Respect API rate limits:
 
 ```go
 type RateLimiter struct {
     limiter *rate.Limiter
 }
 
-func NewRateLimiter(requestsPerSecond float64) *RateLimiter {
-    return &RateLimiter{
-        limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), 1),
-    }
-}
-
-func (r *RateLimiter) Wait(ctx context.Context) error {
-    return r.limiter.Wait(ctx)
-}
-
-func (p *YourServiceProvider) makeRequest(ctx context.Context, url string) (map[string]interface{}, error) {
-    // Wait for rate limiter
+func (p *YourServiceProvider) makeAPICall(ctx context.Context, req *http.Request) (*http.Response, error) {
+    // Wait for rate limit
     if err := p.rateLimiter.Wait(ctx); err != nil {
         return nil, err
     }
 
-    // Make request
-    resp, err := p.client.Get(url)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-
-    // Handle rate limiting response
-    if resp.StatusCode == 429 {
-        retryAfter := resp.Header.Get("Retry-After")
-        if retryAfter != "" {
-            if seconds, err := strconv.Atoi(retryAfter); err == nil {
-                time.Sleep(time.Duration(seconds) * time.Second)
-                return p.makeRequest(ctx, url) // Retry
-            }
-        }
-    }
-
-    var result map[string]interface{}
-    return result, json.NewDecoder(resp.Body).Decode(&result)
+    return p.client.Do(req)
 }
 ```
 
-This comprehensive guide should help you create robust, secure, and maintainable custom integrations for Erdo. Remember to follow the established patterns and contribute your integration back to the main codebase when ready!
+### Caching
+
+Implement response caching where appropriate:
+
+```go
+func (p *YourServiceProvider) getResourcesWithCache(ctx context.Context) ([]*resourceTypes.ResourceWithRelatedResources, error) {
+    // Check cache first
+    if cached := p.cache.Get("resources"); cached != nil {
+        return cached.([]*resourceTypes.ResourceWithRelatedResources), nil
+    }
+
+    // Fetch from API
+    resources, err := p.fetchResources(ctx)
+    if err != nil {
+        return nil, err
+    }
+
+    // Cache results
+    p.cache.Set("resources", resources, 5*time.Minute)
+
+    return resources, nil
+}
+```
+
+## Deployment
+
+Once your integration is complete:
+
+1. **Test thoroughly** with real data sources
+2. **Document** configuration requirements
+3. **Submit** for code review
+4. **Deploy** to staging environment
+5. **Validate** in production
+
+Your integration will then be available for use in Erdo agents and workflows.

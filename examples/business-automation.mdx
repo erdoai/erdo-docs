@@ -5,649 +5,401 @@ description: "Real-world examples of business process automation with AI agents"
 
 # Business Automation Examples
 
-Comprehensive examples showing how to automate common business processes using AI agents. These examples demonstrate real-world patterns for document processing, customer onboarding, workflow automation, and more.
+Examples showing how to automate common business processes using AI agents for document processing, customer onboarding, and workflow automation.
 
-## Email Processing & Response Automation
+## Email Processing Automation
 
-Automate email categorization and intelligent response generation:
+Automate email categorization and intelligent responses:
 
 ```python
-from erdo import Agent
+from erdo import Agent, state
 from erdo.actions import llm, memory, utils
-from erdo.conditions import IsSuccess, TextEquals, TextContains, GreaterThan
+from erdo.conditions import IsSuccess, TextEquals, TextContains
 
 email_processor = Agent(
-    name="intelligent_email_processor",
-    description="Automatically processes and responds to emails with context awareness"
+    name="email_processor",
+    description="Automatically processes and responds to emails"
 )
 
-# Step 1: Classify incoming email
+# Classify incoming email
 classify_step = email_processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Classify this email: {{email_content}}",
-        system_prompt="You are an email classification expert. Analyze emails for category, urgency, and required actions.",
+        query=f"Classify this email: {state.email_content}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "enum": ["support", "sales", "general"]},
-                    "urgency": {"type": "string", "enum": ["low", "medium", "high", "urgent"]},
-                    "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative"]},
-                    "requires_response": {"type": "boolean"},
-                    "key_topics": {"type": "array", "items": {"type": "string"}}
+                    "urgency": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "requires_response": {"type": "boolean"}
                 }
             }
         }
     )
 )
 
-# Step 2: Search for relevant context
-context_step = email_processor.step(
-    memory.search(
-        query="{{email_sender}} {{classify_step.output.key_topics}}",
-        limit=5,
-        organization_scope="specific"
+# Generate response
+response_step = email_processor.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Generate a professional response to this {classify_step.output.category} email: {state.email_content}",
+        system_prompt="You are a professional customer service representative."
     ),
     depends_on=classify_step
 )
 
-# Step 3: Generate intelligent response
-response_step = email_processor.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate a professional response to this {{classify_step.output.category}} email: {{email_content}}",
-        context="Previous interactions: {{context_step.output.memories}}",
-        system_prompt="You are a professional customer service representative. Generate helpful, accurate responses."
-    ),
-    depends_on=[classify_step, context_step]
-)
-
-# Handle urgent emails immediately
+# Handle urgent emails
 classify_step.on(
-    IsSuccess() & TextEquals("urgency", "urgent"),
+    IsSuccess() & TextEquals("urgency", "high"),
     utils.send_status(
         status="urgent_email",
-        message="URGENT EMAIL DETECTED - Immediate attention required",
-        priority="critical",
-        email_details="{{email_content}}"
+        message="High priority email requires attention",
+        priority="high"
     )
 )
 
-# Auto-respond to routine inquiries
-response_step.on(
-    IsSuccess() &
-    TextEquals("category", "general") &
-    TextContains("sentiment", "positive") &
-    GreaterThan("confidence", "0.8"),
-    utils.send_status(
-        status="auto_responded",
-        message="Automatic response sent",
-        response_content="{{response_step.output.response}}"
-    )
-)
-
-# Flag complex support issues for human review
-response_step.on(
-    IsSuccess() &
-    TextEquals("category", "support") &
-    (TextContains("sentiment", "negative") | TextEquals("urgency", "high")),
-    memory.store(memory={
-        "content": "Complex support case: {{response_step.output.analysis}}",
-        "type": "escalated_support",
-        "tags": ["support", "escalated", "{{email_sender}}"],
-        "extra": {
-            "original_email": "{{email_content}}",
-            "suggested_response": "{{response_step.output.response}}",
-            "urgency": "{{classify_step.output.urgency}}"
-        }
-    })
-)
-
-# Store all email interactions for context
+# Store interactions
 response_step.on(
     IsSuccess(),
     memory.store(memory={
-        "content": "Email from {{email_sender}}: {{email_content}}\nResponse: {{response_step.output.response}}",
+        "content": f"Email from {state.email_sender}: {response_step.output.response}",
         "type": "email_interaction",
-        "tags": ["email", "{{classify_step.output.category}}", "{{email_sender}}"],
-        "searchable_texts": ["{{email_content}}", "{{response_step.output.response}}"]
+        "tags": ["email", classify_step.output.category]
     })
 )
 ```
 
-## Document Processing & Analysis
+## Document Processing
 
-Intelligent document processing with AI-powered extraction and validation:
+Process and extract data from documents:
 
 ```python
-from erdo.actions import codeexec, webparser
-
 document_processor = Agent(
-    name="intelligent_document_processor",
-    description="Processes various document types with AI-powered extraction and validation"
+    name="document_processor",
+    description="Processes documents and extracts structured data"
 )
 
-# Step 1: Analyze document type and structure
+# Analyze document
 analysis_step = document_processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze this document and determine processing approach: {{document_content}}",
+        query=f"Analyze this document: {state.document_content}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
                     "document_type": {"type": "string"},
-                    "confidence": {"type": "number"},
-                    "key_sections": {"type": "array"},
-                    "processing_complexity": {"type": "string", "enum": ["simple", "moderate", "complex"]},
-                    "extraction_fields": {"type": "array"}
+                    "key_fields": {"type": "array"},
+                    "confidence": {"type": "number"}
                 }
             }
         }
     )
 )
 
-# Step 2: Extract structured data based on document type
+# Extract data
 extraction_step = document_processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Extract key information from this {{analysis_step.output.document_type}}: {{document_content}}",
-        system_prompt="You are a document processing expert. Extract accurate, structured information.",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "extracted_data": {"type": "object"},
-                    "confidence_scores": {"type": "object"},
-                    "validation_flags": {"type": "array"},
-                    "missing_fields": {"type": "array"}
-                }
-            }
-        }
+        query=f"Extract structured data from this {analysis_step.output.document_type}: {state.document_content}",
+        system_prompt="Extract accurate, structured information from the document."
     ),
     depends_on=analysis_step
 )
 
-# Step 3: Validate extracted data
-validation_step = document_processor.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "document_validator.py",
-            "content": """
-import json
-import re
-from datetime import datetime
+# Store extracted data
+extraction_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": extraction_step.output.response,
+        "type": "document_data",
+        "tags": ["document", analysis_step.output.document_type]
+    })
+)
+```
 
-def validate_document_data(extracted_data, document_type):
-    validation_results = {
-        "is_valid": True,
-        "errors": [],
-        "warnings": [],
-        "completeness_score": 0.0
-    }
+## Customer Onboarding
 
-    # Validate based on document type
-    if document_type == "invoice":
-        required_fields = ["invoice_number", "date", "amount", "vendor"]
-        for field in required_fields:
-            if field not in extracted_data or not extracted_data[field]:
-                validation_results["errors"].append(f"Missing required field: {field}")
-                validation_results["is_valid"] = False
+Automate customer onboarding workflows:
 
-    elif document_type == "contract":
-        required_fields = ["parties", "effective_date", "terms"]
-        for field in required_fields:
-            if field not in extracted_data:
-                validation_results["errors"].append(f"Missing required field: {field}")
-                validation_results["is_valid"] = False
-
-    # Calculate completeness score
-    total_fields = len(extracted_data)
-    empty_fields = sum(1 for v in extracted_data.values() if not v)
-    validation_results["completeness_score"] = (total_fields - empty_fields) / total_fields if total_fields > 0 else 0
-
-    return validation_results
-
-# Execute validation
-extracted_data = {{extraction_step.output.extracted_data}}
-document_type = "{{analysis_step.output.document_type}}"
-result = validate_document_data(extracted_data, document_type)
-print(json.dumps(result))
-"""
-        }]
-    ),
-    depends_on=extraction_step
+```python
+onboarding_agent = Agent(
+    name="customer_onboarding",
+    description="Automates customer onboarding process"
 )
 
-# Handle simple documents with high confidence
-extraction_step.on(
-    IsSuccess() &
-    TextEquals("processing_complexity", "simple") &
-    GreaterThan("confidence", "0.9"),
-    utils.send_status(
-        status="auto_processed",
-        message="Document automatically processed and filed",
-        extracted_data="{{extraction_step.output.extracted_data}}"
+# Validate customer information
+validation_step = onboarding_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Validate customer information: {state.customer_data}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "is_valid": {"type": "boolean"},
+                    "missing_fields": {"type": "array"},
+                    "validation_score": {"type": "number"}
+                }
+            }
+        }
     )
 )
 
-# Handle complex documents requiring review
-analysis_step.on(
-    IsSuccess() &
-    (TextEquals("processing_complexity", "complex") | LessThan("confidence", "0.7")),
-    memory.store(memory={
-        "content": "Complex document requiring review: {{analysis_step.output.document_type}}",
-        "type": "document_review_required",
-        "tags": ["document", "review", "complex"],
-        "extra": {
-            "document_type": "{{analysis_step.output.document_type}}",
-            "complexity": "{{analysis_step.output.processing_complexity}}",
-            "confidence": "{{analysis_step.output.confidence}}"
-        }
-    })
+# Generate welcome message
+welcome_step = onboarding_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Generate personalized welcome message for: {state.customer_data}",
+        system_prompt="Create a warm, professional welcome message."
+    ),
+    depends_on=validation_step
 )
 
-# Store successfully validated documents
-validation_step.on(
-    IsSuccess() & TextEquals("is_valid", "true"),
-    memory.store(memory={
-        "content": "{{extraction_step.output.extracted_data}}",
-        "type": "validated_document",
-        "tags": ["document", "{{analysis_step.output.document_type}}", "validated"],
-        "extra": {
-            "validation_score": "{{validation_step.output.completeness_score}}",
-            "extracted_fields": "{{extraction_step.output.extracted_data}}"
-        }
-    })
-)
-
-# Flag documents with validation issues
+# Handle validation failures
 validation_step.on(
     IsSuccess() & TextEquals("is_valid", "false"),
     utils.send_status(
         status="validation_failed",
-        message="Document validation failed - manual review required",
-        validation_errors="{{validation_step.output.errors}}"
+        message="Customer data validation failed",
+        missing_fields=validation_step.output.missing_fields
     )
+)
+
+# Complete successful onboarding
+welcome_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": f"Customer onboarded: {welcome_step.output.response}",
+        "type": "customer_onboarding",
+        "tags": ["onboarding", "completed", state.customer_id]
+    })
 )
 ```
 
-## Invoice Processing Workflow
+## Invoice Processing
 
-Complete invoice processing automation with approval workflows:
+Automate invoice processing and approval:
 
 ```python
 invoice_processor = Agent(
-    name="automated_invoice_processor",
-    description="Processes invoices from receipt to payment approval"
+    name="invoice_processor",
+    description="Processes invoices and handles approvals"
 )
 
-# Step 1: Extract invoice data
+# Extract invoice data
 extract_step = invoice_processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Extract all relevant information from this invoice: {{invoice_image}}",
-        system_prompt="You are an accounting expert. Extract accurate financial information from invoices.",
+        query=f"Extract invoice details: {state.invoice_content}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
-                    "vendor_name": {"type": "string"},
                     "invoice_number": {"type": "string"},
-                    "invoice_date": {"type": "string"},
-                    "due_date": {"type": "string"},
-                    "total_amount": {"type": "number"},
-                    "line_items": {"type": "array"},
-                    "tax_amount": {"type": "number"},
-                    "payment_terms": {"type": "string"}
+                    "amount": {"type": "number"},
+                    "vendor": {"type": "string"},
+                    "due_date": {"type": "string"}
                 }
             }
         }
     )
 )
 
-# Step 2: Validate against purchase orders
-po_validation = invoice_processor.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "po_validator.py",
-            "content": """
-import json
-
-def validate_against_po(invoice_data):
-    # Simulate PO validation logic
-    validation_results = {
-        "po_match": True,
-        "amount_variance": 0.0,
-        "approval_required": False,
-        "approval_level": "auto"
-    }
-
-    # Check if amount exceeds approval threshold
-    if invoice_data["total_amount"] > 10000:
-        validation_results["approval_required"] = True
-        validation_results["approval_level"] = "manager"
-
-    if invoice_data["total_amount"] > 50000:
-        validation_results["approval_level"] = "director"
-
-    return validation_results
-
-invoice_data = {{extract_step.output}}
-result = validate_against_po(invoice_data)
-print(json.dumps(result))
-"""
-        }]
-    ),
-    depends_on=extract_step
-)
-
-# Step 3: Risk assessment
-risk_assessment = invoice_processor.step(
+# Validate invoice
+validate_step = invoice_processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Assess the risk level of this invoice: {{extract_step.output}}",
-        system_prompt="You are a financial risk analyst. Evaluate invoices for potential fraud or errors.",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "risk_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "risk_factors": {"type": "array"},
-                    "recommendation": {"type": "string"},
-                    "requires_investigation": {"type": "boolean"}
-                }
-            }
-        }
+        query=f"Validate invoice data: {extract_step.output.response}",
+        system_prompt="Check for completeness and accuracy of invoice data."
     ),
     depends_on=extract_step
 )
 
-# Auto-approve low-risk, low-amount invoices
-po_validation.on(
-    IsSuccess() &
-    TextEquals("po_match", "true") &
-    TextEquals("approval_required", "false"),
-    utils.send_status(
-        status="auto_approved",
-        message="Invoice auto-approved for payment",
-        invoice_data="{{extract_step.output}}"
-    ),
-    memory.store(memory={
-        "content": "Auto-approved invoice: {{extract_step.output.invoice_number}}",
-        "type": "approved_invoice",
-        "tags": ["invoice", "auto-approved", "{{extract_step.output.vendor_name}}"]
-    })
-)
-
-# Route for manager approval
-po_validation.on(
-    IsSuccess() &
-    TextEquals("approval_required", "true") &
-    TextEquals("approval_level", "manager"),
-    utils.send_status(
-        status="pending_manager_approval",
-        message="Invoice requires manager approval",
-        invoice_details="{{extract_step.output}}",
-        amount="{{extract_step.output.total_amount}}"
-    )
-)
-
-# Escalate high-risk invoices
-risk_assessment.on(
-    IsSuccess() & GreaterThan("risk_score", "0.7"),
-    utils.send_status(
-        status="high_risk_detected",
-        message="High-risk invoice detected - investigation required",
-        priority="urgent",
-        risk_factors="{{risk_assessment.output.risk_factors}}",
-        invoice_data="{{extract_step.output}}"
-    )
-)
-
-# Store all processed invoices for audit trail
+# Handle high-value invoices
 extract_step.on(
+    IsSuccess() & GreaterThan("amount", "5000"),
+    utils.send_status(
+        status="high_value_invoice",
+        message="High-value invoice requires manager approval",
+        invoice_details=extract_step.output.response
+    )
+)
+
+# Store processed invoice
+validate_step.on(
     IsSuccess(),
     memory.store(memory={
-        "content": "Invoice processed: {{extract_step.output.invoice_number}} from {{extract_step.output.vendor_name}}",
-        "type": "invoice_audit_trail",
-        "tags": ["audit", "invoice", "{{extract_step.output.vendor_name}}"],
-        "extra": {
-            "invoice_data": "{{extract_step.output}}",
-            "processing_timestamp": "{{current_timestamp}}",
-            "processor": "automated_invoice_processor"
-        }
+        "content": validate_step.output.response,
+        "type": "processed_invoice",
+        "tags": ["invoice", "processed", extract_step.output.vendor]
     })
 )
 ```
 
-## Customer Onboarding Automation
+## Lead Qualification
 
-Streamline customer onboarding with intelligent document verification and workflow management:
+Qualify and score sales leads:
 
 ```python
-onboarding_agent = Agent(
-    name="customer_onboarding_automation",
-    description="Automates customer onboarding process with document verification and compliance checks"
+lead_qualifier = Agent(
+    name="lead_qualifier",
+    description="Qualifies and scores sales leads"
 )
 
-# Step 1: Analyze onboarding documents
-document_analysis = onboarding_agent.step(
+# Analyze lead information
+analysis_step = lead_qualifier.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze customer onboarding documents: {{documents}}",
-        system_prompt="You are a compliance expert. Analyze documents for completeness and compliance requirements.",
+        query=f"Analyze this sales lead: {state.lead_data}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
-                    "document_types": {"type": "array"},
-                    "completeness_score": {"type": "number"},
-                    "missing_documents": {"type": "array"},
-                    "compliance_status": {"type": "string"},
-                    "risk_indicators": {"type": "array"}
+                    "qualification_score": {"type": "number"},
+                    "interest_level": {"type": "string"},
+                    "budget_range": {"type": "string"},
+                    "timeline": {"type": "string"}
                 }
             }
         }
     )
 )
 
-# Step 2: Verify customer identity
-identity_verification = onboarding_agent.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "identity_verifier.py",
-            "content": """
-import json
-import random
-
-def verify_customer_identity(customer_data):
-    # Simulate identity verification process
-    verification_result = {
-        "identity_verified": random.choice([True, False]),
-        "verification_score": random.uniform(0.7, 1.0),
-        "verification_method": "document_analysis",
-        "flags": []
-    }
-
-    # Add some realistic flags
-    if verification_result["verification_score"] < 0.8:
-        verification_result["flags"].append("low_confidence_match")
-
-    if not verification_result["identity_verified"]:
-        verification_result["flags"].append("identity_mismatch")
-
-    return verification_result
-
-customer_data = {{customer_info}}
-result = verify_customer_identity(customer_data)
-print(json.dumps(result))
-"""
-        }]
-    )
-)
-
-# Step 3: Compliance check
-compliance_check = onboarding_agent.step(
+# Generate follow-up strategy
+strategy_step = lead_qualifier.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Perform compliance check for customer: {{customer_info}}",
-        system_prompt="You are a regulatory compliance expert. Check for AML, KYC, and other regulatory requirements.",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "aml_status": {"type": "string"},
-                    "kyc_status": {"type": "string"},
-                    "sanctions_check": {"type": "string"},
-                    "overall_compliance": {"type": "string"},
-                    "required_actions": {"type": "array"}
-                }
-            }
-        }
-    )
-)
-
-# Step 4: Generate welcome package
-welcome_package = onboarding_agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate personalized welcome package for: {{customer_info}}",
-        system_prompt="Create a warm, professional welcome message with relevant next steps.",
-        context="Account setup: {{account_details}}"
+        query=f"Create follow-up strategy for lead: {analysis_step.output.response}",
+        system_prompt="Provide specific, actionable follow-up recommendations."
     ),
-    depends_on=[document_analysis, identity_verification, compliance_check]
+    depends_on=analysis_step
 )
 
-# Auto-approve customers with complete documentation and clean compliance
-document_analysis.on(
-    IsSuccess() &
-    GreaterThan("completeness_score", "0.95") &
-    TextEquals("compliance_status", "compliant"),
-    identity_verification.on(
-        IsSuccess() &
-        TextEquals("identity_verified", "true") &
-        GreaterThan("verification_score", "0.9"),
-        utils.send_status(
-            status="auto_approved",
-            message="Customer automatically approved for onboarding"
-        )
-    )
-)
-
-# Handle incomplete documentation
-document_analysis.on(
-    IsSuccess() & LessThan("completeness_score", "0.8"),
+# Handle high-quality leads
+analysis_step.on(
+    IsSuccess() & GreaterThan("qualification_score", "80"),
     utils.send_status(
-        status="additional_documents_required",
-        message="Additional documentation required to complete onboarding",
-        missing_documents="{{document_analysis.output.missing_documents}}",
-        customer_id="{{customer_info.id}}"
+        status="hot_lead",
+        message="High-quality lead identified",
+        lead_score=analysis_step.output.qualification_score
     )
 )
 
-# Flag compliance issues
-compliance_check.on(
-    IsSuccess() & ~TextEquals("overall_compliance", "approved"),
-    memory.store(memory={
-        "content": "Compliance issues detected for customer {{customer_info.id}}",
-        "type": "compliance_flag",
-        "tags": ["compliance", "onboarding", "{{customer_info.id}}"],
-        "extra": {
-            "compliance_status": "{{compliance_check.output.overall_compliance}}",
-            "required_actions": "{{compliance_check.output.required_actions}}",
-            "aml_status": "{{compliance_check.output.aml_status}}",
-            "kyc_status": "{{compliance_check.output.kyc_status}}"
-        }
-    })
-)
-
-# Send welcome package to approved customers
-welcome_package.on(
-    IsSuccess(),
-    utils.send_status(
-        status="welcome_package_sent",
-        message="Welcome package sent to customer",
-        customer_id="{{customer_info.id}}",
-        welcome_content="{{welcome_package.output.welcome_message}}"
-    )
-)
-
-# Store successful onboarding records
-welcome_package.on(
+# Store lead analysis
+strategy_step.on(
     IsSuccess(),
     memory.store(memory={
-        "content": "Customer successfully onboarded: {{customer_info.id}}",
-        "type": "successful_onboarding",
-        "tags": ["onboarding", "success", "{{customer_info.id}}"],
-        "extra": {
-            "customer_data": "{{customer_info}}",
-            "onboarding_date": "{{current_timestamp}}",
-            "compliance_status": "{{compliance_check.output.overall_compliance}}"
-        }
+        "content": strategy_step.output.response,
+        "type": "lead_analysis",
+        "tags": ["lead", "qualified", state.lead_source]
     })
 )
 ```
 
-## Key Patterns and Best Practices
+## Task Assignment
 
-### Error Handling Strategies
+Automatically assign tasks based on workload and skills:
 
 ```python
-# Comprehensive error handling with fallbacks
-step.on(
+task_assigner = Agent(
+    name="task_assigner",
+    description="Assigns tasks to team members based on workload and skills"
+)
+
+# Analyze task requirements
+task_analysis = task_assigner.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Analyze task requirements: {state.task_description}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "required_skills": {"type": "array"},
+                    "estimated_hours": {"type": "number"},
+                    "priority": {"type": "string"},
+                    "complexity": {"type": "string"}
+                }
+            }
+        }
+    )
+)
+
+# Find best assignee
+assignment_step = task_assigner.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Find best team member for task: {task_analysis.output.response}, Available team: {state.team_data}",
+        system_prompt="Consider skills, workload, and availability when assigning tasks."
+    ),
+    depends_on=task_analysis
+)
+
+# Notify assignee
+assignment_step.on(
+    IsSuccess(),
+    utils.send_status(
+        status="task_assigned",
+        message=f"Task assigned to {assignment_step.output.assignee}",
+        task_details=state.task_description
+    )
+)
+```
+
+## Best Practices
+
+### Error Handling
+
+Always include error handling for automation workflows:
+
+```python
+process_step.on(
     IsError(),
     utils.send_status(
-        status="error_detected",
-        message="Processing failed: {{step.error.message}}"
+        status="automation_error",
+        message=f"Process failed: {process_step.error.message}",
+        priority="high"
     )
 )
 ```
 
-### Conditional Workflow Routing
+### Human Oversight
+
+Include human review for critical decisions:
 
 ```python
-# Route workflows based on business rules
+# Flag for human review when confidence is low
 analysis_step.on(
-    IsSuccess() & GreaterThan("amount", "10000"),
+    IsSuccess() & LessThan("confidence", "0.7"),
     utils.send_status(
-        status="high_value_approval_required",
-        message="High-value transaction requires additional approval"
-    )
-)
-
-analysis_step.on(
-    IsSuccess() & TextContains("category", "international"),
-    utils.send_status(
-        status="international_compliance_review",
-        message="International transaction requires compliance review"
+        status="human_review_required",
+        message="Low confidence result needs human review"
     )
 )
 ```
 
-### Audit Trail Management
+### Audit Trail
+
+Maintain audit trails for business processes:
 
 ```python
-# Maintain comprehensive audit trails
-step.on(
+process_step.on(
     IsSuccess(),
     memory.store(memory={
-        "content": "Operation completed: {{step.output.operation_type}}",
-        "type": "audit_record",
-        "tags": ["audit", "{{operation_type}}", "{{user_id}}"],
+        "content": f"Process completed: {process_step.output.response}",
+        "type": "audit_log",
+        "tags": ["audit", "completed", state.process_id],
         "extra": {
-            "operation_details": "{{step.output}}",
-            "timestamp": "{{current_timestamp}}",
-            "user_id": "{{user_id}}",
-            "system_version": "{{system_version}}"
+            "timestamp": "{{system.current_time}}",
+            "user": state.user_id
         }
     })
 )

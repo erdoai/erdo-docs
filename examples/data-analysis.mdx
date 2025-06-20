@@ -1,18 +1,18 @@
 ---
 title: "Data Analysis Examples"
-description: "Real-world examples of data analysis agents for business insights and automation"
+description: "Real-world examples of data analysis agents for business insights"
 ---
 
 # Data Analysis Examples
 
-Comprehensive examples showing how to build powerful data analysis agents that can process, analyze, and generate insights from various data sources using the new agent-centric API.
+Examples of building data analysis agents that process, analyze, and generate insights from various data sources.
 
 ## Sales Data Analyzer
 
-Analyze sales performance and generate actionable business insights:
+Analyze sales performance and generate business insights:
 
 ```python
-from erdo import Agent
+from erdo import Agent, state
 from erdo.actions import llm, codeexec, memory, utils
 from erdo.conditions import IsSuccess, GreaterThan, IsError
 
@@ -21,686 +21,394 @@ sales_analyzer = Agent(
     description="Analyzes sales data and generates business insights"
 )
 
-# Step 1: Data preprocessing and validation
+# Step 1: Load and validate data
 preprocess_step = sales_analyzer.step(
     codeexec.execute(
-        code_files=[{
-            "filename": "preprocess.py",
-            "content": """
+        code=f"""
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+import json
 
-# Load and validate sales data
-data = pd.read_csv('{{data_source}}')
+# Load sales data
+data = pd.read_csv('{state.data_source}')
 
-# Data quality checks
+# Basic validation
 missing_data = data.isnull().sum()
-duplicate_rows = data.duplicated().sum()
-date_range = (data['date'].min(), data['date'].max())
-
-# Clean and prepare data
-data['date'] = pd.to_datetime(data['date'])
-data = data.dropna(subset=['amount', 'customer_id'])
-data['month'] = data['date'].dt.to_period('M')
-
-# Calculate key metrics
 total_revenue = data['amount'].sum()
 unique_customers = data['customer_id'].nunique()
-avg_order_value = data['amount'].mean()
 
-result = {
-    "cleaned_data": data.to_dict('records'),
-    "data_quality": {
-        "missing_values": missing_data.to_dict(),
-        "duplicates": int(duplicate_rows),
-        "date_range": [str(date_range[0]), str(date_range[1])]
-    },
-    "summary_metrics": {
-        "total_revenue": float(total_revenue),
-        "unique_customers": int(unique_customers),
-        "avg_order_value": float(avg_order_value),
-        "total_transactions": len(data)
-    }
-}
+result = {{
+    "total_revenue": float(total_revenue),
+    "unique_customers": int(unique_customers),
+    "total_transactions": len(data),
+    "data_quality": "good" if missing_data.sum() < len(data) * 0.1 else "poor"
+}}
 
-import json
 print(json.dumps(result))
 """
-        }],
-        parameters={"data_source": "{{data_source}}"}
-    ),
-    key="preprocess"
+    )
 )
 
-# Step 2: Advanced analytics and trend analysis
+# Step 2: Generate insights
 analysis_step = sales_analyzer.step(
     llm.message(
         model="claude-sonnet-4",
-        system_prompt="You are an expert business analyst. Analyze the provided sales data and identify trends, patterns, and actionable insights.",
-        query="Analyze this sales data: {{preprocess_step.output.summary_metrics}}",
+        query=f"Analyze this sales data: {preprocess_step.output.result}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
-                "required": ["insights", "recommendations", "key_findings"],
                 "properties": {
-                    "insights": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "recommendations": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "key_findings": {
-                        "type": "object",
-                        "properties": {
-                            "revenue_trend": {"type": "string"},
-                            "top_performing_segments": {"type": "array"},
-                            "seasonal_patterns": {"type": "string"}
-                        }
-                    }
+                    "insights": {"type": "array"},
+                    "recommendations": {"type": "array"},
+                    "confidence": {"type": "number"}
                 }
             }
         }
     ),
-    depends_on=preprocess_step,
-    key="analyze"
+    depends_on=preprocess_step
 )
 
-# Step 3: Statistical analysis
-stats_step = sales_analyzer.step(
+# Store high-confidence results
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": analysis_step.output.response,
+        "type": "sales_analysis",
+        "tags": ["sales", "validated"]
+    })
+)
+
+# Flag low confidence for review
+analysis_step.on(
+    IsSuccess() & ~GreaterThan("confidence", "0.8"),
+    utils.send_status(
+        status="review_needed",
+        message="Analysis has low confidence - needs review"
+    )
+)
+```
+
+## Customer Segmentation
+
+Segment customers based on behavior and value:
+
+```python
+segmentation_agent = Agent(
+    name="customer_segmentation",
+    description="Segments customers based on purchase behavior"
+)
+
+# Analyze customer data
+segment_step = segmentation_agent.step(
     codeexec.execute(
-        code_files=[{
-            "filename": "statistical_analysis.py",
-            "content": """
+        code=f"""
 import pandas as pd
-import numpy as np
-from scipy import stats
-from sklearn.linear_model import LinearRegression
 import json
 
-# Load cleaned data
-data = {{preprocess_step.output.cleaned_data}}
-df = pd.DataFrame(data)
+# Load customer data
+data = pd.read_csv('{state.customer_data}')
 
-# Time series analysis
-df['date'] = pd.to_datetime(df['date'])
-monthly_sales = df.groupby(df['date'].dt.to_period('M'))['amount'].agg(['sum', 'count', 'mean'])
-growth_rate = monthly_sales['sum'].pct_change().mean()
+# Calculate customer metrics
+customer_metrics = data.groupby('customer_id').agg({{
+    'amount': ['sum', 'mean', 'count'],
+    'date': ['min', 'max']
+}}).round(2)
 
-# Customer segmentation
-customer_metrics = df.groupby('customer_id')['amount'].agg(['sum', 'count', 'mean'])
+# Simple segmentation
+customer_metrics['total_spent'] = customer_metrics[('amount', 'sum')]
 customer_metrics['segment'] = pd.cut(
-    customer_metrics['sum'],
+    customer_metrics['total_spent'],
     bins=[0, 1000, 5000, float('inf')],
     labels=['Low', 'Medium', 'High']
 )
 
-# Trend analysis
-X = np.arange(len(monthly_sales)).reshape(-1, 1)
-y = monthly_sales['sum'].values
-model = LinearRegression().fit(X, y)
-trend_slope = model.coef_[0]
+segment_counts = customer_metrics['segment'].value_counts().to_dict()
 
-result = {
-    "monthly_trends": monthly_sales.to_dict(),
-    "growth_rate": float(growth_rate),
-    "customer_segments": customer_metrics['segment'].value_counts().to_dict(),
-    "trend_slope": float(trend_slope)
-}
+result = {{
+    "segments": segment_counts,
+    "total_customers": len(customer_metrics),
+    "avg_customer_value": float(customer_metrics['total_spent'].mean())
+}}
 
 print(json.dumps(result))
 """
-        }],
-        parameters={"cleaned_data": "{{preprocess_step.output.cleaned_data}}"}
+    )
+)
+
+# Generate segment insights
+insights_step = segmentation_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Analyze customer segments: {segment_step.output.result}",
+        system_prompt="Provide actionable insights for each customer segment"
     ),
-    depends_on=preprocess_step,
-    key="statistical_analysis"
-)
-
-# Step 4: Generate visualizations and reports
-visualization_step = sales_analyzer.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "create_visualizations.py",
-            "content": """
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import json
-
-# Create comprehensive visualizations
-plt.figure(figsize=(15, 10))
-
-# Revenue trend
-plt.subplot(2, 2, 1)
-monthly_data = {{stats_step.output.monthly_trends}}
-plt.plot(range(len(monthly_data['sum'])), list(monthly_data['sum'].values()))
-plt.title('Revenue Trend Over Time')
-plt.xlabel('Month')
-plt.ylabel('Revenue')
-
-# Customer segments
-plt.subplot(2, 2, 2)
-segments = {{stats_step.output.customer_segments}}
-plt.pie(segments.values(), labels=segments.keys(), autopct='%1.1f%%')
-plt.title('Customer Segments')
-
-plt.tight_layout()
-plt.savefig('sales_analysis_dashboard.png', dpi=300, bbox_inches='tight')
-
-result = {
-    "dashboard_created": True,
-    "charts_generated": 2,
-    "file_path": "sales_analysis_dashboard.png"
-}
-
-print(json.dumps(result))
-"""
-        }]
-    ),
-    depends_on=stats_step,
-    key="visualizations"
-)
-
-# Handle successful preprocessing
-preprocess_step.on(
-    IsSuccess(),
-    memory.store(memory={
-        "content": "{{preprocess_step.output.cleaned_data}}",
-        "description": "Cleaned sales data with quality metrics",
-        "type": "cleaned_sales_data",
-        "tags": ["sales", "cleaned", "preprocessed"],
-        "extra": "{{preprocess_step.output.data_quality}}"
-    })
-)
-
-# Handle high-quality analysis results
-analysis_step.on(
-    IsSuccess(),
-    memory.store(memory={
-        "content": "{{analysis_step.output.insights}}",
-        "description": "Sales analysis insights and recommendations",
-        "type": "business_insights",
-        "tags": ["sales", "insights", "analysis"],
-        "extra": {
-            "recommendations": "{{analysis_step.output.recommendations}}",
-            "key_findings": "{{analysis_step.output.key_findings}}"
-        }
-    })
-)
-
-# Handle statistical analysis completion
-stats_step.on(
-    IsSuccess() & GreaterThan("growth_rate", 0),
-    utils.send_status(
-        status="positive_growth",
-        message="Excellent! Sales showing {{stats_step.output.growth_rate}} growth rate",
-        priority="high"
-    )
-)
-
-# Handle error cases
-preprocess_step.on(
-    IsError(),
-    utils.send_status(
-        status="data_error",
-        message="Data preprocessing failed: {{preprocess_step.error.message}}",
-        error_details="{{preprocess_step.error.details}}"
-    )
-)
-
-analysis_step.on(
-    IsError(),
-    utils.send_status(
-        status="analysis_error",
-        message="Analysis failed: {{analysis_step.error.message}}",
-        suggestion="Check data quality and try again"
-    )
+    depends_on=segment_step
 )
 ```
 
-<CardGroup cols={2}>
-  <Card title="Key Features" icon="star">
-    - Automated data quality validation - Advanced statistical analysis -
-    Customer segmentation - Trend and seasonality detection - Interactive
-    visualizations - Actionable recommendations
-  </Card>
-  <Card title="Business Value" icon="chart-line">
-    - Identify revenue opportunities - Understand customer behavior - Optimize
-    sales strategies - Predict future performance - Monitor KPIs automatically -
-    Data-driven decision making
-  </Card>
-</CardGroup>
+## Financial Trend Analysis
 
-## Financial Data Processor
-
-Process financial statements and calculate key ratios:
+Analyze financial trends and forecasting:
 
 ```python
-financial_analyzer = Agent(
-    name="financial_analyzer",
-    description="Analyzes financial statements and calculates key ratios"
+financial_agent = Agent(
+    name="financial_trend_analyzer",
+    description="Analyzes financial trends and generates forecasts"
 )
 
-# Step 1: Parse financial statements
-parse_financials = financial_analyzer.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Extract financial data from: {{financial_statements}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "balance_sheet": {
-                            "type": "object",
-                            "properties": {
-                                "total_assets": {"type": "number"},
-                                "total_liabilities": {"type": "number"},
-                                "shareholders_equity": {"type": "number"}
-                            }
-                        },
-                        "income_statement": {
-                            "type": "object",
-                            "properties": {
-                                "revenue": {"type": "number"},
-                                "gross_profit": {"type": "number"},
-                                "net_income": {"type": "number"}
-                            }
-                        },
-                        "cash_flow": {
-                            "type": "object",
-                            "properties": {
-                                "operating_cash_flow": {"type": "number"},
-                                "investing_cash_flow": {"type": "number"},
-                                "financing_cash_flow": {"type": "number"}
-                            }
-                        }
-                    }
-                }
-            }
-        }
+# Calculate trends
+trend_step = financial_agent.step(
+    codeexec.execute(
+        code=f"""
+import pandas as pd
+import numpy as np
+import json
+
+# Load financial data
+data = pd.read_csv('{state.financial_data}')
+data['date'] = pd.to_datetime(data['date'])
+
+# Monthly aggregation
+monthly = data.groupby(data['date'].dt.to_period('M'))['revenue'].sum()
+
+# Calculate growth rate
+growth_rate = monthly.pct_change().mean()
+
+# Simple trend detection
+recent_months = monthly.tail(3)
+trend = "increasing" if recent_months.is_monotonic_increasing else "decreasing"
+
+result = {{
+    "monthly_growth_rate": float(growth_rate),
+    "trend": trend,
+    "latest_revenue": float(monthly.iloc[-1]),
+    "months_analyzed": len(monthly)
+}}
+
+print(json.dumps(result))
+"""
     )
 )
 
-# Step 2: Calculate financial ratios
-calculate_ratios = financial_analyzer.step(
-    codeexec.execute(
-        code="""
-# Extract financial data
-balance_sheet = {{parse.output.balance_sheet}}
-income_statement = {{parse.output.income_statement}}
-cash_flow = {{parse.output.cash_flow}}
-
-# Liquidity ratios
-current_ratio = balance_sheet.get('current_assets', 0) / balance_sheet.get('current_liabilities', 1)
-quick_ratio = (balance_sheet.get('current_assets', 0) - balance_sheet.get('inventory', 0)) / balance_sheet.get('current_liabilities', 1)
-
-# Profitability ratios
-gross_margin = income_statement.get('gross_profit', 0) / income_statement.get('revenue', 1)
-net_margin = income_statement.get('net_income', 0) / income_statement.get('revenue', 1)
-roe = income_statement.get('net_income', 0) / balance_sheet.get('shareholders_equity', 1)
-
-# Efficiency ratios
-asset_turnover = income_statement.get('revenue', 0) / balance_sheet.get('total_assets', 1)
-debt_to_equity = balance_sheet.get('total_liabilities', 0) / balance_sheet.get('shareholders_equity', 1)
-
-# Cash flow ratios
-operating_margin = cash_flow.get('operating_cash_flow', 0) / income_statement.get('revenue', 1)
-
-return {
-    "liquidity": {
-        "current_ratio": round(current_ratio, 2),
-        "quick_ratio": round(quick_ratio, 2)
-    },
-    "profitability": {
-        "gross_margin": round(gross_margin * 100, 2),
-        "net_margin": round(net_margin * 100, 2),
-        "roe": round(roe * 100, 2)
-    },
-    "efficiency": {
-        "asset_turnover": round(asset_turnover, 2),
-        "debt_to_equity": round(debt_to_equity, 2)
-    },
-    "cash_flow": {
-        "operating_margin": round(operating_margin * 100, 2)
-    }
-}
-"""
-    ),
-    depends_on=parse_financials,
-    key="ratios"
-)
-
-# Step 3: Financial health assessment
-assessment_step = financial_analyzer.step(
+# Generate financial insights
+financial_insights = financial_agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Assess financial health based on ratios: {{ratios.output.content}}",
-        system_prompt="You are a financial analyst. Provide comprehensive assessment of financial health."
+        query=f"Analyze financial trends: {trend_step.output.result}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string"},
+                    "forecast": {"type": "string"},
+                    "risks": {"type": "array"},
+                    "opportunities": {"type": "array"}
+                }
+            }
+        }
     ),
-    depends_on=calculate_ratios,
-    key="assess"
+    depends_on=trend_step
 )
 
-agents.append(financial_analyzer)
+# Store analysis results
+financial_insights.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": financial_insights.output.response,
+        "type": "financial_analysis",
+        "tags": ["finance", "trends", state.period]
+    })
+)
+```
+
+## Data Quality Checker
+
+Validate and assess data quality:
+
+```python
+quality_agent = Agent(
+    name="data_quality_checker",
+    description="Checks data quality and identifies issues"
+)
+
+# Quality assessment
+quality_step = quality_agent.step(
+    codeexec.execute(
+        code=f"""
+import pandas as pd
+import json
+
+# Load data
+data = pd.read_csv('{state.dataset}')
+
+# Quality checks
+missing_percent = (data.isnull().sum() / len(data) * 100).round(2)
+duplicate_count = data.duplicated().sum()
+numeric_cols = data.select_dtypes(include=['number']).columns
+
+quality_score = 100
+if missing_percent.max() > 10:
+    quality_score -= 30
+if duplicate_count > len(data) * 0.05:
+    quality_score -= 20
+
+result = {{
+    "quality_score": quality_score,
+    "missing_data": missing_percent.to_dict(),
+    "duplicate_rows": int(duplicate_count),
+    "total_rows": len(data),
+    "status": "good" if quality_score > 70 else "poor"
+}}
+
+print(json.dumps(result))
+"""
+    )
+)
+
+# Generate quality report
+report_step = quality_agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Generate data quality report: {quality_step.output.result}",
+        system_prompt="Provide specific recommendations for data quality improvements"
+    ),
+    depends_on=quality_step
+)
+
+# Handle poor quality data
+quality_step.on(
+    IsSuccess() & ~GreaterThan("quality_score", "70"),
+    utils.send_status(
+        status="quality_alert",
+        message="Data quality is below acceptable threshold",
+        priority="high"
+    )
+)
 ```
 
 ## Market Research Analyzer
 
-Analyze market trends and competitive landscape:
+Analyze market research data and trends:
 
 ```python
-market_researcher = Agent(
+market_agent = Agent(
     name="market_research_analyzer",
-    description="Analyzes market trends and competitive intelligence"
+    description="Analyzes market research data and competitive intelligence"
 )
 
-# Step 1: Gather market data
-research_step = market_researcher.step(
+# Research data analysis
+research_step = market_agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Research market trends for {{industry}} in {{region}}",
-        tools=[
-            Tool(
-                name="web_search",
-                description="Search for market information",
-                actiontype="websearch.search",
-                parameters={
-                    "query": "{{industry}} market trends {{region}} 2024",
-                    "num_results": 10
-                }
-            ),
-            Tool(
-                name="parse_reports",
-                description="Parse market research reports",
-                actiontype="webparser.parse",
-                parameters={"url": "{{url}}"}
-            )
-        ]
-    )
-)
-
-# Step 2: Competitive analysis
-competitive_analysis = market_researcher.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Analyze competitive landscape: {{research.output.content}}",
+        query=f"Analyze market research data: {state.research_data}",
         response_format={
             "Type": "json_schema",
             "Schema": {
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "market_size": {"type": "string"},
-                        "growth_rate": {"type": "string"},
-                        "key_players": {"type": "array"},
-                        "market_trends": {"type": "array"},
-                        "opportunities": {"type": "array"},
-                        "threats": {"type": "array"}
-                    }
+                "type": "object",
+                "properties": {
+                    "market_size": {"type": "string"},
+                    "growth_rate": {"type": "string"},
+                    "key_trends": {"type": "array"},
+                    "competitive_landscape": {"type": "string"},
+                    "opportunities": {"type": "array"}
                 }
             }
         }
-    ),
-    depends_on=research_step,
-    key="competitive"
+    )
 )
 
-# Step 3: SWOT analysis
-swot_analysis = market_researcher.step(
+# Generate strategic recommendations
+strategy_step = market_agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Generate SWOT analysis for {{company}} in {{industry}}",
-        system_prompt="Create comprehensive SWOT analysis based on market research."
+        query=f"Generate strategic recommendations based on: {research_step.output.response}",
+        system_prompt="You are a strategic business consultant. Provide actionable recommendations."
     ),
-    depends_on=competitive_analysis,
-    key="swot"
+    depends_on=research_step
 )
 
-agents.append(market_researcher)
+# Store market insights
+research_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": research_step.output.response,
+        "type": "market_research",
+        "tags": ["market", "research", state.industry]
+    })
+)
 ```
 
-## Performance Analytics Dashboard
+## Best Practices
 
-Create automated performance dashboards:
+### Data Validation
+
+Always validate data before analysis:
 
 ```python
-dashboard_generator = Agent(
-    name="performance_dashboard",
-    description="Generates automated performance analytics dashboards"
-)
-
-# Step 1: Data aggregation
-aggregate_data = dashboard_generator.step(
+# Check data quality first
+validation_step = agent.step(
     codeexec.execute(
-        code="""
+        code=f"""
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 
-# Aggregate data from multiple sources
-sources = {{data_sources}}
-aggregated_data = {}
+data = pd.read_csv('{state.file_path}')
 
-for source_name, source_data in sources.items():
-    df = pd.DataFrame(source_data)
+# Basic validation
+issues = []
+if data.empty:
+    issues.append("Dataset is empty")
+if data.isnull().sum().sum() > len(data) * 0.2:
+    issues.append("Too much missing data")
 
-    # Calculate key metrics
-    metrics = {
-        'total_volume': df['volume'].sum() if 'volume' in df.columns else 0,
-        'average_value': df['value'].mean() if 'value' in df.columns else 0,
-        'growth_rate': calculate_growth_rate(df),
-        'trend_direction': determine_trend(df),
-        'data_points': len(df)
-    }
-
-    aggregated_data[source_name] = metrics
-
-# Overall performance calculation
-overall_performance = {
-    'total_sources': len(sources),
-    'combined_volume': sum(data['total_volume'] for data in aggregated_data.values()),
-    'avg_growth_rate': np.mean([data['growth_rate'] for data in aggregated_data.values()]),
-    'data_freshness': calculate_data_freshness(sources)
-}
-
-return {
-    'source_metrics': aggregated_data,
-    'overall_performance': overall_performance,
-    'last_updated': datetime.now().isoformat()
-}
+result = {{"valid": len(issues) == 0, "issues": issues}}
+print(json.dumps(result))
 """
     )
 )
 
-# Step 2: Generate visualizations
-create_dashboard = dashboard_generator.step(
-    codeexec.execute(
-        code="""
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.express as px
-
-# Create interactive dashboard
-fig = make_subplots(
-    rows=3, cols=2,
-    subplot_titles=[
-        'Performance Overview', 'Growth Trends',
-        'Source Comparison', 'Volume Analysis',
-        'Trend Indicators', 'Data Quality Metrics'
-    ],
-    specs=[
-        [{"type": "indicator"}, {"type": "scatter"}],
-        [{"type": "bar"}, {"type": "scatter"}],
-        [{"type": "pie"}, {"type": "table"}]
-    ]
+# Only proceed if data is valid
+validation_step.on(
+    IsSuccess() & TextContains("valid", "true"),
+    llm.message(model="claude-sonnet-4", query="Proceed with analysis")
 )
-
-metrics = {{aggregate.output.source_metrics}}
-overall = {{aggregate.output.overall_performance}}
-
-# Performance indicators
-fig.add_trace(
-    go.Indicator(
-        mode="gauge+number+delta",
-        value=overall['avg_growth_rate'],
-        title={'text': "Average Growth Rate"},
-        gauge={'axis': {'range': [-20, 50]}}
-    ),
-    row=1, col=1
-)
-
-# Save dashboard
-fig.write_html('performance_dashboard.html')
-fig.write_image('performance_dashboard.png')
-
-return {
-    'dashboard_created': True,
-    'html_path': 'performance_dashboard.html',
-    'image_path': 'performance_dashboard.png',
-    'charts_count': 6
-}
-"""
-    ),
-    depends_on=aggregate_data,
-    key="dashboard"
-)
-
-# Step 3: Generate insights and alerts
-insights_step = dashboard_generator.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate insights and alerts from performance data: {{aggregate.output.content}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "key_insights": {"type": "array"},
-                        "alerts": {"type": "array"},
-                        "recommendations": {"type": "array"},
-                        "next_actions": {"type": "array"}
-                    }
-                }
-            }
-        }
-    ),
-    depends_on=create_dashboard,
-    key="insights"
-)
-
-agents.append(dashboard_generator)
 ```
 
-## Advanced Analytics Examples
+### Error Handling
 
-<Tabs>
-  <Tab title="Predictive Analytics">
-    ```python
-    # Predictive sales forecasting
-    forecast_step = predictor_agent.step(
-        codeexec.execute(
-            code="""
-    from sklearn.ensemble import RandomForestRegressor
-    from sklearn.metrics import mean_absolute_error
-    import pandas as pd
+Handle analysis errors gracefully:
 
-    # Prepare time series data
-    data = prepare_time_series_data({{historical_data}})
-
-    # Feature engineering
-    features = create_features(data)
-    X, y = prepare_ml_data(features)
-
-    # Train model
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X, y)
-
-    # Generate predictions
-    future_features = create_future_features({{forecast_periods}})
-    predictions = model.predict(future_features)
-
-    # Calculate confidence intervals
-    confidence_intervals = calculate_confidence_intervals(model, future_features)
-
-    return {
-        'predictions': predictions.tolist(),
-        'confidence_intervals': confidence_intervals,
-        'model_accuracy': calculate_accuracy_metrics(model, X, y),
-        'feature_importance': dict(zip(features.columns, model.feature_importances_))
-    }
-    """
-        ),
-        key="forecast"
+```python
+analysis_step.on(
+    IsError(),
+    utils.send_status(
+        status="analysis_failed",
+        message=f"Analysis failed: {analysis_step.error.message}"
+    ),
+    # Try simpler analysis as fallback
+    llm.message(
+        model="claude-sonnet-4",
+        query="Provide basic summary of the data",
+        system_prompt="Focus on simple, observable patterns"
     )
-    ```
+)
+```
 
-  </Tab>
-  <Tab title="Anomaly Detection">
-    ```python
-    # Detect anomalies in data
-    anomaly_detection = anomaly_agent.step(
-        codeexec.execute(
-            code="""
-    from sklearn.ensemble import IsolationForest
-    from sklearn.preprocessing import StandardScaler
-    import numpy as np
+### Result Storage
 
-    # Prepare data
-    data = np.array({{time_series_data}})
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(data.reshape(-1, 1))
+Store analysis results for future reference:
 
-    # Anomaly detection
-    detector = IsolationForest(contamination=0.1, random_state=42)
-    anomalies = detector.fit_predict(scaled_data)
-
-    # Identify anomalous points
-    anomaly_indices = np.where(anomalies == -1)[0]
-    anomaly_values = data[anomaly_indices]
-
-    # Calculate severity scores
-    severity_scores = detector.decision_function(scaled_data)
-
-    return {
-        'anomaly_count': len(anomaly_indices),
-        'anomaly_indices': anomaly_indices.tolist(),
-        'anomaly_values': anomaly_values.tolist(),
-        'severity_scores': severity_scores.tolist(),
-        'anomaly_percentage': (len(anomaly_indices) / len(data)) * 100
-    }
-    """
-        ),
-        key="detect_anomalies"
-    )
-    ```
-
-  </Tab>
-</Tabs>
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card
-    title="Business Automation"
-    icon="briefcase"
-    href="/examples/business-automation"
-  >
-    Explore business process automation examples
-  </Card>
-  <Card title="Core Concepts" icon="book" href="/concepts/overview">
-    Learn about agents, steps, actions, and result handlers
-  </Card>
-  <Card title="SDK Reference" icon="code" href="/sdk/overview">
-    Complete Python SDK documentation and API reference
-  </Card>
-  <Card title="Pre-built Agents" icon="robot" href="/agents/data-analyst">
-    Leverage ready-made data analysis solutions
-  </Card>
-</CardGroup>
+```python
+analysis_step.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": analysis_step.output.response,
+        "type": "data_analysis",
+        "tags": ["analysis", state.dataset_name, state.analysis_type],
+        "extra": {
+            "timestamp": "{{system.current_time}}",
+            "model_used": "claude-sonnet-4"
+        }
+    })
+)
+```

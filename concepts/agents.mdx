@@ -1,642 +1,202 @@
 ---
 title: "Agents"
-description: "Understanding agents - the core containers for AI workflows and automation"
+description: "Agents are containers for AI workflows that execute steps and handle complex automation tasks"
 ---
 
 # Agents
 
-Agents are the foundational containers for AI workflows in Erdo. They encapsulate the logic, steps, and configuration needed to automate complex tasks using AI models and tools.
+Agents are the core building blocks in Erdo. They contain workflow logic, execute steps, and coordinate AI operations.
 
-## What is an Agent?
-
-An agent represents a complete AI workflow that can:
-
-- Execute multiple steps in sequence or parallel
-- Make decisions based on data and conditions
-- Use external tools and services
-- Handle errors and retry logic
-- Store and retrieve knowledge
-- Validate outputs and ensure data quality
-- Parse and fix malformed responses
-
-<CardGroup cols={2}>
-  <Card title="Single-Purpose Agents" icon="target">
-    Focused on one specific task like data analysis or email processing
-  </Card>
-  <Card title="Multi-Purpose Agents" icon="layers">
-    Handle complex workflows with multiple decision points and actions
-  </Card>
-  <Card title="Orchestrator Agents" icon="sitemap">
-    Coordinate other agents and manage complex pipelines
-  </Card>
-  <Card title="Interactive Agents" icon="comments">
-    Respond to user inputs and maintain conversation context
-  </Card>
-</CardGroup>
-
-## Agent Structure
-
-### Basic Agent Definition
+## Basic Agent
 
 ```python
-from erdo import Agent
+from erdo import Agent, state
+from erdo.actions import llm
 
-my_agent = Agent(
+agent = Agent(
     name="data_analyzer",
-    description="Analyzes data and generates insights",
-    visibility="public"  # or "private"
-)
-```
-### Agent Properties
-
-<Tabs>
-  <Tab title="Core Properties">
-    ```python
-    agent = Agent(
-        name="unique_agent_name",  # Required: Unique identifier
-        description="What this agent does",  # Required: Clear description
-        visibility="public",  # public, private, or organization
-        version="1.0.0",  # Semantic versioning
-        tags=["analysis", "automation"],  # Categorization tags
-        timeout=300  # Maximum execution time (seconds)
-    )
-    ```
-  </Tab>
-  <Tab title="Advanced Configuration">
-    ```python
-    agent = Agent(
-        name="advanced_agent",
-        description="Advanced agent with custom configuration",
-        visibility="organization",
-        running_message="Processing your request...",
-        finished_message="Analysis complete!",
-        retry_attempts=3,
-        tags=["data", "analysis", "automation"]
-    )
-    ```
-  </Tab>
-</Tabs>
-
-## Agent Types and Patterns
-
-### Data Processing Agents
-
-Agents focused on analyzing and transforming data with validation:
-
-```python
-from erdo import Agent
-from erdo.actions import llm, codeexec, memory, utils
-from erdo.conditions import IsSuccess, GreaterThan, TextContains
-
-data_agent = Agent(
-    name="sales_data_analyzer",
-    description="Analyzes sales data and generates business insights with validation"
+    description="Analyzes data and generates insights"
 )
 
-analyze_step = data_agent.step(
+# Add a step to the agent
+analysis_step = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze sales data: {{data}}",
-        system_prompt="You are a business analyst expert. Provide insights in JSON format.",
+        query=f"Analyze this data: {state.dataset}"
+    )
+)
+```
+
+## Agent Configuration
+
+```python
+agent = Agent(
+    name="unique_agent_name",        # Required: Unique identifier
+    description="What this agent does",  # Required: Clear description
+    visibility="public",             # public, private, or organization
+    version="1.0.0",                # Semantic versioning
+    tags=["analysis", "automation"], # Categorization tags
+    timeout=300                     # Maximum execution time (seconds)
+)
+```
+
+## Steps and Dependencies
+
+Steps define what actions an agent performs. Use `depends_on` to control execution order:
+
+```python
+from erdo.actions import websearch, llm
+
+research_step = agent.step(
+    websearch.search(query=f"{state.topic} latest research")
+)
+
+analysis_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Analyze this research: {research_step.output.results}"
+    ),
+    depends_on=research_step  # Wait for research to complete
+)
+```
+
+## Result Handlers
+
+Handle step outcomes with conditional logic:
+
+```python
+from erdo.conditions import IsSuccess, GreaterThan
+from erdo.actions import memory, utils
+
+# Store successful results
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": analysis_step.output.response,
+        "type": "high_confidence_analysis"
+    })
+)
+
+# Handle low confidence results
+analysis_step.on(
+    IsSuccess() & ~GreaterThan("confidence", "0.8"),
+    utils.send_status(
+        status="review_needed",
+        message="Analysis has low confidence - human review recommended"
+    )
+)
+```
+
+## Example: Document Processor
+
+```python
+from erdo import Agent, state
+from erdo.actions import llm, memory, utils
+from erdo.conditions import IsSuccess, TextContains
+
+processor = Agent(
+    name="document_processor",
+    description="Extracts and validates information from documents"
+)
+
+# Step 1: Extract information
+extract_step = processor.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Extract key information from: {state.document}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
-                    "insights": {"type": "array"},
-                    "trends": {"type": "array"},
-                    "metrics": {"type": "object"}
+                    "title": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "key_points": {"type": "array"}
                 }
             }
         }
     )
 )
 
-# Validate analysis contains required components
-analyze_step.on(
-    IsSuccess() & TextContains("insights") & TextContains("trends"),
-    memory.store(memory={
-        "content": "{{analyze_step.output.response}}",
-        "type": "validated_analysis",
-        "tags": ["sales", "validated"]
-    })
-)
-
-# Handle incomplete analysis
-analyze_step.on(
-    IsSuccess() & ~TextContains("insights"),
+# Step 2: Validate extraction
+validate_step = processor.step(
     llm.message(
         model="claude-sonnet-4",
-        query="The analysis is missing key insights. Please provide detailed insights for: {{data}}",
-        system_prompt="Focus on generating comprehensive business insights and trends."
-    )
-)
-
-# Parse and validate JSON structure
-json_step = data_agent.step(
-    utils.parse_json(
-        json="{{analyze_step.output.response}}",
-        required_keys=["insights", "trends", "metrics"]
+        query=f"Validate this extraction is complete: {extract_step.output.response}"
     ),
-    depends_on=analyze_step
+    depends_on=extract_step
 )
 
-calculate_step = data_agent.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "calculate.py",
-            "content": "calculate_sales_metrics({{json_step.output.insights}})"
-        }]
-    ),
-    depends_on=json_step
-)
-
-# Validate calculation results
-calculate_step.on(
-    IsSuccess() & TextContains("result") & TextContains("metrics"),
+# Store validated results
+validate_step.on(
+    IsSuccess() & TextContains("complete"),
     memory.store(memory={
-        "content": "{{calculate_step.output.metrics}}",
-        "type": "validated_sales_analysis",
-        "tags": ["sales", "calculated", "validated"]
+        "content": extract_step.output.response,
+        "type": "validated_extraction",
+        "tags": ["document", "validated"]
     })
 )
 
-# Handle calculation errors with fallback
-calculate_step.on(
+# Handle incomplete extractions
+validate_step.on(
+    IsSuccess() & ~TextContains("complete"),
+    utils.send_status(
+        status="incomplete",
+        message="Document extraction incomplete - manual review needed"
+    )
+)
+```
+
+## Agent Patterns
+
+### Sequential Processing
+
+Execute steps one after another:
+
+```python
+step1 = agent.step(action1)
+step2 = agent.step(action2, depends_on=step1)
+step3 = agent.step(action3, depends_on=step2)
+```
+
+### Parallel Processing
+
+Execute multiple steps simultaneously:
+
+```python
+# These run in parallel
+search_step = agent.step(websearch.search(query=state.query))
+analysis_step = agent.step(llm.message(query=state.prompt))
+
+# This waits for both to complete
+synthesis_step = agent.step(
+    llm.message(query="Combine results"),
+    depends_on=[search_step, analysis_step]
+)
+```
+
+### Error Handling
+
+Use result handlers to manage failures:
+
+```python
+from erdo.conditions import IsError
+
+process_step = agent.step(some_action)
+
+# Handle errors with retry logic
+process_step.on(
     IsError(),
-    utils.send_status(
-        status="calculation_failed",
-        message="Calculation failed - using original analysis"
-    ),
-    memory.store(memory={
-        "content": "{{json_step.output.insights}}",
-        "type": "fallback_analysis"
-    })
-)
-```
-
-### Research Agents
-
-Agents that gather and synthesize information:
-
-```python
-from erdo.actions import websearch, webparser
-
-research_agent = Agent(
-    name="market_researcher",
-    description="Conducts market research and competitive analysis"
-)
-
-search_step = research_agent.step(
-    websearch.search(
-        query="{{topic}} market analysis {{industry}}",
-        language="en",
-        country="us"
-    )
-)
-
-parse_step = research_agent.step(
-    webparser.parse(
-        url="{{target_url}}",
-        selectors=["h1", "p", ".content"],
-        extract_links=True
-    )
-)
-
-synthesis_step = research_agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Synthesize research findings: {{search_step.output.results}}",
-        system_prompt="You are a market research analyst"
-    ),
-    depends_on=[search_step, parse_step]
-)
-```
-
-### Automation Agents
-
-Agents that automate business processes:
-
-```python
-from erdo.conditions import TextEquals, IsSuccess, Not
-
-automation_agent = Agent(
-    name="email_processor",
-    description="Automates email categorization and response"
-)
-
-classify_step = automation_agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Classify this email: {{email_content}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "category": {"type": "string"},
-                    "priority": {"type": "string"},
-                    "requires_response": {"type": "boolean"}
-                }
-            }
-        }
-    )
-)
-
-classify_step.on(
-    IsSuccess() & TextEquals("requires_response", "true"),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate response for {{classify_step.output.category}} email: {{email_content}}"
-    )
-)
-
-classify_step.on(
-    IsSuccess() & TextEquals("priority", "urgent"),
-    utils.send_status(
-        status="urgent_email",
-        message="Urgent email detected - immediate attention required"
-    )
-)
-```
-
-### Conversational Agents
-
-Agents that maintain context across interactions:
-
-```python
-from erdo.actions import memory
-
-chat_agent = Agent(
-    name="customer_support",
-    description="Provides intelligent customer support with context awareness"
-)
-
-context_step = chat_agent.step(
-    memory.search(
-        query="{{user_message}} {{customer_id}}",
-        limit=5,
-        organization_scope="specific"
-    )
-)
-
-response_step = chat_agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="{{user_message}}",
-        context="{{context_step.output.memories}}",
-        system_prompt="You are a helpful customer support agent"
-    ),
-    depends_on=context_step
-)
-
-response_step.on(
-    IsSuccess(),
-    memory.store(memory={
-        "content": "User: {{user_message}}\nAgent: {{response_step.output.response}}",
-        "type": "conversation",
-        "tags": ["support", "{{customer_id}}"]
-    })
-)
-```
-
-## Agent Composition
-
-### Modular Design
-
-Break complex workflows into focused agents:
-
-```python
-# Data collection agent
-collector = Agent(name="data_collector")
-collect_step = collector.step(websearch.search(query="{{topic}}"))
-
-# Analysis agent
-analyzer = Agent(name="data_analyzer")
-analyze_step = analyzer.step(
-    llm.message(query="Analyze: {{collected_data}}")
-)
-
-# Reporting agent
-reporter = Agent(name="report_generator")
-report_step = reporter.step(
-    llm.message(query="Generate report: {{analysis_results}}")
-)
-```
-
-### Agent Orchestration
-
-Coordinate multiple agents for complex workflows:
-
-```python
-orchestrator = Agent(
-    name="research_orchestrator",
-    description="Coordinates research workflow across multiple agents"
-)
-
-# Trigger data collection
-trigger_collection = orchestrator.step(
-    utils.trigger_agent(
-        agent_name="data_collector",
-        parameters={"topic": "{{research_topic}}"}
-    )
-)
-
-# Trigger analysis after collection
-trigger_analysis = orchestrator.step(
-    utils.trigger_agent(
-        agent_name="data_analyzer",
-        parameters={"data": "{{trigger_collection.output.results}}"}
-    ),
-    depends_on=trigger_collection
-)
-
-# Generate final report
-final_report = orchestrator.step(
-    utils.trigger_agent(
-        agent_name="report_generator",
-        parameters={"analysis": "{{trigger_analysis.output.insights}}"}
-    ),
-    depends_on=trigger_analysis
+    utils.send_status(status="failed", message="Processing failed"),
+    # Could add retry logic here
 )
 ```
 
 ## Best Practices
 
-### Agent Design Principles
-
-1. **Single Responsibility**: Each agent should have a clear, focused purpose
-2. **Composability**: Design agents to work together in larger workflows
-3. **Error Handling**: Always include error handling for robust operation
-4. **State Management**: Use memory effectively for context and persistence
-5. **Output Validation**: Validate outputs using TextContains and format checking
-6. **Graceful Degradation**: Provide fallback actions for failed validations
-
-### Naming Conventions
-
-```python
-# Good: Descriptive, action-oriented names
-email_processor = Agent(name="email_processor")
-data_analyzer = Agent(name="sales_data_analyzer")
-content_generator = Agent(name="marketing_content_generator")
-
-# Avoid: Generic or unclear names
-agent1 = Agent(name="agent1")
-helper = Agent(name="helper")
-processor = Agent(name="processor")
-```
-
-### Configuration Management
-
-```python
-# Use environment-specific configurations
-production_agent = Agent(
-    name="production_analyzer",
-    description="Production data analysis agent",
-    visibility="organization",
-    timeout=600,
-    retry_attempts=3
-)
-
-development_agent = Agent(
-    name="dev_analyzer",
-    description="Development testing agent",
-    visibility="private",
-    timeout=120,
-    retry_attempts=1
-)
-```
-
-### Output Validation and Error Handling
-
-Erdo provides powerful validation tools to ensure AI outputs meet your quality standards and handle format errors gracefully:
-
-```python
-from erdo.conditions import TextContains, IsSuccess, IsError, GreaterThan
-from erdo.actions import llm, utils, memory
-
-# Validate LLM output contains expected content
-analysis_step = agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Analyze this data: {{dataset}}",
-        response_format={
-            "Type": "json_schema",
-            "Schema": {
-                "type": "object",
-                "properties": {
-                    "insights": {"type": "array"},
-                    "confidence": {"type": "number"},
-                    "status": {"type": "string"}
-                }
-            }
-        }
-    )
-)
-
-
-# Validate analysis contains expected content
-analysis_step.on(
-    IsSuccess() & TextContains("insights") & TextContains("confidence"),
-    memory.store(memory={
-        "content": "{{analysis_step.output.response}}",
-        "type": "validated_analysis",
-        "tags": ["validated", "high-quality"]
-    })
-)
-
-# Validate specific field values and content quality
-analysis_step.on(
-    IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("status", "complete"),
-    utils.send_status(
-        status="high_quality_analysis",
-        message="Analysis meets quality standards"
-    )
-)
-
-# Handle missing required fields
-analysis_step.on(
-    IsSuccess() & ~TextContains("insights"),
-    llm.message(
-        model="claude-sonnet-4",
-        query="The previous analysis is missing insights. Please provide detailed insights for: {{dataset}}",
-        system_prompt="Focus on generating comprehensive insights and analysis."
-    )
-)
-
-# JSON parsing with required key validation
-json_parse_step = agent.step(
-    utils.parse_json(
-        json="{{analysis_step.output.response}}",
-    ),
-    depends_on=analysis_step
-)
-
-# Validate parsed JSON has required structure
-json_parse_step.on(
-    IsSuccess() & TextContains("insights") & TextContains("confidence"),
-    utils.send_status(
-        status="json_validated",
-        message="JSON parsing successful with required fields"
-    )
-)
-
-# Handle JSON parsing failures with recovery
-json_parse_step.on(
-    IsError(),
-    utils.send_status(
-        status="json_parse_failed",
-        message="JSON parsing failed - using text extraction fallback"
-    ),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Extract key insights from this text even if it's not valid JSON: {{analysis_step.output.response}}",
-        system_prompt="Extract insights in a structured format regardless of input format."
-    )
-)
-
-# Handle successful JSON parsing
-json_parse_step.on(
-    IsSuccess(),
-    utils.send_status(
-        status="json_validated",
-        message="JSON parsing successful with required fields"
-    )
-)
-```
-
-### Advanced Validation Patterns
-
-```python
-# Multi-condition validation
-code_step = agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate Python code for: {{task}}",
-        system_prompt="Generate clean, executable Python code with proper imports."
-    )
-)
-
-# Validate code structure and content
-code_step.on(
-    IsSuccess() & TextContains("def ") & TextContains("import ") & TextContains("return"),
-    memory.store(memory={
-        "content": "{{code_step.output.code}}",
-        "type": "validated_code",
-        "tags": ["code", "validated", "executable"]
-    })
-)
-
-# Handle incomplete code generation
-code_step.on(
-    IsSuccess() & ~TextContains("def "),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Complete this code by adding proper function definitions: {{code_step.output.code}}",
-        system_prompt="Ensure the code has proper function definitions and structure."
-    )
-)
-
-# Validate email format and content
-email_step = agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate a professional email for: {{context}}"
-    )
-)
-
-email_step.on(
-    IsSuccess() & TextContains("Subject:") & TextContains("Dear") & TextContains("Best regards"),
-    utils.send_status(
-        status="email_validated",
-        message="Email contains proper formatting and professional tone"
-    )
-)
-
-# Chain validation with error recovery
-email_step.on(
-    IsSuccess() & ~TextContains("Subject:"),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Add a proper subject line to this email: {{email_step.output.email}}",
-        system_prompt="Ensure the email has a clear, professional subject line."
-    )
-)
-```
-
-### Content Quality Validation
-
-```python
-# Validate content completeness and quality
-content_step = agent.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Write a comprehensive report on: {{topic}}"
-    )
-)
-
-# Check for comprehensive content
-content_step.on(
-    IsSuccess() & TextContains("introduction") & TextContains("conclusion") & GreaterThan("word_count", "500"),
-    memory.store(memory={
-        "content": "{{content_step.output.report}}",
-        "type": "comprehensive_report",
-        "tags": ["complete", "quality", "{{topic}}"]
-    })
-)
-
-# Handle insufficient content
-content_step.on(
-    IsSuccess() & ~TextContains("conclusion"),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Add a comprehensive conclusion to this report: {{content_step.output.report}}",
-        system_prompt="Write a detailed conclusion that summarizes key points and provides actionable insights."
-    )
-)
-
-# Validate technical accuracy
-content_step.on(
-    IsSuccess() & TextContains("data") & TextContains("analysis"),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Review this report for technical accuracy: {{content_step.output.report}}",
-        system_prompt="You are a technical expert. Identify any inaccuracies or areas needing clarification."
-    )
-)
-```
-
-## Agent Lifecycle
-
-### Development Workflow
-
-1. **Design**: Define agent purpose and workflow
-2. **Implement**: Create steps and result handlers
-3. **Test**: Validate locally with sample data
-4. **Deploy**: Sync to production environment
-5. **Monitor**: Track performance and errors
-6. **Iterate**: Improve based on feedback
-
-### Deployment Considerations
-
-- **Resource Requirements**: Consider memory and compute needs
-- **Scaling**: Design for expected load and concurrency
-- **Security**: Implement appropriate access controls
-- **Monitoring**: Set up alerting for failures and performance issues
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Steps" icon="list-check" href="/concepts/steps">
-    Learn about creating and managing workflow steps
-  </Card>
-  <Card title="Actions" icon="bolt" href="/concepts/actions">
-    Explore the available action types and their uses
-  </Card>
-  <Card title="Result Handlers" icon="wrench" href="/concepts/result-handlers">
-    Master conditional logic and error handling
-  </Card>
-  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
-    See complete agent implementations
-  </Card>
-</CardGroup>
+1. **Clear Names**: Use descriptive agent and step names
+2. **Error Handling**: Always handle potential failures
+3. **Validation**: Validate AI outputs before using them
+4. **Dependencies**: Use `depends_on` to control execution flow
+5. **Memory**: Store important results for future reference
+6. **Timeouts**: Set appropriate timeout values for long-running tasks

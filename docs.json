@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "Erdo Docs",
   "colors": {
-    "primary": "#0D9373",
-    "light": "#07C983",
-    "dark": "#0D9373"
+    "primary": "#008b1d",
+    "light": "#84bf88",
+    "dark": "#007c10"
   },
   "favicon": "/favicon.ico",
   "navigation": {
@@ -22,7 +22,8 @@
           "concepts/steps",
           "concepts/actions",
           "concepts/tools",
-          "concepts/result-handlers"
+          "concepts/result-handlers",
+          "concepts/state-templating"
         ]
       },
       {

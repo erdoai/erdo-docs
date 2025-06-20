@@ -1,11 +1,11 @@
 ---
 title: "Quick Start"
-description: "Build your first AI agent with Erdo in under 10 minutes"
+description: "Build your first AI agent in 5 minutes"
 ---
 
 ## Getting Started
 
-This guide will walk you through creating your first AI agent with Erdo. By the end, you'll have a working agent that can automate tasks and integrate with external services.
+Create your first AI agent with Erdo. This guide covers installation, authentication, and building a basic agent.
 
 <Info>
   **Prerequisites** You should have Python 3.8+ and access to the Erdo platform
@@ -58,50 +58,50 @@ cd my-first-agent
 
 This creates a new agent project with the basic structure.
 
-## Step 4: Understanding Agent Structure
+## Step 4: Agent Components
 
-Erdo agents are built with these key components:
+Agents are built with these components:
 
 <AccordionGroup>
-  <Accordion title="Agents - The Main Orchestrator">
+  <Accordion title="Agents">
     ```python
     from erdo import Agent
 
     agent = Agent(
         name="task_automator",
-        description="Automates tasks and integrates with external services",
-        visibility="public"
+        description="Automates tasks and processes data"
     )
     ```
 
   </Accordion>
 
-  <Accordion title="Steps - Individual Actions">
+  <Accordion title="Steps">
     ```python
     from erdo.actions import llm
 
     automation_step = agent.step(
         llm.message(
             model="claude-sonnet-4",
-            query="Help automate this task: {{task_description}}"
+            query=f"Help automate this task: {state.task_description}"
         )
     )
     ```
 
   </Accordion>
 
-  <Accordion title="Actions - The Building Blocks">
+  <Accordion title="Actions">
     ```python
+    from erdo import state
     from erdo.actions import llm, memory, codeexec, websearch
 
     # Language model actions
     llm_step = agent.step(
-        llm.message(model="claude-sonnet-4", query="{{query}}")
+        llm.message(model="claude-sonnet-4", query=state.query)
     )
 
     # Memory operations
     memory_step = agent.step(
-        memory.search(query="{{search_term}}", limit=5)
+        memory.search(query=state.search_term, limit=5)
     )
 
     # Code execution
@@ -111,7 +111,7 @@ Erdo agents are built with these key components:
 
     # Web search
     search_step = agent.step(
-        websearch.search(query="{{topic}} research")
+        websearch.search(query=f"{state.topic} research")
     )
     ```
 
@@ -146,7 +146,7 @@ Erdo agents are built with these key components:
 Here's a complete agent that demonstrates the API patterns:
 
 ```python
-from erdo import Agent
+from erdo import Agent, state
 from erdo.actions import llm, memory, utils
 from erdo.conditions import IsSuccess, GreaterThan, IsError
 
@@ -160,7 +160,7 @@ task_agent = Agent(
 analyze_step = task_agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze this task and provide automation recommendations: {{task_description}}",
+        query=f"Analyze this task and provide automation recommendations: {state.task_description}",
         response_format={
             "Type": "json_schema",
             "Schema": {
@@ -179,7 +179,7 @@ analyze_step = task_agent.step(
 plan_step = task_agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Create a detailed automation plan for: {{analyze_step.output.recommendations}}"
+        query=f"Create a detailed automation plan for: {analyze_step.output.recommendations}"
     ),
     depends_on=analyze_step
 )
@@ -199,7 +199,7 @@ plan_step.on(
     IsSuccess(),
     utils.send_status(status="plan_ready", message="Automation plan generated successfully"),
     memory.store(memory={
-        "content": "{{plan_step.output.plan}}",
+        "content": plan_step.output.plan,
         "type": "automation_plan"
     })
 )

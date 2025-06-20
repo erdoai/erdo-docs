@@ -1,186 +1,78 @@
 ---
 title: "Introduction"
-description: "Welcome to Erdo - Build powerful AI agents with Python"
+description: "Build AI agents that automate workflows with Python"
 ---
 
 <img
   className="block dark:hidden"
-  src="/images/hero-light.svg"
+  src="/images/hero-light.png"
   alt="Hero Light"
 />
 <img
   className="hidden dark:block"
-  src="/images/hero-dark.svg"
+  src="/images/hero-dark.png"
   alt="Hero Dark"
 />
 
-# Welcome to Erdo
+# Erdo
 
-Erdo is a powerful platform for building AI agents that can automate complex workflows, integrate with external services, and make intelligent decisions. With our Python SDK, you can create sophisticated automation that combines language models, code execution, web research, and custom integrations.
+Erdo lets you build AI agents that automate workflows using Python. Combine language models, code execution, web research, and external APIs into intelligent automation.
 
-## What Makes Erdo Different?
+## Core Features
 
 <CardGroup cols={2}>
-  <Card title="Agent-Centric Design" icon="robot">
-    Build workflows with intuitive agent.step() methods and clean result
-    handling
+  <Card title="Agent Workflows" icon="robot">
+    Define multi-step workflows with dependencies and conditional logic
   </Card>
-  <Card title="Multi-Modal Actions" icon="layers">
-    Combine LLMs, code execution, web search, and memory in single workflows
+  <Card title="Multiple Actions" icon="puzzle-piece">
+    LLM calls, code execution, web search, memory, and external integrations
   </Card>
-  <Card title="Smart Result Handling" icon="brain">
-    Use decorators and direct handlers for sophisticated conditional logic
+  <Card title="Result Handling" icon="brain">
+    Conditional logic based on step outcomes and data validation
   </Card>
   <Card title="Output Validation" icon="shield-check">
-    Built-in validation with TextContains, parse_json, and format checking
-  </Card>
-  <Card title="Production Ready" icon="rocket">
-    Built-in error handling, retry logic, and scalable deployment
+    Built-in validation tools for AI outputs and data formats
   </Card>
 </CardGroup>
 
 ## Quick Example
 
-Here's a complete AI agent that analyzes data and makes intelligent decisions:
-
 ```python
-from erdo import Agent
-from erdo.actions import llm, memory, codeexec, utils
-from erdo.conditions import IsSuccess, GreaterThan, IsError, TextContains
+from erdo import Agent, state
+from erdo.actions import llm, memory
+from erdo.conditions import IsSuccess, GreaterThan
 
-# Create your agent
-data_analyst = Agent(
-    name="smart_data_analyst",
-    description="Analyzes data and provides intelligent insights with validation"
+# Create an agent
+agent = Agent(
+    name="data_analyzer",
+    description="Analyzes data and stores insights"
 )
 
-# Step 1: Analyze the data with structured output
-analysis_step = data_analyst.step(
+# Add a step
+analysis_step = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="Analyze this dataset and provide insights: {{dataset}}",
+        query=f"Analyze this data: {state.dataset}",
         response_format={
             "Type": "json_schema",
             "Schema": {
                 "type": "object",
                 "properties": {
                     "insights": {"type": "array"},
-                    "confidence": {"type": "number"},
-                    "recommendations": {"type": "array"},
-                    "status": {"type": "string"}
+                    "confidence": {"type": "number"}
                 }
             }
         }
     )
 )
 
-# Step 2: Parse JSON format
-validation_step = data_analyst.step(
-    utils.parse_json(
-        json="{{analysis_step.output.response}}"
-    ),
-    depends_on=analysis_step
-)
-
-# Step 3: Generate code for deeper analysis
-code_generation = data_analyst.step(
-    llm.message(
-        model="claude-sonnet-4",
-        query="Generate Python code to validate these insights: {{validation_step.output.insights}}",
-        system_prompt="You are an expert data scientist. Generate clean, efficient Python code."
-    ),
-    depends_on=validation_step
-)
-
-# Step 4: Execute the generated code
-code_execution = data_analyst.step(
-    codeexec.execute(
-        code_files=[{
-            "filename": "validation.py",
-            "content": "{{code_generation.output.code}}"
-        }]
-    ),
-    depends_on=code_generation
-)
-
-# Validate analysis contains expected content
+# Handle the result
 analysis_step.on(
-    IsSuccess() & TextContains("insights") & TextContains("confidence"),
+    IsSuccess() & GreaterThan("confidence", "0.8"),
     memory.store(memory={
-        "content": "{{analysis_step.output.response}}",
-        "type": "validated_analysis",
-        "tags": ["analysis", "validated", "{{domain}}"]
+        "content": analysis_step.output.response,
+        "type": "validated_analysis"
     })
-)
-
-# Validate parsed JSON has required fields
-validation_step.on(
-    IsSuccess() & TextContains("insights") & TextContains("confidence") & TextContains("recommendations"),
-    memory.store(memory={
-        "content": "{{validation_step.output}}",
-        "type": "validated_json",
-        "tags": ["analysis", "validated", "{{domain}}"]
-    })
-)
-
-# Handle high-confidence results with additional validation
-validation_step.on(
-    IsSuccess() & GreaterThan("confidence", "0.8") & TextContains("status", "complete"),
-    memory.store(memory={
-        "content": "{{validation_step.output.insights}}",
-        "type": "verified_insights",
-        "tags": ["analysis", "high-confidence", "{{domain}}"],
-        "extra": {
-            "confidence": "{{validation_step.output.confidence}}",
-            "recommendations": "{{validation_step.output.recommendations}}"
-        }
-    })
-)
-
-# Validate code generation output format
-code_generation.on(
-    IsSuccess() & TextContains("def ") & TextContains("import "),
-    utils.send_status(
-        status="code_validated",
-        message="Generated code contains proper function definitions and imports"
-    )
-)
-
-# Handle malformed code generation
-code_generation.on(
-    IsSuccess() & ~TextContains("def "),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Fix this code to include proper function definitions: {{code_generation.output.code}}",
-        system_prompt="Generate valid Python code with proper function definitions."
-    )
-)
-
-# Handle successful code execution with validation
-code_execution.on(
-    IsSuccess() & TextContains("result"),
-    utils.send_status(
-        status="analysis_complete",
-        message="Data analysis completed successfully with validation"
-    ),
-    memory.store(memory={
-        "content": "{{code_execution.output.result}}",
-        "type": "code_validation_result"
-    })
-)
-
-# Handle JSON parsing errors with recovery
-validation_step.on(
-    IsError(),
-    utils.send_status(
-        status="json_parse_failed",
-        message="JSON parsing failed, using fallback processing"
-    ),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Extract insights from this text even if it's not valid JSON: {{analysis_step.output.response}}",
-        system_prompt="Extract key insights in a structured format regardless of input format."
-    )
 )
 ```
 
@@ -188,25 +80,24 @@ validation_step.on(
 
 ### Agents
 
-Agents are the main containers for your AI workflows. They orchestrate multiple steps and handle complex decision-making:
+Agents contain workflow logic and execute steps:
 
 ```python
 agent = Agent(
-    name="my_automation_agent",
-    description="Automates business processes with AI",
-    visibility="organization"
+    name="my_agent",
+    description="What this agent does"
 )
 ```
 
 ### Steps
 
-Steps are individual actions within an agent workflow. Each step can perform LLM calls, execute code, search the web, or interact with external services:
+Steps define what actions an agent performs. Each step can perform LLM calls, execute code, search the web, or interact with external services:
 
 ```python
 step = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query="{{user_input}}"
+        query=state.user_input
     ),
     depends_on=previous_step
 )
@@ -219,7 +110,7 @@ Handle step outcomes with conditional logic using decorators or direct methods:
 ```python
 step.on(
     IsSuccess() & GreaterThan("score", "0.8"),
-    memory.store(memory={"content": "{{step.output.data}}"})
+    memory.store(memory={"content": step.output.data})
 )
 
 step.on(
@@ -243,7 +134,7 @@ Actions are the building blocks that define what each step does:
 
 <AccordionGroup>
   <Accordion title="Business Process Automation">
-    Automate complex business workflows like invoice processing, customer onboarding, and document analysis with validation:
+    Automate workflows like invoice processing, customer onboarding, and document analysis:
     
     ```python
     from erdo.conditions import TextContains, IsSuccess
@@ -253,7 +144,7 @@ Actions are the building blocks that define what each step does:
     extract_step = invoice_processor.step(
         llm.message(
             model="claude-sonnet-4",
-            query="Extract key information from this invoice: {{invoice_image}}",
+            query=f"Extract key information from this invoice: {state.invoice_image}",
             response_format={
                 "Type": "json_schema",
                 "Schema": {
@@ -272,7 +163,7 @@ Actions are the building blocks that define what each step does:
     extract_step.on(
         IsSuccess() & TextContains("amount") & TextContains("vendor"),
         memory.store(memory={
-            "content": "{{extract_step.output.response}}",
+            "content": extract_step.output.response,
             "type": "validated_invoice"
         })
     )
@@ -297,7 +188,7 @@ Actions are the building blocks that define what each step does:
     analysis_step = analyst.step(
         llm.message(
             model="claude-sonnet-4",
-            query="Analyze trends in this data: {{dataset}}"
+            query=f"Analyze trends in this data: {state.dataset}"
         )
     )
     
@@ -305,7 +196,7 @@ Actions are the building blocks that define what each step does:
         codeexec.execute(
             code_files=[{
                 "filename": "analysis.py",
-                "content": "generate_statistical_analysis({{dataset}})"
+                "content": f"generate_statistical_analysis({state.dataset})"
             }]
         ),
         depends_on=analysis_step
@@ -313,25 +204,16 @@ Actions are the building blocks that define what each step does:
     ```
   </Accordion>
 
-  <Accordion title="Content Generation & Management">
-    Create AI-powered content workflows for marketing, documentation, and communication:
-    
-    ```python
-    content_creator = Agent(name="content_creator")
-    
-    research_step = content_creator.step(
-        websearch.search(query="{{topic}} latest trends")
-    )
-    
-    content_step = content_creator.step(
-        llm.message(
-            model="claude-sonnet-4",
-            query="Create engaging content about {{topic}} using: {{research_step.output.results}}"
-        ),
-        depends_on=research_step
-    )
-    ```
-  </Accordion>
+{" "}
+
+<Accordion title="Content Generation & Management">
+  Create AI-powered content workflows for marketing, documentation, and
+  communication: ```python content_creator = Agent(name="content_creator")
+  research_step = content_creator.step( websearch.search(query=f"{state.topic}{" "}
+  latest trends") ) content_step = content_creator.step( llm.message(
+  model="claude-sonnet-4", query=f"Create engaging content about {state.topic}{" "}
+  using: {research_step.output.results}" ), depends_on=research_step ) ```
+</Accordion>
 
   <Accordion title="Customer Support Automation">
     Build intelligent customer support agents that understand context and provide personalized responses:
@@ -341,7 +223,7 @@ Actions are the building blocks that define what each step does:
     
     context_step = support_agent.step(
         memory.search(
-            query="{{customer_message}} {{customer_id}}",
+            query=f"{state.customer_message} {state.customer_id}",
             limit=5
         )
     )
@@ -349,8 +231,8 @@ Actions are the building blocks that define what each step does:
     response_step = support_agent.step(
         llm.message(
             model="claude-sonnet-4",
-            query="{{customer_message}}",
-            context="{{context_step.output.memories}}"
+            query=state.customer_message,
+            context=context_step.output.memories
         ),
         depends_on=context_step
     )
@@ -381,13 +263,13 @@ from erdo.conditions import TextContains, GreaterThan
 # Validate content quality and format
 analysis_step.on(
     IsSuccess() & TextContains("analysis") & TextContains("recommendation") & GreaterThan("confidence", "0.8"),
-    memory.store(memory={"content": "{{analysis_step.output.response}}", "type": "validated"})
+    memory.store(memory={"content": analysis_step.output.response, "type": "validated"})
 )
 
 # Parse JSON output
 json_step = agent.step(
     utils.parse_json(
-        json="{{llm_output}}"
+        json=state.llm_output
     )
 )
 
@@ -397,100 +279,21 @@ json_step.on(
     utils.send_status(status="validated", message="Output meets all requirements")
 )
 
-# Handle JSON parsing errors with recovery
-json_step.on(
-    IsError(),
-    utils.send_status(
-        status="json_error",
-        message="JSON parsing failed - using fallback"
-    ),
-    llm.message(
-        model="claude-sonnet-4",
-        query="Fix this malformed JSON: {{llm_output}}",
-        system_prompt="Return only valid JSON with the same content structure."
-    )
-)
-```
-
-### Error Handling & Recovery
-
-Built-in error handling with retry logic and graceful degradation:
-
-```python
-process_step.on(IsError(), codeexec.execute(
-    code_files=[{
-        "filename": "fallback.py",
-        "content": "fallback_processing({{input_data}})"
-    }]
-))
-```
-
-### Memory & Context Management
-
-Persistent memory across workflow executions for context-aware processing:
-
-```python
-memory_step = agent.step(
-    memory.store(memory={
-        "content": "{{analysis_results}}",
-        "type": "customer_insight",
-        "tags": ["analysis", "{{customer_id}}"]
-    })
-)
-```
-
-### Scalable Deployment
-
-Deploy agents to production with built-in monitoring, logging, and scaling:
-
-```bash
-# Deploy your agent
-erdo sync
-
-# Monitor performance
-erdo logs my_agent
-
-# Scale based on demand
-erdo scale my_agent --instances 5
 ```
 
 ## Getting Started
 
-<Steps>
-  <Step title="Install Erdo CLI">```bash brew install erdoai/tap/erdo ```</Step>
-  <Step title="Authenticate">```bash erdo login ```</Step>
-  <Step title="Create Your First Agent">
-    ```bash erdo init my-first-agent cd my-first-agent ```
-  </Step>
-  <Step title="Build Your Workflow">
-    Edit the generated Python file to define your agent's workflow with steps
-    and result handlers.
-  </Step>
-  <Step title="Deploy">```bash erdo sync ```</Step>
-</Steps>
-
-## Next Steps
-
 <CardGroup cols={2}>
-  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
-    Build your first agent in under 10 minutes
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first agent in 5 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Erdo CLI and Python SDK
   </Card>
   <Card title="Core Concepts" icon="book" href="/concepts/overview">
-    Understand agents, steps, actions, and result handlers
+    Learn about agents, steps, and actions
   </Card>
-  <Card title="Python SDK" icon="code" href="/sdk/overview">
-    Explore the full SDK capabilities and API reference
-  </Card>
-  <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
-    See complete agent implementations for common use cases
+  <Card title="Examples" icon="code" href="/examples/business-automation">
+    See complete implementations
   </Card>
 </CardGroup>
-
-## Community & Support
-
-- **Documentation**: Comprehensive guides and API reference
-- **Examples**: Ready-to-use agent templates and patterns
-- **Community**: Join our Discord for support and discussions
-- **GitHub**: Open source tools and community contributions
-
-Ready to build your first AI agent? Start with our [Quick Start Guide](/quickstart) or explore the [SDK Overview](/sdk/overview) for detailed technical information.

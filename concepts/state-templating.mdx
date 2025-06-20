@@ -1,0 +1,382 @@
+---
+title: "State & Templating"
+description: "Learn how to use state variables and templating for dynamic agent workflows"
+---
+
+# State & Templating
+
+Erdo provides powerful state management and templating capabilities that allow you to create dynamic, data-driven agent workflows. The state system enables clean Python syntax while supporting complex Go template expressions for advanced use cases.
+
+## Overview
+
+Erdo's templating system supports two main approaches:
+
+<CardGroup cols={2}>
+  <Card title="State Syntax" icon="code">
+    Clean Python syntax like `state.query` and `state.dataset.id`
+  </Card>
+  <Card title="TemplateString" icon="brackets-curly">
+    Complex Go templates with `TemplateString("{{complex expression}}")`
+  </Card>
+</CardGroup>
+
+## State Object
+
+The `state` object provides clean, Pythonic access to workflow data with IDE autocomplete and type safety.
+
+### Basic Usage
+
+```python
+from erdo import Agent, state
+from erdo.actions import llm, memory, codeexec
+
+# Simple state field access
+analysis_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=state.query,  # Clean, readable syntax
+        context=state.previous_analysis
+    )
+)
+
+# Nested state access
+data_step = agent.step(
+    codeexec.execute(
+        code=f"""
+        dataset_id = '{state.dataset.id}'
+        filename = '{state.dataset.filename}'
+        analysis_type = '{state.parameters.analysis_type}'
+        """,
+        resources=[{
+            "method": "download",
+            "filename": state.resource.dataset.filename,
+            "uri": state.resource.dataset.url
+        }]
+    )
+)
+```
+
+### F-string Integration
+
+Use state variables naturally in f-strings:
+
+```python
+# F-strings with state variables
+context_step = agent.step(
+    utils.echo(message=f"Analyzing {state.dataset.name} for {state.customer.name}")
+)
+
+# Multi-line f-strings
+report_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"""
+        Generate a comprehensive analysis report for:
+
+        Dataset: {state.dataset.name}
+        Customer: {state.customer.name}
+        Analysis Type: {state.analysis_type}
+        Time Period: {state.date_range}
+
+        Focus on key insights and actionable recommendations.
+        """
+    )
+)
+```
+
+### Step Output Access
+
+Access outputs from previous steps with clean syntax:
+
+```python
+# Step output references
+analysis_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze this data",
+        data=state.input_data
+    )
+)
+
+# Use step outputs in subsequent steps
+insights_step = agent.step(
+    memory.store(
+        memory={
+            "content": analysis_step.output.insights,
+            "description": f"Analysis of {state.dataset.name}",
+            "type": "data_analysis",
+            "tags": ["analysis", state.project_name],
+            "extra": {
+                "confidence": analysis_step.output.confidence,
+                "model_used": "claude-sonnet-4",
+                "processing_time": analysis_step.metadata.execution_time
+            }
+        }
+    ),
+    depends_on=analysis_step
+)
+```
+
+## TemplateString for Complex Templates
+
+For complex Go template expressions that can't be expressed as simple `state.field` access, use `TemplateString`:
+
+```python
+from erdo.template import TemplateString
+
+# Complex conditional logic
+conditional_step = agent.step(
+    memory.search(
+        query=state.search_query,
+        organization_scope=TemplateString("{{if memory.is_organization_specific}}specific{{else}}none{{end}}"),
+        user_scope=TemplateString("{{if memory.is_user_specific}}specific{{else}}any{{end}}"),
+        dataset_id=TemplateString("{{memory.dataset_id}}")
+    )
+)
+
+# Complex data transformations
+transform_step = agent.step(
+    utils.echo(
+        data={
+            "messages": TemplateString("{{sliceEndKeepFirstUserMessage system.messages 5}}"),
+            "user_query": state.query,
+            "resource_lookup": TemplateString('{{get "dataset.id" (find "resources" "id" "memory.resource_id" .Data .MissingKeys) .MissingKeys}}'),
+            "processed_data": TemplateString('{{addkey "memory" "processed" "true"}}')
+        }
+    )
+)
+```
+
+### When to Use TemplateString
+
+Use `TemplateString` for:
+
+- **Conditional expressions**: `{{if condition}}value{{else}}other{{end}}`
+- **Complex data access**: `{{get "field" (find "array" "key" "value" .Data) .MissingKeys}}`
+- **Template functions**: `{{sliceEndKeepFirstUserMessage system.messages 5}}`
+- **Data manipulation**: `{{addkey "object" "key" "value"}}`
+- **Loops and iterations**: `{{range $item := .Data.items}}{{$item.name}}{{end}}`
+
+## Available State Fields
+
+### System Fields
+
+Access system-level information:
+
+```python
+# System information
+system_step = agent.step(
+    utils.echo(
+        data={
+            "current_date": TemplateString("{{system.current_date}}"),
+            "execution_id": TemplateString("{{system.execution_id}}"),
+            "user_id": TemplateString("{{system.user_id}}"),
+            "organization_id": TemplateString("{{system.organization_id}}")
+        }
+    )
+)
+```
+
+### Step References
+
+Reference data from previous steps:
+
+```python
+# Step data access
+step_data = agent.step(
+    utils.echo(
+        data={
+            "step_output": previous_step.output.result,
+            "step_metadata": TemplateString("{{steps.previous_step.metadata}}"),
+            "step_error": TemplateString("{{steps.previous_step.error}}")
+        }
+    )
+)
+```
+
+### Parameters and Context
+
+Access workflow parameters and context:
+
+```python
+# Parameters and context
+params_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=state.query,
+        context={
+            "user_preferences": state.parameters.preferences,
+            "analysis_settings": state.parameters.analysis_config,
+            "historical_context": TemplateString("{{parameters.context.historical_data}}")
+        }
+    )
+)
+```
+
+## Template Functions
+
+Erdo provides built-in template functions for common operations:
+
+### Data Manipulation
+
+```python
+# Data manipulation functions
+manipulation_step = agent.step(
+    utils.echo(
+        data={
+            # Add/remove keys from objects
+            "updated_memory": TemplateString('{{addkey "memory" "processed_at" "current_timestamp"}}'),
+            "cleaned_data": TemplateString('{{removekey "data" "sensitive_field"}}'),
+
+            # Array operations
+            "recent_messages": TemplateString("{{sliceEndKeepFirstUserMessage system.messages 10}}"),
+            "filtered_items": TemplateString('{{filter "items" "status" "active"}}'),
+
+            # JSON operations
+            "parsed_json": TemplateString('{{toJSON data}}'),
+            "merged_data": TemplateString('{{merge "object1" "object2"}}')
+        }
+    )
+)
+```
+
+### Conditional Logic
+
+```python
+# Conditional operations
+conditional_step = agent.step(
+    memory.search(
+        query=state.search_term,
+        limit=TemplateString("{{if eq analysis_type \"detailed\"}}20{{else}}5{{end}}"),
+        organization_scope=TemplateString("{{if is_organization_specific}}specific{{else}}none{{end}}"),
+        time_filter=TemplateString("{{if recent_only}}7d{{else}}all{{end}}")
+    )
+)
+```
+
+### String Operations
+
+```python
+# String manipulation
+string_step = agent.step(
+    utils.echo(
+        data={
+            "truncated_text": TemplateString("{{truncateString long_description 200}}"),
+            "formatted_name": TemplateString("{{title customer_name}}"),
+            "sanitized_input": TemplateString("{{sanitize user_input}}")
+        }
+    )
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="When to Use Each Approach">
+    **Use State Syntax For:**
+    - Simple field access (`state.query`, `state.dataset.id`)
+    - Step outputs (`step.output.result`)
+    - F-string integration (`f"Analysis for {state.customer}"`)
+    - IDE autocomplete and type safety
+
+    **Use TemplateString For:**
+    - Conditional logic (`{{if condition}}value{{else}}other{{end}}`)
+    - Complex data manipulation (`{{addkey "obj" "key" "value"}}`)
+    - Template functions (`{{sliceEndKeepFirstUserMessage messages 5}}`)
+    - Advanced Go template expressions
+
+  </Accordion>
+
+  <Accordion title="Performance Considerations">
+    **Optimize Template Usage:**
+    - Use simple state access when possible (faster)
+    - Cache complex template results
+    - Avoid deeply nested template expressions
+    - Use appropriate data types for state fields
+
+    **Memory Management:**
+    - Clear unused state data
+    - Use appropriate data structures
+    - Monitor template compilation performance
+
+  </Accordion>
+
+  <Accordion title="Debugging Templates">
+    **Debug State Access:**
+    - Use `state.get_accessed_fields()` to see what's being used
+    - Enable template debugging in development
+    - Validate state field availability
+
+    **Debug TemplateString:**
+    - Test complex templates in isolation
+    - Use template validation tools
+    - Add logging for template execution
+
+  </Accordion>
+</AccordionGroup>
+
+## Migration Guide
+
+### From Old Template Syntax
+
+If you're migrating from the old template syntax:
+
+```python
+# Old way (still supported via TemplateString)
+old_style = llm.message(
+    query="{{query}}",
+    context="{{previous_analysis}}"
+)
+
+# New way (preferred)
+new_style = llm.message(
+    query=state.query,
+    context=state.previous_analysis
+)
+
+# Complex expressions still use TemplateString
+complex_style = llm.message(
+    query=state.query,
+    organization_scope=TemplateString("{{if is_org_specific}}specific{{else}}none{{end}}")
+)
+```
+
+### Best Migration Strategy
+
+1. **Start with simple fields**: Convert basic `"{{field}}"` to `state.field`
+2. **Use f-strings**: Replace template concatenation with f-strings
+3. **Keep complex templates**: Use `TemplateString` for complex expressions
+4. **Test incrementally**: Migrate and test one step at a time
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="State Field Not Found">
+    **Error**: `AttributeError: 'StateMagic' object has no attribute 'field'`
+    
+    **Solutions**:
+    - Check if the field exists in your workflow context
+    - Use `state.get_accessed_fields()` to debug
+    - Verify field names match exactly (case-sensitive)
+    - For dynamic fields, use `TemplateString` instead
+  </Accordion>
+
+{" "}
+<Accordion title="Template Compilation Errors">
+  **Error**: Template compilation failed **Solutions**: - Validate
+  TemplateString syntax - Check for unescaped quotes in templates - Ensure
+  proper Go template syntax - Use template validation tools in development
+</Accordion>
+
+  <Accordion title="Type Conversion Issues">
+    **Error**: Type mismatch in template evaluation
+    
+    **Solutions**:
+    - Ensure state fields have correct types
+    - Use explicit type conversion in templates
+    - Validate data types before template usage
+    - Check for null/undefined values
+  </Accordion>
+</AccordionGroup>
+
+The state and templating system in Erdo provides the flexibility to handle both simple and complex data access patterns, enabling you to build sophisticated, dynamic agent workflows while maintaining clean, readable code.

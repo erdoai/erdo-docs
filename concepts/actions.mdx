@@ -38,19 +38,21 @@ An action specifies:
 Language model actions for AI-powered text generation and analysis:
 
 ```python
+from erdo import state
 from erdo.actions import llm
+from erdo.template import TemplateString
 
 # Basic message generation
 basic_llm = llm.message(
     model="claude-sonnet-4",
-    query="Analyze this data: {{input_data}}",
+    query=f"Analyze this data: {state.input_data}",
     system_prompt="You are a data analysis expert"
 )
 
 # Structured response with JSON schema
 structured_llm = llm.message(
     model="claude-sonnet-4",
-    query="Extract key insights from: {{document}}",
+    query=f"Extract key insights from: {state.document}",
     response_format={
         "Type": "json_schema",
         "Schema": {
@@ -73,19 +75,19 @@ structured_llm = llm.message(
 # LLM with tools
 llm_with_tools = llm.message(
     model="claude-sonnet-4",
-    query="Research and analyze {{topic}}",
+    query=f"Research and analyze {state.topic}",
     tools=[
         Tool(
             name="web_search",
             description="Search for information",
             actiontype="websearch.search",
-            parameters={"query": "{{query}}"}
+            parameters={"query": state.query}
         ),
         Tool(
             name="calculator",
             description="Perform calculations",
             actiontype="codeexec.execute",
-            parameters={"code": "{{calculation}}"}
+            parameters={"code": state.calculation}
         )
     ]
 )
@@ -96,33 +98,34 @@ llm_with_tools = llm.message(
 Execute Python code for data processing and calculations:
 
 ```python
+from erdo import state
 from erdo.actions import codeexec
 
 # Basic code execution
 basic_code = codeexec.execute(
-    code="""
+    code=f"""
 # Process the input data
-data = {{input_data}}
+data = {state.input_data}
 result = process_data(data)
-print(f"Processed {len(data)} items")
+print(f"Processed {{len(data)}} items")
 """
 )
 
 # Advanced data analysis
 analysis_code = codeexec.execute(
-    code="""
+    code=f"""
 import pandas as pd
 import numpy as np
 
 # Load and analyze data
-df = pd.read_csv('{{file_path}}')
+df = pd.read_csv('{state.file_path}')
 summary = df.describe()
 insights = analyze_trends(df)
 
-results = {
+results = {{
     'summary': summary.to_dict(),
     'insights': insights
-}
+}}
 """
 )
 ```
@@ -132,20 +135,21 @@ results = {
 Store, search, and retrieve knowledge and information:
 
 ```python
+from erdo import state
 from erdo.actions import memory
 
 # Store information
-store_memory = memory.store(memory=
+store_memory = memory.store(
     memory={
-        "content": "{{analysis_results}}",
-        "tags": ["analysis", "{{project_name}}"],
-        "searchable_texts": ["{{key_findings}}"]
+        "content": state.analysis_results,
+        "tags": ["analysis", state.project_name],
+        "searchable_texts": [state.key_findings]
     }
 )
 
 # Search for relevant information
 search_memory = memory.search(
-    query="{{search_query}}",
+    query=state.search_query,
     limit=10,
     organization_scope="specific"
 )
@@ -156,18 +160,19 @@ search_memory = memory.search(
 Search and parse web content:
 
 ```python
+from erdo import state
 from erdo.actions import websearch, webparser
 
 # Web search
 web_search = websearch.search(
-    query="{{search_term}} latest developments",
+    query=f"{state.search_term} latest developments",
     num_results=10,
     time_filter="past_month"
 )
 
 # Parse website content
 parse_content = webparser.parse(
-    url="{{target_url}}",
+    url=state.target_url,
     extract_format="markdown",
     include_links=True,
     include_images=False
@@ -175,7 +180,7 @@ parse_content = webparser.parse(
 
 # Comprehensive research action
 research_action = websearch.search(
-    query="{{research_topic}}",
+    query=state.research_topic,
     sites=["arxiv.org", "scholar.google.com", "nature.com"],
     content_type="academic"
 )
@@ -186,14 +191,15 @@ research_action = websearch.search(
 Invoke pre-built bots and other agents:
 
 ```python
+from erdo import state
 from erdo.actions import bot
 
 # Invoke data analyst bot
 data_analysis = bot.invoke(
     bot_name="data analyst",
     parameters={
-        "query": "{{analysis_request}}",
-        "data_source": "{{data_connection}}"
+        "query": state.analysis_request,
+        "data_source": state.data_connection
     }
 )
 
@@ -201,7 +207,7 @@ data_analysis = bot.invoke(
 security_check = bot.invoke(
     bot_name="security checker",
     parameters={
-        "code": "{{code_to_check}}",
+        "code": state.code_to_check,
         "scan_type": "comprehensive"
     }
 )
@@ -210,8 +216,8 @@ security_check = bot.invoke(
 quality_check = bot.invoke(
     bot_name="data quality checker",
     parameters={
-        "output": "{{previous_analysis}}",
-        "validation_rules": "{{quality_rules}}"
+        "output": state.previous_analysis,
+        "validation_rules": state.quality_rules
     }
 )
 ```
@@ -221,33 +227,35 @@ quality_check = bot.invoke(
 Helper actions for workflow control and data manipulation:
 
 ```python
+from erdo import state
 from erdo.actions import utils
+from erdo.template import TemplateString
 
 # Echo/pass-through data
 echo_action = utils.echo(
-    data={"processed": True, "timestamp": "{{current_time}}"}
+    data={"processed": True, "timestamp": TemplateString("{{system.current_time}}")}
 )
 
 # Send status updates
 status_update = utils.send_status(
     status="processing",
-    message="Analyzing data batch {{batch_number}}",
+    message=f"Analyzing data batch {state.batch_number}",
     details={
-        "progress": "{{progress_percentage}}",
-        "eta": "{{estimated_completion}}"
+        "progress": state.progress_percentage,
+        "eta": state.estimated_completion
     }
 )
 
 # Capture exceptions
 exception_handler = utils.capture_exception(
-    message="Analysis failed for dataset {{dataset_name}}",
-    exception="{{error_details}}"
+    message=f"Analysis failed for dataset {state.dataset_name}",
+    exception=state.error_details
 )
 
 # Checkpoint for long-running processes
 checkpoint_action = utils.checkpoint_attempt(
-    loops="{{loop_count}}",
-    attempts="{{attempt_number}}"
+    loops=state.loop_count,
+    attempts=state.attempt_number
 )
 ```
 
@@ -262,7 +270,7 @@ Configure how actions return data:
     ```python
     structured_response = llm.message(
         model="claude-sonnet-4",
-        query="{{query}}",
+        query=state.query,
         response_format={
             "Type": "json_schema",
             "Schema": {
@@ -301,7 +309,7 @@ Configure how actions return data:
     ```python
     text_response = llm.message(
         model="claude-sonnet-4",
-        query="{{query}}",
+        query=state.query,
         response_format="text"
     )
     ```
@@ -310,7 +318,7 @@ Configure how actions return data:
     ```python
     markdown_response = llm.message(
         model="claude-sonnet-4",
-        query="Generate a report for {{topic}}",
+        query=f"Generate a report for {state.topic}",
         response_format="markdown"
     )
     ```
