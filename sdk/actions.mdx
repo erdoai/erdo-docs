@@ -126,6 +126,17 @@ multi_file_action = codeexec.execute(
     parameters={"batch_size": 1000, "timeout": 300}
 )
 
+# Execution with external files using PythonFile
+from erdo.types import PythonFile
+
+external_file_action = codeexec.execute(
+    code_files=[
+        PythonFile(filename="analysis_files/analyze.py"),
+        PythonFile(filename="analysis_files/utils.py")
+    ],
+    parameters={"dataset": "{{input_dataset}}"}
+)
+
 # Execution with resources
 resource_action = codeexec.execute(
     entrypoint="process.py",

@@ -173,6 +173,91 @@ analysis_step.on(
 )
 ```
 
+## Result Handlers with Step Metadata
+
+When result handlers need step-level configuration, use the `step_metadata` parameter:
+
+```python
+from erdo import Agent, StepMetadata
+from erdo.actions import llm, utils
+from erdo.conditions import IsSuccess, IsError
+
+agent = Agent(name="analysis_agent")
+
+analysis_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Analyze the data",
+        response_format={"type": "json_schema", "schema": {...}}
+    )
+)
+
+# Result handler with step metadata
+analysis_step.on(
+    IsSuccess(),
+    utils.send_status(
+        status="completed",
+        message="Analysis successful",
+        step_metadata=StepMetadata(
+            key="success_handler",
+            depends_on=["analysis_step"],
+            user_output_visibility="visible",
+            running_message="Processing result...",
+            finished_message="Result processed"
+        )
+    )
+)
+
+analysis_step.on(
+    IsError(),
+    utils.raise_error(
+        message="Analysis failed",
+        status="error",
+        step_metadata=StepMetadata(
+            key="error_handler",
+            user_output_visibility="visible",
+            bot_output_visibility="hidden"
+        )
+    )
+)
+```
+
+### Step Metadata Configuration
+
+The `StepMetadata` object supports all step-level configuration:
+
+```python
+from erdo import StepMetadata, ExecutionMode, OutputVisibility
+
+# Basic step metadata
+step_metadata = StepMetadata(
+    key="handler_step",
+    depends_on=["previous_step"]
+)
+
+# Full configuration options
+step_metadata = StepMetadata(
+    key="detailed_handler",
+    depends_on=["step1", "step2"],
+    execution_mode=ExecutionMode.PARALLEL,
+    user_output_visibility=OutputVisibility.VISIBLE,
+    bot_output_visibility=OutputVisibility.HIDDEN,
+    output_content_type="json",
+    running_message="Processing result...",
+    finished_message="Result processed"
+)
+
+# Use in result handler
+main_step.on(
+    IsSuccess(),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Process the successful result",
+        step_metadata=step_metadata
+    )
+)
+```
+
 ## Common Patterns
 
 ### Quality-Based Handling
@@ -221,14 +306,6 @@ classification_step.on(
     utils.send_status(status="queued", message="Added to routine processing")
 )
 ```
-
-## Best Practices
-
-1. **Handle Both Success and Failure**: Always include error handlers
-2. **Use Specific Conditions**: Be precise about when handlers should trigger
-3. **Keep Actions Simple**: Avoid complex logic within handlers
-4. **Test Edge Cases**: Verify handlers work with unexpected data
-5. **Document Complex Conditions**: Make complex logic clear with comments
 
 ## Available Conditions
 

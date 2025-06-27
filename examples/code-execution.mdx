@@ -1,0 +1,342 @@
+---
+title: "Code Execution Patterns"
+description: "Patterns for executing Python code using the @agent.exec decorator and PythonFile references"
+---
+
+# Code Execution Patterns
+
+This guide covers patterns for executing Python code in agents using external files with the `@agent.exec` decorator and `PythonFile` references.
+
+## When to Use .exec vs codeexec.execute
+
+Use `@agent.exec` when:
+
+- You have reusable code that multiple agents might use
+- Your code logic is substantial and benefits from being in separate files
+- You want to test your code independently of the agent
+- You prefer organizing code in modules
+
+Use `codeexec.execute()` when:
+
+- Your code is short and specific to one agent
+- You need to generate code dynamically based on agent parameters
+- Your code is templated with agent variables
+
+## Basic .exec Pattern
+
+```python
+from erdo import Agent
+from erdo.types import PythonFile
+
+agent = Agent(name="data_processor")
+
+@agent.exec(
+    code_files=[PythonFile(filename="processors/analyze.py")]
+)
+def process_data():
+    """Execute data processing using external code."""
+    from processors.analyze import run_analysis
+    return run_analysis(context)
+```
+
+**processors/analyze.py:**
+
+```python
+def run_analysis(context):
+    """Main analysis function."""
+    query = context.parameters.get("query", "")
+    dataset = context.parameters.get("dataset", {})
+
+    # Your analysis logic here
+    results = {
+        "query": query,
+        "processed": True,
+        "row_count": dataset.get("size", 0)
+    }
+
+    return results
+```
+
+## Multi-File Organization
+
+For larger processing tasks, organize code across multiple files:
+
+```python
+@agent.exec(
+    code_files=[
+        PythonFile(filename="processors/main.py"),
+        PythonFile(filename="processors/utils.py"),
+        PythonFile(filename="processors/validators.py")
+    ]
+)
+def comprehensive_processing():
+    """Execute processing with multiple modules."""
+    from processors.main import process
+    from processors.utils import prepare_data
+    from processors.validators import validate_input
+
+    # Validate input first
+    if not validate_input(context.parameters):
+        return {"error": "Invalid input parameters"}
+
+    # Prepare data
+    prepared = prepare_data(context.parameters.get("dataset", {}))
+
+    # Run main processing
+    results = process(context, prepared)
+
+    return results
+```
+
+**File structure:**
+
+```
+your_project/
+├── agent.py
+└── processors/
+    ├── main.py
+    ├── utils.py
+    └── validators.py
+```
+
+## Context Access Patterns
+
+Your external Python files receive context through the `context` parameter:
+
+```python
+def process_data(context):
+    """Access agent context safely."""
+
+    # Access parameters with defaults
+    query = context.parameters.get("query", "")
+    dataset = context.parameters.get("dataset", {})
+    options = context.parameters.get("options", {})
+
+    # Access secrets
+    api_key = context.secrets.get("api_key", "")
+
+    # Check required parameters
+    if not query:
+        return {"error": "Query parameter required"}
+
+    # Process with error handling
+    try:
+        results = perform_analysis(query, dataset, api_key)
+        return {"success": True, "results": results}
+    except Exception as e:
+        return {"error": f"Processing failed: {str(e)}"}
+```
+
+## Integration with Agent Steps
+
+Combine `.exec` steps with regular agent steps:
+
+```python
+# Step 1: AI generates analysis plan
+plan_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query="Create analysis plan for: {{query}}",
+        response_format={
+            "Type": "json_schema",
+            "Schema": {
+                "type": "object",
+                "properties": {
+                    "approach": {"type": "string"},
+                    "steps": {"type": "array"}
+                }
+            }
+        }
+    )
+)
+
+# Step 2: Execute analysis using .exec
+@agent.exec(
+    code_files=[PythonFile(filename="analysis/executor.py")]
+)
+def execute_plan():
+    """Execute the analysis plan."""
+    from analysis.executor import run_plan
+
+    # Get the plan from previous step
+    plan = context.parameters.get("plan", {})
+    query = context.parameters.get("query", "")
+
+    return run_plan(plan, query, context)
+
+# Set dependency
+execute_plan.depends_on = plan_step
+
+# Step 3: Store results
+execute_plan.on(
+    IsSuccess(),
+    memory.store(memory={
+        "content": execute_plan.output.results,
+        "type": "analysis_results"
+    })
+)
+```
+
+## Error Handling Patterns
+
+Handle errors gracefully in your external code:
+
+```python
+# In your external file
+def robust_processing(context):
+    """Processing with comprehensive error handling."""
+
+    try:
+        # Validate inputs
+        required_params = ["query", "dataset"]
+        for param in required_params:
+            if not context.parameters.get(param):
+                return {"error": f"Missing required parameter: {param}"}
+
+        # Process data
+        results = process_data_safely(context.parameters)
+
+        # Validate results
+        if not validate_results(results):
+            return {"error": "Results validation failed", "partial": results}
+
+        return {"success": True, "results": results}
+
+    except ValueError as e:
+        return {"error": f"Invalid data: {str(e)}"}
+    except Exception as e:
+        return {"error": f"Unexpected error: {str(e)}"}
+
+def process_data_safely(parameters):
+    """Your actual processing logic with error handling."""
+    # Implementation here
+    pass
+
+def validate_results(results):
+    """Validate processing results."""
+    # Validation logic here
+    return True
+```
+
+## Testing External Files
+
+Test your external Python files independently:
+
+```python
+# test_processors.py
+import pytest
+from unittest.mock import Mock
+from processors.analyze import run_analysis
+
+def test_run_analysis():
+    # Mock context
+    mock_context = Mock()
+    mock_context.parameters = {
+        "query": "test analysis",
+        "dataset": {"size": 1000, "type": "csv"}
+    }
+    mock_context.secrets = {"api_key": "test_key"}
+
+    # Test the function
+    result = run_analysis(mock_context)
+
+    # Assertions
+    assert result["query"] == "test analysis"
+    assert result["processed"] is True
+    assert result["row_count"] == 1000
+
+def test_run_analysis_missing_query():
+    # Test error handling
+    mock_context = Mock()
+    mock_context.parameters = {"dataset": {"size": 100}}
+    mock_context.secrets = {}
+
+    result = run_analysis(mock_context)
+
+    assert "error" in result
+```
+
+## File Organization Best Practices
+
+### Directory Structure
+
+```
+your_project/
+├── agent.py                    # Main agent definition
+├── analysis/                   # Analysis modules
+│   ├── __init__.py
+│   ├── core.py                 # Main analysis logic
+│   ├── utils.py                # Utility functions
+│   └── validators.py           # Input validation
+├── processors/                 # Data processors
+│   ├── csv_processor.py
+│   ├── json_processor.py
+│   └── api_processor.py
+└── tests/                      # Test files
+    ├── test_analysis.py
+    ├── test_processors.py
+    └── conftest.py
+```
+
+### Code Organization
+
+- **Keep functions focused**: Each function should have a single responsibility
+- **Use type hints**: Improve code clarity and enable better tooling
+- **Include docstrings**: Document function purpose and parameters
+- **Handle errors gracefully**: Return structured error responses
+- **Return consistent formats**: Use dictionaries with predictable keys
+
+### Example External File
+
+```python
+# analysis/core.py
+from typing import Dict, Any, Optional
+
+def analyze_dataset(context, prepared_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Analyze a prepared dataset.
+
+    Args:
+        context: Agent execution context
+        prepared_data: Preprocessed dataset information
+
+    Returns:
+        Dictionary containing analysis results or error information
+    """
+    try:
+        query = context.parameters.get("query", "")
+
+        # Perform analysis
+        insights = generate_insights(prepared_data, query)
+        confidence = calculate_confidence(insights, prepared_data)
+
+        return {
+            "success": True,
+            "query": query,
+            "insights": insights,
+            "confidence": confidence,
+            "metadata": {
+                "rows_analyzed": prepared_data.get("row_count", 0),
+                "analysis_type": "standard"
+            }
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
+def generate_insights(data: Dict[str, Any], query: str) -> list:
+    """Generate insights from data based on query."""
+    # Implementation here
+    return ["insight1", "insight2"]
+
+def calculate_confidence(insights: list, data: Dict[str, Any]) -> float:
+    """Calculate confidence score for insights."""
+    # Implementation here
+    return 0.85
+```
+
+This pattern provides clean separation between agent orchestration logic and data processing code, making your agents easier to test, maintain, and reuse.

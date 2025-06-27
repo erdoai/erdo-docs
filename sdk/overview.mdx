@@ -244,6 +244,77 @@ parameters={"data_source": "{{input_file}}"}
   </Accordion>
 </AccordionGroup>
 
+## Code Execution with .exec Decorator
+
+For steps that run Python code using external files, use the `@agent.exec` decorator:
+
+### Basic .exec Usage
+
+```python
+from erdo import Agent
+from erdo.types import PythonFile
+from erdo.actions import memory
+from erdo.conditions import IsSuccess, GreaterThan
+
+agent = Agent(name="data_analyzer")
+
+@agent.exec(
+    code_files=[PythonFile(filename="analysis_files/analyze.py")]
+)
+def analyze_data():
+    """Execute data analysis using external code files."""
+    from analysis_files.analyze import analyze_data
+
+    # Execute the analysis
+    results = analyze_data(context)
+    return results
+
+# Handle results from .exec steps
+analyze_data.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": analyze_data.output.insights,
+        "type": "analysis",
+        "tags": ["analysis", "high-confidence"]
+    })
+)
+```
+
+### Multi-File Code Execution
+
+```python
+@agent.exec(
+    code_files=[
+        PythonFile(filename="analysis_files/analyze.py"),
+        PythonFile(filename="analysis_files/utils.py")
+    ]
+)
+def analyze_with_utils():
+    """Execute analysis using multiple code files."""
+    from analysis_files.analyze import analyze_data
+    from analysis_files.utils import prepare_data
+
+    prepared_data = prepare_data(context.parameters.get("dataset", {}))
+    results = analyze_data(context, prepared_data)
+    return results
+```
+
+### PythonFile Reference
+
+```python
+from erdo.types import PythonFile
+
+# Reference external Python files in your .exec steps
+code_files = [
+    PythonFile(filename="processors/main.py"),
+    PythonFile(filename="processors/utils.py")
+]
+```
+
+<Info>
+For detailed examples and best practices, see the [Code Execution Guide](/examples/code-execution).
+</Info>
+
 ## Result Handlers
 
 Handle step outcomes with conditional logic:

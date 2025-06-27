@@ -130,6 +130,43 @@ Actions are the building blocks that define what each step does:
 - **Validation Actions**: Parse JSON, validate formats, handle errors
 - **Utility Actions**: Send notifications, manage state, debug workflows
 
+### Integrations
+
+Define custom integrations for external services, databases, and APIs:
+
+```python
+from erdo.integrations import IntegrationConfig
+from erdo import IntegrationType, AuthType, UIConfig
+
+class StripeIntegrationConfig(IntegrationConfig):
+    def __init__(self):
+        super().__init__()
+
+        self.definition.name = "Stripe"
+        self.definition.description = "Payment processing integration"
+        self.definition.integration_type = IntegrationType.API
+        self.definition.auth_type = AuthType.API_KEY
+
+        # UI Configuration
+        self.definition.ui_config = UIConfig(
+            icon={"set": "lucide", "name": "credit-card"},
+            primary_color="#635bff",
+            display_name="Stripe",
+            short_description="Process payments and manage subscriptions"
+        )
+
+        # Credential schema for API key
+        self.credential_schema = {
+            "api_key": {
+                "type": "secret",
+                "label": "API Key",
+                "description": "Your Stripe API key"
+            }
+        }
+```
+
+Integrations can then be used in agents for data access, API calls, and workflow automation.
+
 ## Use Cases
 
 <AccordionGroup>

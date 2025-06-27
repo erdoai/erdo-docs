@@ -171,6 +171,33 @@ step = agent.step(
 )
 ```
 
+### Step Metadata in Result Handlers
+
+To configure step attributes in result handlers, use `StepMetadata`:
+
+```python
+from erdo import StepMetadata
+
+main_step = agent.step(
+    llm.message(model="claude-sonnet-4", query="Analyze data")
+)
+
+# Result handler with step metadata
+main_step.on(
+    IsSuccess(),
+    llm.message(
+        model="claude-sonnet-4",
+        query="Create detailed report",
+        step_metadata=StepMetadata(
+            key="detailed_report",
+            depends_on=["main_step"],
+            user_output_visibility="visible",
+            running_message="Generating report..."
+        )
+    )
+)
+```
+
 ## Common Patterns
 
 ### Data Processing Pipeline
@@ -251,6 +278,33 @@ validate_step.on(
     })
 )
 ```
+
+## Code Execution with External Files
+
+For steps that run Python code from external files, use the `@agent.exec` decorator:
+
+```python
+from erdo.types import PythonFile
+
+@agent.exec(
+    code_files=[PythonFile(filename="analysis_files/analyze.py")]
+)
+def analyze_data():
+    """Execute analysis using external code files."""
+    from analysis_files.analyze import analyze_data
+    return analyze_data(context)
+
+# Works with dependencies like regular steps
+next_step = agent.step(
+    llm.message(query=f"Summarize: {analyze_data.output.result}"),
+    depends_on=analyze_data
+)
+```
+
+<Info>
+  See the [Code Execution Guide](/examples/code-execution) for detailed examples
+  and file organization patterns.
+</Info>
 
 ## Step Lifecycle
 
