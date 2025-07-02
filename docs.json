@@ -12,7 +12,7 @@
     "groups": [
       {
         "group": "Get Started",
-        "pages": ["introduction", "quickstart", "installation"]
+        "pages": ["introduction", "quickstart", "installation", "changelog"]
       },
       {
         "group": "Core Concepts",
@@ -76,11 +76,7 @@
       "href": "https://github.com/erdoai",
       "icon": "github"
     },
-    {
-      "name": "Community",
-      "href": "https://discord.gg/erdo",
-      "icon": "discord"
-    },
+
     {
       "name": "Blog",
       "href": "https://erdo.ai/blog",

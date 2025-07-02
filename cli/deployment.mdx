@@ -303,26 +303,123 @@ erdo export-bot my-agent --include-deps --output ./my-agent-complete.zip
 erdo export-bot agent1,agent2,agent3 --output ./agents/
 ```
 
-### Export Formats
+### Export Modes
 
-<CardGroup cols={2}>
-  <Card title="Python Script" icon="code">
-    ```bash erdo export-bot my-agent --format python ``` Single Python file with
-    all code
-  </Card>
-  <Card title="ZIP Archive" icon="archive">
-    ```bash erdo export-bot my-agent --format zip --include-deps ``` Complete
-    project structure
-  </Card>
-  <Card title="Docker Image" icon="docker">
-    ```bash erdo export-bot my-agent --format docker --tag my-agent:v1.0 ```
-    Containerized deployment
-  </Card>
-  <Card title="YAML Config" icon="file-code">
-    ```bash erdo export-bot my-agent --format yaml --config-only ```
-    Configuration and metadata only
-  </Card>
-</CardGroup>
+<Tabs>
+  <Tab title="Standalone Export (Default)">
+    ```bash
+    # Creates a single Python file ready for syncing
+    erdo export-bot "file analyzer" > standalone-agent.py
+    
+    # Or save to file
+    erdo export-bot "file analyzer" --output standalone-agent.py
+    ```
+    
+    **Features:**
+    - Single file contains complete agent definition
+    - All embedded Python code has imports fixed for standalone execution
+    - Classes from common.py are moved to the top of the file
+    - Relative imports are commented out with explanatory notes
+    - Ready to sync back with `erdo sync standalone-agent.py`
+    
+    **Use Cases:**
+    - Backup and restore
+    - Sharing agents between environments
+    - Version control of complete agent definitions
+    - Quick agent duplication
+  </Tab>
+
+  <Tab title="Package Structure Export (-o flag)">
+    ```bash
+    # Creates main file + separate directory with individual code files
+    erdo export-bot "file analyzer" -o agent-with-files.py
+    ```
+    
+    **Creates:**
+    - `agent-with-files.py` - Main agent definition (can be synced)
+    - `file_analyzer_analyze_file_files/` - Directory with individual Python files
+    - `analyze_file.py` - Main analysis code with proper relative imports
+    - `analyze_file_fn.py` - Analysis functions
+    - `common.py` - Shared classes and utilities
+    
+    **Benefits:**
+    - Individual files maintain proper Python package structure
+    - Relative imports work correctly for local development
+    - Can run individual Python files for testing
+    - Easier to edit and understand code structure
+    - Better for collaborative development
+    
+    **Use Cases:**
+    - Local development and testing
+    - Code review and analysis
+    - Educational purposes
+    - Custom modifications before re-importing
+  </Tab>
+</Tabs>
+
+### Export Workflow Examples
+
+<AccordionGroup>
+  <Accordion title="Development Workflow">
+    ```bash
+    # 1. Export agent for local development
+    erdo export-bot "data-processor" -o local-dev.py
+    
+    # 2. Work with individual files
+    cd data_processor_process_data_files/
+    
+    # 3. Test individual components
+    python common.py          # Test shared utilities
+    python process_data.py    # Test main processing logic
+    
+    # 4. Modify code as needed
+    vim process_data_fn.py
+    
+    # 5. Sync back when ready (use main file)
+    cd ..
+    erdo sync local-dev.py --name-suffix="_updated"
+    ```
+  </Accordion>
+  
+  <Accordion title="Backup and Migration">
+    ```bash
+    # 1. Export all agents for backup
+    mkdir backup-$(date +%Y%m%d)
+    for agent in $(erdo list-bots --format plain | cut -f1); do
+      erdo export-bot "$agent" > "backup-$(date +%Y%m%d)/${agent// /-}.py"
+    done
+    
+    # 2. Migrate to new environment
+    erdo configure --server https://new-environment.erdo.ai
+    erdo login
+    
+    # 3. Import agents
+    for file in backup-*/*.py; do
+      erdo sync "$file" --name-suffix="_migrated"
+    done
+    ```
+  </Accordion>
+  
+  <Accordion title="Code Review Process">
+    ```bash
+    # 1. Export agent with package structure for review
+    erdo export-bot "security-scanner" -o review-agent.py
+    
+    # 2. Review individual files
+    cd security_scanner_scan_code_files/
+    ls -la                    # See all code files
+    cat scan_code.py         # Review main logic
+    cat security_utils.py   # Review utility functions
+    
+    # 3. Check for issues
+    python -m py_compile *.py  # Syntax check
+    pylint *.py               # Code quality check
+    
+    # 4. Test locally if needed
+    python scan_code.py       # Run main script
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ### Export Options
 

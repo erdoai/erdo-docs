@@ -176,6 +176,107 @@ erdo agent test <agent-name>
 - `--test-data`: Test data file
 - `--coverage`: Generate coverage report
 
+### `erdo export-bot`
+
+Export agents for backup, sharing, migration, or local development.
+
+```bash
+erdo export-bot <agent-name>
+```
+
+**Basic Usage:**
+
+```bash
+# Export to stdout (standalone Python file)
+erdo export-bot "file analyzer"
+
+# Export to file (standalone Python file)
+erdo export-bot "file analyzer" > my-agent.py
+
+# Export with separate code files (-o flag)
+erdo export-bot "file analyzer" -o my-agent-with-files.py
+```
+
+**Export Formats:**
+
+<Tabs>
+  <Tab title="Standalone Export (Default)">
+    ```bash
+    # Creates a single Python file with all code embedded
+    erdo export-bot "file analyzer" > standalone-agent.py
+    ```
+    
+    **Features:**
+    - Single file contains complete agent definition
+    - All Python code files are embedded with fixed imports
+    - Ready for syncing back with `erdo sync`
+    - Common.py classes are moved to the top of the file
+    - Relative imports are commented out with explanatory notes
+  </Tab>
+
+  <Tab title="Package Structure Export (-o flag)">
+    ```bash
+    # Creates main file + separate directory with code files
+    erdo export-bot "file analyzer" -o agent-with-files.py
+    ```
+    
+    **Creates:**
+    - `agent-with-files.py` - Main agent definition (syncable)
+    - `file_analyzer_analyze_file_files/` - Directory with individual Python files
+    - `analyze_file.py` - Main analysis code with relative imports
+    - `analyze_file_fn.py` - Analysis functions
+    - `common.py` - Shared classes and utilities
+    
+    **Benefits:**
+    - Individual files maintain proper Python package structure
+    - Relative imports work correctly in the separate files
+    - Easier for local development and testing
+    - Can be used as a proper Python package
+  </Tab>
+</Tabs>
+
+**Options:**
+
+| Option           | Description                        | Example                                     |
+| ---------------- | ---------------------------------- | ------------------------------------------- |
+| `-o, --output`   | Export with separate code files    | `erdo export-bot "my-agent" -o agent.py`    |
+| `--format`       | Export format (python, json, yaml) | `erdo export-bot "my-agent" --format json`  |
+| `--include-deps` | Include dependencies               | `erdo export-bot "my-agent" --include-deps` |
+
+**Examples:**
+
+```bash
+# Export for backup
+erdo export-bot "data-processor" > backups/data-processor-$(date +%Y%m%d).py
+
+# Export for local development
+erdo export-bot "file-analyzer" -o local-development.py
+cd file_analyzer_analyze_file_files/
+python analyze_file.py  # Run individual files
+
+# Export for sharing
+erdo export-bot "security-checker" --format json > agent-config.json
+
+# Export multiple agents
+for agent in "file analyzer" "data analyst" "security checker"; do
+  erdo export-bot "$agent" > "exports/${agent// /-}.py"
+done
+```
+
+**Syncing Exported Agents:**
+
+```bash
+# Sync standalone export back to platform
+erdo sync exported-agent.py --name-suffix="_imported"
+
+# Sync package structure export (use main file)
+erdo sync agent-with-files.py --name-suffix="_from_package"
+
+# The separate code files directory is for local development only
+```
+
+### `erdo sync`
+
 ## Integration Commands
 
 ### `erdo integration add`

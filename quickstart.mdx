@@ -24,9 +24,11 @@ brew install erdoai/tap/erdo
 
 ```bash Manual Download
 # Download from GitHub Releases
-curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-amd64 -o erdo
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
+unzip erdo-cli.zip
 chmod +x erdo
 mv erdo /usr/local/bin/
+rm erdo-cli.zip
 ```
 
 </CodeGroup>

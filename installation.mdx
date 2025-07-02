@@ -32,26 +32,33 @@ Download the latest release for your platform:
 <CodeGroup>
 
 ```bash macOS (Intel)
-curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-amd64 -o erdo
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_x86_64.zip -o erdo-cli.zip
+unzip erdo-cli.zip
 chmod +x erdo
 sudo mv erdo /usr/local/bin/
+rm erdo-cli.zip
 ```
 
 ```bash macOS (Apple Silicon)
-curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-darwin-arm64 -o erdo
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
+unzip erdo-cli.zip
 chmod +x erdo
 sudo mv erdo /usr/local/bin/
+rm erdo-cli.zip
 ```
 
 ```bash Linux (x86_64)
-curl -L https://github.com/erdoai/erdo-cli/releases/latest/download/erdo-linux-amd64 -o erdo
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Linux_x86_64.zip -o erdo-cli.zip
+unzip erdo-cli.zip
 chmod +x erdo
 sudo mv erdo /usr/local/bin/
+rm erdo-cli.zip
 ```
 
 ```bash Windows
-# Download erdo-windows-amd64.exe from GitHub Releases
-# Add to your PATH
+# Download erdo-cli_Windows_x86_64.zip from GitHub Releases
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Windows_x86_64.zip -o erdo-cli.zip
+# Extract erdo.exe and add to PATH
 ```
 
 </CodeGroup>
@@ -76,8 +83,8 @@ pip install erdo
 poetry add erdo
 ```
 
-```bash Conda
-conda install -c conda-forge erdo
+```bash uv
+uv add erdo
 ```
 
 </CodeGroup>
@@ -283,5 +290,4 @@ Now that you have Erdo installed:
 
 1. **[Follow the Quick Start](/quickstart)** - Build your first agent
 2. **[Explore Examples](/examples/business-automation)** - See real-world use cases
-3. **[Join the Community](https://discord.gg/erdo)** - Get help and share knowledge
-4. **[Read the SDK Docs](/sdk/overview)** - Dive deeper into development
+3. **[Read the SDK Docs](/sdk/overview)** - Dive deeper into development
