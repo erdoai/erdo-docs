@@ -12,42 +12,97 @@ Create your first AI agent with Erdo. This guide covers installation, authentica
   ([sign up here](https://erdo.ai))
 </Info>
 
-## Step 1: Install the Erdo CLI
+## Step 1: Choose Your Approach
 
-The fastest way to get started is with the Erdo CLI:
+Choose between CLI and Python SDK based on your preference:
 
-<CodeGroup>
+<Tabs>
+  <Tab title="CLI (Traditional)">
+    The fastest way to get started is with the Erdo CLI:
 
-```bash Homebrew (Recommended)
-brew install erdoai/tap/erdo
-```
+    <CodeGroup>
 
-```bash Manual Download
-# Download from GitHub Releases
-curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
-unzip erdo-cli.zip
-chmod +x erdo
-mv erdo /usr/local/bin/
-rm erdo-cli.zip
-```
+    ```bash Homebrew (Recommended)
+    brew install erdoai/tap/erdo
+    ```
 
-</CodeGroup>
+    ```bash Manual Download
+    # Download from GitHub Releases
+    curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
+    unzip erdo-cli.zip
+    chmod +x erdo
+    mv erdo /usr/local/bin/
+    rm erdo-cli.zip
+    ```
 
-Verify the installation:
+    </CodeGroup>
 
-```bash
-erdo --version
-```
+    Verify the installation:
+    ```bash
+    erdo --version
+    ```
+  </Tab>
+  <Tab title="Python SDK">
+    Install the Python SDK for pure Python workflows:
+
+    <CodeGroup>
+
+    ```bash pip
+    pip install erdo
+    ```
+
+    ```bash Poetry
+    poetry add erdo
+    ```
+
+    ```bash uv
+    uv add erdo
+    ```
+
+    </CodeGroup>
+
+    Verify the installation:
+    ```python
+    import erdo
+    from erdo.sync import Sync
+    from erdo.invoke import Invoke
+    print(f"Erdo SDK version: {erdo.__version__}")
+    ```
+  </Tab>
+</Tabs>
 
 ## Step 2: Authenticate
 
-Connect the CLI to your Erdo account:
+<Tabs>
+  <Tab title="CLI">
+    Connect the CLI to your Erdo account:
 
-```bash
-erdo login
-```
+    ```bash
+    erdo login
+    ```
 
-This will open your browser to authenticate with your Erdo account.
+    This will open your browser to authenticate with your Erdo account.
+  </Tab>
+  <Tab title="SDK">
+    The SDK uses the same authentication as the CLI:
+
+    ```bash
+    erdo login
+    ```
+
+    Or set environment variables:
+    ```bash
+    export ERDO_AUTH_TOKEN="your-token"
+    ```
+
+    Verify authentication:
+    ```python
+    from erdo.config import Config
+    config = Config()
+    print(f"Authenticated: {config.is_authenticated()}")
+    ```
+  </Tab>
+</Tabs>
 
 ## Step 3: Create Your First Agent
 
@@ -218,15 +273,38 @@ plan_step.on(
 
 ## Step 6: Run Your Agent
 
-Deploy and test your agent:
+<Tabs>
+  <Tab title="CLI">
+    Deploy and test your agent:
 
-```bash
-# Sync your agent to the platform
-erdo sync
+    ```bash
+    # Sync your agent to the platform
+    erdo sync
 
-# Test your agent
-erdo test task_automator --input '{"task_description": "Organize my email inbox"}'
-```
+    # Test your agent
+    erdo test task_automator --input '{"task_description": "Organize my email inbox"}'
+    ```
+  </Tab>
+  <Tab title="SDK">
+    Sync and invoke your agent directly from Python:
+
+    ```python
+    from erdo.sync import Sync
+    from erdo.invoke import Invoke
+
+    # Sync your agent to the platform
+    result = Sync(task_agent)
+    print(f"Synced agent: {result.agent_key}")
+
+    # Invoke your agent
+    result = Invoke.by_key(
+        result.agent_key,
+        parameters={"task_description": "Organize my email inbox"}
+    )
+    print(f"Result: {result.data}")
+    ```
+  </Tab>
+</Tabs>
 
 ## Next Steps
 

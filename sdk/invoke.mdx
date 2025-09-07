@@ -1,0 +1,525 @@
+---
+title: "Invoke Module"
+description: "Execute agents programmatically with the Erdo platform"
+---
+
+# Invoke Module
+
+The Invoke module enables you to execute agents programmatically, providing both streaming and non-streaming modes for different use cases.
+
+## Installation & Setup
+
+```python
+from erdo.invoke import Invoke
+from erdo.config import Config
+
+# Verify configuration
+config = Config()
+if not config.is_authenticated():
+    print("Please run 'erdo login' first")
+```
+
+## Basic Usage
+
+### Invoke by Agent Key
+
+```python
+from erdo.invoke import Invoke
+
+# Execute agent with parameters
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={
+        "query": "Analyze sales trends",
+        "dataset": "sales_2024.csv"
+    }
+)
+
+print(f"Status: {result.status}")
+print(f"Result: {result.data}")
+```
+
+### Invoke Agent Object
+
+```python
+from erdo import Agent
+from erdo.actions import llm
+from erdo.invoke import Invoke
+from erdo.sync import Sync
+
+# Create and sync agent
+agent = Agent(name="my_analyzer")
+step = agent.step(llm.message(
+    model="claude-sonnet-4",
+    context="Analyze: {{input}}"
+))
+
+sync_result = Sync(agent)
+
+# Invoke the synced agent
+invoke_result = Invoke(
+    agent,
+    parameters={"input": "sample data"}
+)
+print(f"Analysis: {invoke_result.data}")
+```
+
+## Streaming Mode
+
+For real-time event processing during agent execution:
+
+```python
+from erdo.invoke import Invoke
+
+# Enable streaming mode
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={"dataset": "large_data.csv"},
+    stream=True
+)
+
+# Process events as they arrive
+for event in result.events:
+    print(f"Event Type: {event.type}")
+    print(f"Data: {event.data}")
+    
+    if event.type == "step_completed":
+        print(f"Step '{event.data['step_name']}' finished")
+    elif event.type == "agent_completed":
+        print("Agent execution completed")
+        break
+```
+
+## API Reference
+
+### Invoke Class
+
+```python
+class Invoke:
+    def __init__(self, agent: Agent, parameters: Optional[Dict] = None, 
+                 dataset_ids: Optional[List[str]] = None, stream: bool = False):
+        """Initialize Invoke for an agent object."""
+    
+    @classmethod
+    def by_key(cls, bot_key: str, parameters: Optional[Dict] = None,
+               dataset_ids: Optional[List[str]] = None, stream: bool = False) -> InvokeResult:
+        """Invoke agent by its platform key."""
+```
+
+### InvokeResult
+
+```python
+class InvokeResult:
+    status: str                    # "success", "error", "running"
+    data: Any                     # Agent output data
+    agent_key: str                # Agent identifier
+    execution_id: str             # Unique execution ID
+    error: Optional[str]          # Error message if failed
+    events: Optional[Iterator]    # SSE event stream (streaming mode)
+    metadata: Dict                # Additional execution metadata
+```
+
+### Event Types (Streaming)
+
+```python
+class SSEEvent:
+    type: str        # Event type
+    data: Dict       # Event data
+    timestamp: str   # ISO timestamp
+    
+# Common event types:
+# - "agent_started"
+# - "step_started" 
+# - "step_completed"
+# - "step_failed"
+# - "agent_completed"
+# - "agent_failed"
+```
+
+## Advanced Usage
+
+### Error Handling
+
+```python
+from erdo.invoke import Invoke, InvokeError
+
+try:
+    result = Invoke.by_key(
+        "erdo.data-analyzer",
+        parameters={"query": "analyze data"}
+    )
+    
+    if result.status == "success":
+        print(f"Success: {result.data}")
+    else:
+        print(f"Agent returned error: {result.error}")
+        
+except InvokeError as e:
+    print(f"Invocation failed: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Custom Configuration
+
+```python
+from erdo.config import Config
+from erdo.invoke import Invoke
+
+# Custom configuration
+config = Config(
+    api_url="https://staging.erdo.ai",
+    auth_token="custom-token"
+)
+
+# Use with invoke
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={"data": "test"},
+    config=config
+)
+```
+
+### Dataset Integration
+
+```python
+from erdo.invoke import Invoke
+
+# Invoke with dataset references
+result = Invoke.by_key(
+    "erdo.data-processor",
+    parameters={
+        "analysis_type": "trend_analysis"
+    },
+    dataset_ids=["dataset_123", "dataset_456"]
+)
+
+print(f"Analysis result: {result.data}")
+```
+
+## Streaming Examples
+
+### Progress Tracking
+
+```python
+from erdo.invoke import Invoke
+
+def track_agent_progress(bot_key: str, parameters: Dict):
+    """Track agent execution with progress updates."""
+    
+    result = Invoke.by_key(bot_key, parameters=parameters, stream=True)
+    
+    step_count = 0
+    completed_steps = 0
+    
+    for event in result.events:
+        if event.type == "step_started":
+            step_count += 1
+            print(f"Step {step_count} started: {event.data.get('step_name')}")
+            
+        elif event.type == "step_completed":
+            completed_steps += 1
+            print(f"Step {completed_steps}/{step_count} completed")
+            
+        elif event.type == "agent_completed":
+            print(f"✅ Agent completed successfully!")
+            print(f"Final result: {event.data}")
+            break
+            
+        elif event.type == "agent_failed":
+            print(f"❌ Agent failed: {event.data.get('error')}")
+            break
+
+# Usage
+track_agent_progress(
+    "erdo.data-analyzer",
+    {"query": "complex analysis task"}
+)
+```
+
+### Real-time Data Processing
+
+```python
+from erdo.invoke import Invoke
+import json
+
+def process_streaming_results(bot_key: str, data_stream):
+    """Process data as agent generates results."""
+    
+    result = Invoke.by_key(
+        bot_key,
+        parameters={"mode": "streaming"},
+        stream=True
+    )
+    
+    results = []
+    
+    for event in result.events:
+        if event.type == "step_completed":
+            step_result = event.data.get('output')
+            if step_result:
+                results.append(step_result)
+                print(f"Intermediate result: {step_result}")
+                
+        elif event.type == "agent_completed":
+            final_result = event.data
+            print(f"Final aggregated result: {final_result}")
+            return final_result
+    
+    return results
+
+# Usage
+final_data = process_streaming_results(
+    "erdo.stream-processor",
+    {"input_stream": "real_time_data"}
+)
+```
+
+## Integration Examples
+
+### Jupyter Notebook
+
+```python
+# Cell 1: Setup
+from erdo.invoke import Invoke
+from erdo.sync import Sync
+import matplotlib.pyplot as plt
+
+# Cell 2: Quick analysis
+result = Invoke.by_key(
+    "erdo.data-visualizer", 
+    parameters={
+        "data_source": "sales_data.csv",
+        "chart_type": "trend_analysis"
+    }
+)
+
+# Cell 3: Display results
+if result.status == "success":
+    chart_data = result.data["chart_data"]
+    plt.plot(chart_data["x"], chart_data["y"])
+    plt.show()
+else:
+    print(f"Analysis failed: {result.error}")
+```
+
+### Web Application
+
+```python
+from flask import Flask, request, jsonify
+from erdo.invoke import Invoke
+
+app = Flask(__name__)
+
+@app.route('/analyze', methods=['POST'])
+def analyze_data():
+    """API endpoint for data analysis."""
+    
+    data = request.get_json()
+    
+    try:
+        result = Invoke.by_key(
+            "erdo.api-analyzer",
+            parameters={
+                "input_data": data["data"],
+                "analysis_type": data.get("type", "basic")
+            }
+        )
+        
+        if result.status == "success":
+            return jsonify({
+                "success": True,
+                "result": result.data,
+                "execution_id": result.execution_id
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.error
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
+```
+
+### Batch Processing
+
+```python
+from erdo.invoke import Invoke
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+
+def process_batch_data(data_items, bot_key="erdo.batch-processor"):
+    """Process multiple data items concurrently."""
+    
+    def process_item(item):
+        """Process a single item."""
+        try:
+            result = Invoke.by_key(
+                bot_key,
+                parameters={"data": item}
+            )
+            return {"item": item, "result": result.data, "status": "success"}
+        except Exception as e:
+            return {"item": item, "error": str(e), "status": "error"}
+    
+    results = []
+    
+    # Process items concurrently
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_item = {
+            executor.submit(process_item, item): item 
+            for item in data_items
+        }
+        
+        for future in as_completed(future_to_item):
+            result = future.result()
+            results.append(result)
+            print(f"Processed item: {result['status']}")
+    
+    return results
+
+# Usage
+data_items = [
+    {"id": 1, "value": "data_1"},
+    {"id": 2, "value": "data_2"}, 
+    {"id": 3, "value": "data_3"}
+]
+
+results = process_batch_data(data_items)
+successful = [r for r in results if r["status"] == "success"]
+print(f"Successfully processed {len(successful)}/{len(data_items)} items")
+```
+
+### Automated Workflow
+
+```python
+from erdo.invoke import Invoke
+from erdo.sync import Sync
+import schedule
+import time
+
+def automated_analysis_workflow():
+    """Automated daily analysis workflow."""
+    
+    print("Starting daily analysis...")
+    
+    # Step 1: Data collection
+    collection_result = Invoke.by_key(
+        "erdo.data-collector",
+        parameters={"source": "daily_reports", "date": "today"}
+    )
+    
+    if collection_result.status != "success":
+        print(f"Data collection failed: {collection_result.error}")
+        return
+    
+    # Step 2: Analysis
+    analysis_result = Invoke.by_key(
+        "erdo.daily-analyzer",
+        parameters={
+            "data": collection_result.data,
+            "analysis_type": "comprehensive"
+        }
+    )
+    
+    if analysis_result.status != "success":
+        print(f"Analysis failed: {analysis_result.error}")
+        return
+    
+    # Step 3: Report generation
+    report_result = Invoke.by_key(
+        "erdo.report-generator",
+        parameters={
+            "analysis": analysis_result.data,
+            "format": "executive_summary"
+        }
+    )
+    
+    if report_result.status == "success":
+        print("✅ Daily analysis completed successfully")
+        print(f"Report: {report_result.data['report_url']}")
+    else:
+        print(f"Report generation failed: {report_result.error}")
+
+# Schedule the workflow
+schedule.every().day.at("09:00").do(automated_analysis_workflow)
+
+# Run scheduler
+print("Starting automated workflow scheduler...")
+while True:
+    schedule.run_pending()
+    time.sleep(60)
+```
+
+## Best Practices
+
+1. **Error Handling**: Always check result status and handle errors gracefully
+2. **Timeouts**: Set appropriate timeouts for long-running operations
+3. **Streaming**: Use streaming mode for long-running agents to track progress
+4. **Resource Management**: Clean up resources and handle connection errors
+5. **Logging**: Log execution details for debugging and monitoring
+6. **Retry Logic**: Implement retry logic for transient failures
+7. **Concurrency**: Use threading/async for batch processing multiple agents
+
+## Troubleshooting
+
+### Common Issues
+
+**Agent Not Found**
+```python
+from erdo.invoke import Invoke, InvokeError
+
+try:
+    result = Invoke.by_key("nonexistent.agent")
+except InvokeError as e:
+    if "not found" in str(e).lower():
+        print("Agent doesn't exist - check agent key")
+```
+
+**Parameter Validation**
+```python
+# Ensure required parameters are provided
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={
+        "query": "required field",
+        "dataset": "optional field"
+    }
+)
+```
+
+**Timeout Issues**
+```python
+# For long-running agents, use streaming mode
+result = Invoke.by_key(
+    "erdo.long-running-agent",
+    parameters={"large_dataset": "data.csv"},
+    stream=True  # Prevents timeout
+)
+```
+
+**Network Issues**
+```python
+import time
+from erdo.invoke import InvokeError
+
+def invoke_with_retry(bot_key, parameters, max_retries=3):
+    """Invoke with retry logic."""
+    
+    for attempt in range(max_retries):
+        try:
+            result = Invoke.by_key(bot_key, parameters=parameters)
+            return result
+        except InvokeError as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"Attempt {attempt + 1} failed, retrying...")
+            time.sleep(2 ** attempt)  # Exponential backoff
+```

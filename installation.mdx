@@ -71,7 +71,7 @@ erdo --version
 
 ## Python SDK
 
-Install the Erdo Python SDK to build agents programmatically.
+Install the Erdo Python SDK for pure Python workflows - sync, test, and invoke agents all from Python without needing the CLI.
 
 <CodeGroup>
 
@@ -93,7 +93,24 @@ uv add erdo
 
 ```python
 import erdo
+from erdo.sync import Sync
+from erdo.invoke import Invoke
+
 print(f"Erdo SDK version: {erdo.__version__}")
+print("SDK modules available: sync, invoke, test")
+```
+
+### SDK Configuration
+
+The SDK uses the same configuration as the CLI, reading from `~/.erdo/config.yaml` or environment variables:
+
+```python
+from erdo.config import Config
+
+# Automatically loads from ~/.erdo/config.yaml or env vars
+config = Config()
+print(f"API URL: {config.api_url}")
+print(f"Authenticated: {config.is_authenticated()}")
 ```
 
 ## Platform Access
@@ -106,23 +123,50 @@ print(f"Erdo SDK version: {erdo.__version__}")
 
 ### Authentication
 
-Connect your local tools to the platform:
+<Tabs>
+  <Tab title="CLI">
+    Connect your local tools to the platform:
 
-```bash
-erdo login
-```
+    ```bash
+    erdo login
+    ```
 
-This will:
+    This will:
+    - Open your browser for authentication
+    - Store your credentials securely
+    - Set up API access for both CLI and SDK
 
-- Open your browser for authentication
-- Store your credentials securely
-- Set up API access for the CLI and SDK
+    ### Verify Authentication
+    ```bash
+    erdo whoami
+    ```
+  </Tab>
+  <Tab title="SDK">
+    The SDK automatically uses CLI authentication. If you haven't logged in yet:
 
-### Verify Authentication
+    ```bash
+    erdo login
+    ```
 
-```bash
-erdo whoami
-```
+    Or set environment variables directly:
+    ```bash
+    export ERDO_API_URL="https://api.erdo.ai"
+    export ERDO_AUTH_TOKEN="your-token"
+    ```
+
+    ### Verify in Python
+    ```python
+    from erdo.config import Config
+    
+    config = Config()
+    if config.is_authenticated():
+        print("Ready to sync and invoke agents!")
+        print(f"Organization: {config.organization}")
+    else:
+        print("Please run 'erdo login' first")
+    ```
+  </Tab>
+</Tabs>
 
 ## System Requirements
 

@@ -12,7 +12,7 @@
     "groups": [
       {
         "group": "Get Started",
-        "pages": ["introduction", "quickstart", "installation", "changelog"]
+        "pages": ["introduction", "quickstart", "installation", "cli-vs-sdk", "changelog"]
       },
       {
         "group": "Core Concepts",
@@ -32,7 +32,14 @@
       },
       {
         "group": "Python SDK",
-        "pages": ["sdk/overview", "sdk/actions", "sdk/workflows"]
+        "pages": [
+          "sdk/overview",
+          "sdk/sync", 
+          "sdk/invoke",
+          "sdk/test",
+          "sdk/actions",
+          "sdk/workflows"
+        ]
       },
       {
         "group": "CLI Tools",

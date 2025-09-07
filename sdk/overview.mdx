@@ -7,6 +7,8 @@ description: "Comprehensive guide to the Erdo Python SDK"
 
 The Erdo Python SDK provides a powerful framework for building intelligent AI agents. With our agent-centric API design, you can create sophisticated automation workflows that combine language models, web research, code execution, and custom integrations using clean, readable code.
 
+**Pure Python Workflows**: The SDK now includes sync, invoke, and test modules, enabling you to work entirely in Python without needing the CLI.
+
 ## Installation
 
 <CodeGroup>
@@ -24,6 +26,52 @@ uv add erdo
 ```
 
 </CodeGroup>
+
+## Complete Python Workflow
+
+Build, sync, and invoke agents entirely in Python:
+
+```python
+from erdo import Agent
+from erdo.actions import llm, memory
+from erdo.conditions import IsSuccess, GreaterThan
+from erdo.sync import Sync
+from erdo.invoke import Invoke
+
+# 1. Define your agent
+agent = Agent(
+    name="email_assistant",
+    description="Automatically responds to emails with context-aware replies"
+)
+
+response_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        context="Generate a professional response to this email: {{email_content}}"
+    )
+)
+
+# Add result handlers
+response_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={
+        "content": response_step.output.response,
+        "type": "email_response",
+        "tags": ["automated", "high-quality"]
+    })
+)
+
+# 2. Sync to platform
+sync_result = Sync(agent)
+print(f"Synced agent: {sync_result.agent_key}")
+
+# 3. Invoke the agent
+invoke_result = Invoke.by_key(
+    sync_result.agent_key,
+    parameters={"email_content": "Hi, I need help with my order..."}
+)
+print(f"Response: {invoke_result.data}")
+```
 
 ## Quick Start
 
@@ -72,6 +120,20 @@ response_step.on(
   </Card>
   <Card title="Result Handlers" icon="wrench" href="/concepts/result-handlers">
     Conditional logic for processing step outcomes
+  </Card>
+</CardGroup>
+
+## SDK Modules
+
+<CardGroup cols={3}>
+  <Card title="Sync" icon="upload" href="#sync-module">
+    Sync agents from Python code to the platform
+  </Card>
+  <Card title="Invoke" icon="play" href="#invoke-module">
+    Execute agents programmatically with parameters
+  </Card>
+  <Card title="Test" icon="check-circle" href="#test-module">
+    Run agent tests and validations
   </Card>
 </CardGroup>
 
@@ -540,6 +602,75 @@ execute_step.on(
 )
 ```
 
+## SDK Modules Reference
+
+### Sync Module
+
+Sync agents from Python code to the Erdo platform:
+
+```python
+from erdo.sync import Sync
+
+# Sync a single agent
+result = Sync(agent)
+print(f"Agent synced: {result.agent_key}")
+
+# Sync from file
+results = Sync.from_file("my_agent.py")
+for result in results:
+    print(f"Synced: {result.agent_name} -> {result.agent_key}")
+
+# Sync all agents in directory
+results = Sync.from_directory("agents/")
+print(f"Synced {len(results)} agents")
+```
+
+### Invoke Module
+
+Execute agents programmatically:
+
+```python
+from erdo.invoke import Invoke
+
+# Invoke by agent object
+result = Invoke(agent, parameters={"query": "analyze this data"})
+print(f"Result: {result.data}")
+
+# Invoke by agent key
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={"dataset": "sales_data.csv"}
+)
+print(f"Status: {result.status}, Data: {result.data}")
+
+# Streaming mode (for real-time events)
+result = Invoke.by_key(
+    "erdo.data-analyzer",
+    parameters={"dataset": "large_data.csv"},
+    stream=True
+)
+for event in result.events:
+    print(f"Event: {event.type} - {event.data}")
+```
+
+### Test Module
+
+Run agent tests and validations:
+
+```python
+from erdo.test import AgentTest, LiveTest
+
+# Local agent testing
+test = AgentTest(agent)
+validation_results = test.validate()
+simulation_results = test.simulate(data={"input": "test data"})
+
+# Live testing via platform
+live = LiveTest()
+results = live.run_all()
+results = live.run_by_agent("data-analyzer")
+```
+
 ## Best Practices
 
 - **Use descriptive agent names** for easy identification
@@ -553,6 +684,9 @@ execute_step.on(
 ## Next Steps
 
 <CardGroup cols={2}>
+  <Card title="CLI vs SDK" icon="code-compare" href="/cli-vs-sdk">
+    Compare CLI and SDK approaches for your workflow
+  </Card>
   <Card title="Concepts" icon="lightbulb" href="/concepts/overview">
     Learn core concepts and patterns
   </Card>
@@ -561,9 +695,6 @@ execute_step.on(
   </Card>
   <Card title="Actions Reference" icon="bolt" href="/sdk/actions">
     Complete action documentation
-  </Card>
-  <Card title="Workflows" icon="sitemap" href="/sdk/workflows">
-    Advanced workflow patterns
   </Card>
 </CardGroup>
 
