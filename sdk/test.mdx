@@ -69,39 +69,41 @@ Total: 15 | Passed: 14 | Failed: 1 | Duration: 2.3s
 ----------------------------------------------------------------------
 ```
 
-## Why This Pattern?
+## Benefits
 
-**⚡ 10x Faster**: Tests run in parallel automatically
+**Parallel Execution**
+Tests run concurrently, reducing test suite duration from minutes to seconds.
 
-**🆓 Free Testing**: Use `mode="replay"` for cached responses (free after first run)
+**Efficient Caching**
+Replay mode caches LLM responses after the first execution, eliminating API costs for subsequent runs.
 
-**🎯 Simple**: Just name functions `agent_test_*` and use `invoke()`
+**Simple Pattern**
+Name functions with `agent_test_*` prefix and use `invoke()`. No complex test framework required.
 
-**📊 Clean Output**: Nice summary with pass/fail counts and timing
-
-**🔧 No pytest**: Pure Python, easy to debug
+**Clear Results**
+Clean summary with pass/fail counts, timing information, and detailed error output when needed.
 
 ## Test Modes
 
 Control how bot actions are executed in tests:
 
-| Mode | Description | Cost | Use Case |
-|------|-------------|------|----------|
-| **live** | Real API calls | $$$ per run | Integration tests, fresh data |
-| **replay** | Cached responses | $$$ first run, FREE after | Unit tests, CI/CD |
-| **manual** | Developer mocks | FREE always | Deterministic tests, offline |
+| Mode | Description | API Calls | Use Case |
+|------|-------------|-----------|----------|
+| **live** | Real LLM execution | Every test run | Integration tests requiring fresh data |
+| **replay** | Cached responses | First run only | Most tests, CI/CD pipelines |
+| **manual** | Developer mocks | None | Deterministic tests, offline development |
 
 ### Live Mode (Default)
-Runs against real backend with LLM API (costs $):
+Executes with real LLM calls:
 
 ```python
 response = invoke("my-agent", messages=[...])  # mode="live" is default
 ```
 
-**Use for:** Integration tests requiring fresh data
+**Use for:** Integration tests requiring current model behavior or fresh data
 
 ### Replay Mode (Recommended)
-Uses cached responses - **first run costs $, subsequent runs FREE**:
+Caches LLM responses for efficient testing:
 
 ```python
 def agent_test_basic():
@@ -111,18 +113,18 @@ def agent_test_basic():
 
 **Cache behavior:**
 - First run: Executes live and caches response
-- Subsequent runs: Returns cached response (FREE!)
-- Auto-invalidates when bot is updated
+- Subsequent runs: Returns cached response without API calls
+- Auto-invalidates when agent definition changes
 
-**Use for:** Most agent tests, CI/CD pipelines
+**Use for:** Most integration tests, CI/CD pipelines, regression testing
 
 #### Replay Mode with Refresh
 
-Force cache refresh while staying in replay mode:
+Force cache refresh in replay mode:
 
 ```python
 def agent_test_with_fresh_data():
-    # Bypass cache and get fresh response
+    # Bypass cache to get fresh response
     response = invoke(
         "my-agent",
         messages=[...],
@@ -132,12 +134,12 @@ def agent_test_with_fresh_data():
 ```
 
 **Use for:**
-- Testing with fresh data without leaving replay mode
-- Updating cached responses after bot changes
-- Testing cache refresh behavior
+- Updating cached responses after agent modifications
+- Validating current model behavior
+- Refreshing test fixtures
 
 ### Manual Mode
-Developer-provided mock responses - always free:
+Developer-provided mock responses:
 
 ```python
 def agent_test_with_mocks():
@@ -157,10 +159,10 @@ def agent_test_with_mocks():
 ```
 
 **Use for:**
-- Testing error handling
-- Deterministic test outcomes
+- Testing error handling with controlled failures
+- Deterministic test scenarios
 - Offline development
-- Fast unit tests without API calls
+- Fast execution without API dependencies
 
 ## Test Helpers
 
@@ -354,25 +356,25 @@ def agent_test_test1():
 ### 2. Choose the Right Mode
 
 ```python
-# Good - replay mode for most tests (fast, free after first run)
+# Recommended: replay mode for most tests
 response = invoke("my-agent", messages=[...], mode="replay")
 
-# Good - manual mode for deterministic tests
+# Strategic: manual mode for deterministic scenarios
 response = invoke("my-agent", messages=[...], mode="manual",
                   manual_mocks={"llm.message": {...}})
 
-# Good - refresh when you need fresh data
+# Occasional: refresh when updating cache
 response = invoke("my-agent", messages=[...], mode={"mode": "replay", "refresh": True})
 
-# Avoid - live mode costs $ every test run
-response = invoke("my-agent", messages=[...])  # mode="live" is expensive
+# Selective: live mode for critical validations
+response = invoke("my-agent", messages=[...])  # mode="live" incurs API costs
 ```
 
 **Mode selection guide:**
-- **Replay mode**: Default choice for most tests (free after first run)
-- **Manual mode**: When you need deterministic, controlled responses
-- **Refresh**: When you need to update cached responses
-- **Live mode**: Only for integration tests requiring fresh data
+- **Replay mode**: Most integration tests and CI/CD
+- **Manual mode**: Deterministic test scenarios and error handling
+- **Refresh**: Updating cached responses after agent changes
+- **Live mode**: Strategic validation with current model behavior
 
 ### 3. Add Good Error Messages
 
@@ -459,14 +461,14 @@ erdo agent-test --help
 - `-j, --jobs <N>`: Number of parallel jobs (default: auto)
 - `-r, --refresh`: Force refresh cached responses in replay mode
 
-**Refresh Flag:**
+**Refresh Flag Behavior:**
 
-The `--refresh` flag automatically forces all tests using `mode="replay"` to bypass the cache and get fresh responses. This is useful when:
-- You've updated your bot logic and want to refresh cached responses
-- You need fresh data from APIs without modifying test code
-- You want to verify that tests still pass with current LLM behavior
+The `--refresh` flag forces all tests using `mode="replay"` to bypass cache and execute with live LLM calls. Use this when:
+- Agent logic has changed and cached responses need updating
+- Validating behavior with current model versions
+- Refreshing test fixtures after significant changes
 
-**Important:** Tests must use `mode="replay"` for the refresh flag to work. Tests using `mode="live"` or `mode="manual"` are unaffected.
+**Note:** Tests using `mode="live"` or `mode="manual"` are unaffected by the refresh flag.
 
 ## Python API
 
@@ -485,19 +487,21 @@ exit_code = run_tests(
 # exit_code is 0 if all tests passed, 1 if any failed
 ```
 
-## Performance
+## Performance Characteristics
 
-**Old Pattern (Sequential)**
+**Sequential Execution**
 ```
 15 tests × 2s each = 30 seconds total
 ```
 
-**New Pattern (Parallel)**
+**Parallel Execution with Replay Mode**
 ```
 15 tests in parallel = ~2-3 seconds total
+First run: Standard duration with caching
+Subsequent runs: Near-instant with cached responses
 ```
 
-**10x faster! 🚀**
+Parallel execution combined with replay caching provides order-of-magnitude improvements in test suite duration.
 
 ## Troubleshooting
 
@@ -543,13 +547,13 @@ export ERDO_AUTH_TOKEN="your-token"
 
 ### Slow test execution
 
-Use replay mode for faster, free testing:
+Use replay mode for efficient testing:
 
 ```python
-# Slow - hits LLM API every time
+# Slower - makes API calls every execution
 response = invoke("my-agent", messages=[...])
 
-# Fast - cached after first run
+# Faster - caches responses after first run
 response = invoke("my-agent", messages=[...], mode="replay")
 ```
 

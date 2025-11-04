@@ -271,37 +271,98 @@ plan_step.on(
 )
 ```
 
-## Step 6: Run Your Agent
+## Step 6: Test Your Agent
+
+Erdo provides two complementary testing approaches:
+
+<Tabs>
+  <Tab title="Unit Testing">
+    Test all execution paths without LLM calls:
+
+    ```bash
+    # Validate agent logic and templates
+    erdo test task_automator.py
+
+    # Output shows comprehensive validation:
+    # 🌳 Building flow tree for execution simulation...
+    # 📊 Generating execution paths...
+    # ✅ All 12 execution paths tested successfully!
+    ```
+
+    **What gets tested:**
+    - All conditional branches and result handlers
+    - Template expressions with generated test data
+    - State transformations and step dependencies
+    - Error handling paths
+
+    This validation happens **without LLM API calls**, enabling rapid iteration.
+  </Tab>
+  <Tab title="Integration Testing">
+    Write integration tests with replay mode for efficient execution:
+
+    ```python
+    from erdo import invoke
+    from erdo.test import text_contains
+
+    def agent_test_task_automation():
+        """Test task automation with real LLM execution."""
+        response = invoke(
+            "task_automator",
+            messages=[{
+                "role": "user",
+                "content": "Organize my email inbox"
+            }],
+            mode="replay"  # Caches response after first run
+        )
+        
+        assert response.success
+        assert text_contains(str(response.result), "organize")
+    ```
+
+    ```bash
+    # Run tests in parallel
+    erdo agent-test tests/test_task_automator.py
+    ```
+
+    **Replay mode:** First execution calls LLM and caches the response. Subsequent runs use the cached response, eliminating API costs during development.
+  </Tab>
+</Tabs>
+
+## Step 7: Deploy Your Agent
 
 <Tabs>
   <Tab title="CLI">
-    Deploy and test your agent:
+    Sync your validated agent to the platform:
 
     ```bash
-    # Sync your agent to the platform
+    # Deploy to platform
     erdo sync
 
-    # Test your agent
-    erdo test task_automator --input '{"task_description": "Organize my email inbox"}'
+    # Invoke remotely
+    erdo invoke task_automator \
+      --message "Organize my email inbox"
     ```
   </Tab>
   <Tab title="SDK">
-    Sync and invoke your agent directly from Python:
+    Deploy directly from Python:
 
     ```python
     from erdo.sync import Sync
-    from erdo.invoke import Invoke
+    from erdo.invoke import invoke
 
     # Sync your agent to the platform
     result = Sync(task_agent)
     print(f"Synced agent: {result.agent_key}")
 
     # Invoke your agent
-    result = Invoke.by_key(
+    response = invoke(
         result.agent_key,
-        parameters={"task_description": "Organize my email inbox"}
+        messages=[{
+            "role": "user",
+            "content": "Organize my email inbox"
+        }]
     )
-    print(f"Result: {result.data}")
+    print(f"Result: {response.result}")
     ```
   </Tab>
 </Tabs>

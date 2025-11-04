@@ -1,0 +1,493 @@
+---
+title: "Unit Testing"
+description: "Validate agent logic and execution paths without LLM costs"
+---
+
+# Unit Testing
+
+Unit tests validate agent structure, logic, and all execution paths through static analysis and mock execution. This enables rapid development iteration with immediate feedback.
+
+## Overview
+
+The `erdo test` command analyzes your agent's declarative structure and simulates execution:
+
+```bash
+erdo test my_agent.py
+```
+
+**Key capabilities:**
+- Automatically enumerates all execution paths from the agent structure
+- Validates template expressions against test data
+- Simulates state management and data flow
+- Verifies step dependencies
+- No LLM API calls needed for validation
+
+## What Gets Tested
+
+### Execution Path Enumeration
+
+Erdo analyzes your agent's structure to identify all possible execution paths:
+
+```python
+analysis_step = agent.step(
+    llm.message(model="claude-sonnet-4", query=state.query)
+)
+
+# Success path
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={"content": analysis_step.output.response})
+)
+
+# Low confidence path
+analysis_step.on(
+    IsSuccess() & ~GreaterThan("confidence", "0.8"),
+    utils.send_status(status="review_needed")
+)
+
+# Error path
+analysis_step.on(
+    IsError(),
+    utils.send_status(status="failed")
+)
+```
+
+The test harness will validate all three paths:
+1. Success with high confidence → memory storage
+2. Success with low confidence → status notification
+3. Error → failure notification
+
+### Template Validation
+
+Templates are evaluated against generated or provided test data:
+
+```python
+# This template reference is validated
+data_step = agent.step(
+    codeexec.execute(
+        code=f"""
+        dataset_id = '{state.dataset.id}'
+        filename = '{state.dataset.filename}'
+        """
+    )
+)
+
+# Test validates:
+# ✅ state.dataset exists
+# ✅ state.dataset.id is accessible
+# ✅ state.dataset.filename is accessible
+```
+
+### State Management
+
+The test harness simulates state accumulation across steps:
+
+```python
+step1 = agent.step(llm.message(query="analyze"))
+
+step2 = agent.step(
+    codeexec.execute(
+        code=f"results = '{step1.output.analysis}'"
+    ),
+    depends_on=step1
+)
+
+# Test validates:
+# ✅ step1 executes before step2
+# ✅ step1.output.analysis is available to step2
+# ✅ State properly accumulates
+```
+
+## Running Unit Tests
+
+### Basic Usage
+
+```bash
+# Test all agents in current directory
+erdo test
+
+# Test specific agent file
+erdo test agents/data_analyzer.py
+
+# Test with verbose output
+erdo test agents/data_analyzer.py --verbose
+```
+
+### With Custom Test Data
+
+Provide test data to simulate specific scenarios:
+
+```json
+// test_scenarios.json
+{
+  "query": "Analyze Q4 sales trends",
+  "dataset": {
+    "id": "sales_2024_q4",
+    "name": "Q4 Sales Data",
+    "type": "file",
+    "filename": "sales_q4.csv"
+  },
+  "user_preferences": {
+    "detail_level": "comprehensive",
+    "include_forecasts": true
+  }
+}
+```
+
+```bash
+erdo test agents/data_analyzer.py --data test_scenarios.json
+```
+
+### Watch Mode
+
+Run tests automatically on file changes:
+
+```bash
+erdo test agents/data_analyzer.py --watch
+```
+
+This provides immediate feedback during development.
+
+## Test Output
+
+### Successful Test
+
+```
+🔍 Testing Python agents in data_analyzer.py...
+🤖 Found 1 agents to test:
+  • data_analyzer: Analyzes data and generates insights
+
+📋 Parameter definitions:
+  - query (string) (required): The analysis query
+  - dataset (object) (required): Dataset to analyze
+
+🎭 Executing agent with template processing...
+📊 Generating execution paths...
+
+🛤️  Testing path 1:
+    analysis (llm.message) → store_results (memory.store) → notify (utils.send_status)
+
+🛤️  Testing path 2:
+    analysis (llm.message) → request_review (utils.send_status)
+
+🛤️  Testing path 3:
+    analysis (llm.message) [error] → handle_error (utils.send_status)
+
+✅ All 3 execution paths tested successfully!
+
+═════════════════════════════════════════════════════════════
+TEST SUMMARY
+═════════════════════════════════════════════════════════════
+
+✅ Passed (1/1):
+   • data_analyzer
+
+🎉 All agents passed testing!
+```
+
+### Failed Test
+
+```
+🔍 Testing Python agents in broken_agent.py...
+🤖 Found 1 agents to test
+
+📊 Generating execution paths...
+
+═════════════════════════════════════════════════════════════
+Path 1 FAILED
+═════════════════════════════════════════════════════════════
+
+📍 Execution Path:
+   fetch_data (codeexec.execute)
+   ↓
+   ❌ analysis (llm.message)
+
+💥 Error: Template validation failed
+
+🔍 Template Hydration Errors (1):
+   1. step analysis parameter hydration: Missing key 'dataset.url' in template data
+
+═════════════════════════════════════════════════════════════
+
+❌ Failed (1/1):
+   • broken_agent
+     1 paths failed with 1 template hydration errors
+```
+
+## Test Data Generation
+
+### Automatic Generation
+
+Erdo generates test data from parameter definitions:
+
+```python
+agent = Agent(
+    name="analyzer",
+    parameter_definitions=[
+        ParameterDefinition(
+            name="Query",
+            key="query",
+            type=ParameterType.STRING,
+            description="Analysis query",
+            is_required=True
+        ),
+        ParameterDefinition(
+            name="Dataset ID",
+            key="dataset_id",
+            type=ParameterType.STRING,
+            description="Dataset identifier",
+            is_required=True
+        )
+    ]
+)
+
+# Auto-generated test data:
+# {
+#   "query": "sample_query",
+#   "dataset_id": "sample_dataset_id"
+# }
+```
+
+### Custom Test Data
+
+For complex scenarios, provide custom test data:
+
+```json
+{
+  "query": "What were top performing products in Q4?",
+  "dataset_id": "sales_2024_q4",
+  "dataset": {
+    "id": "sales_2024_q4",
+    "name": "Q4 2024 Sales",
+    "type": "file",
+    "url": "https://storage.example.com/sales_q4.csv",
+    "rows": 15420,
+    "columns": ["product_id", "revenue", "quantity", "date"]
+  },
+  "resources": [
+    {
+      "resource_id": 1,
+      "dataset": {
+        "id": "sales_2024_q4",
+        "key": "sales_data"
+      }
+    }
+  ]
+}
+```
+
+## Advanced Features
+
+### ITERATE_OVER Testing
+
+Agents using `ITERATE_OVER` execution mode are tested with array iteration:
+
+```python
+analyze_files = agent.step(
+    llm.message(
+        model="claude-sonnet-4",
+        query=f"Analyze file: {state.file.name}"
+    ),
+    execution_mode=ExecutionMode(
+        mode=ExecutionModeType.ITERATE_OVER,
+        data="files",
+        if_condition=IsAny(key="file.type", value=["csv", "json"])
+    )
+)
+
+# Test harness:
+# ✅ Tests iteration logic
+# ✅ Validates state.file.name access during iteration
+# ✅ Checks if_condition evaluation
+# ✅ Simulates multiple iterations
+```
+
+### Handler Chain Testing
+
+Complex handler chains are fully validated:
+
+```python
+step.on(
+    IsSuccess() & GreaterThan("score", "0.9"),
+    memory.store(memory={"type": "high_quality"}),
+    utils.send_status(status="excellent")
+)
+
+step.on(
+    IsSuccess() & GreaterThan("score", "0.7"),
+    utils.send_status(status="good")
+)
+
+step.on(
+    IsSuccess(),
+    utils.send_status(status="acceptable")
+)
+
+# Test validates:
+# ✅ All handler conditions
+# ✅ Handler execution order
+# ✅ Multiple action execution in single handler
+```
+
+### Nested Step Testing
+
+Steps that invoke other agents are tested recursively:
+
+```python
+orchestrator_step = agent.step(
+    bot.invoke(
+        bot_key="erdo.data-analyst",
+        parameters={"query": state.query}
+    )
+)
+
+# Test harness:
+# ✅ Tests orchestrator logic
+# ✅ Recursively tests invoked agent
+# ✅ Validates parameter passing
+# ✅ Checks output handling
+```
+
+## Best Practices
+
+### Comprehensive Coverage
+
+Write agents with clear conditional paths:
+
+```python
+# Good: Clear conditions, easy to test
+analysis_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={"validated": True})
+)
+
+analysis_step.on(
+    IsSuccess() & ~GreaterThan("confidence", "0.8"),
+    utils.send_status(status="needs_review")
+)
+
+analysis_step.on(
+    IsError(),
+    utils.send_status(status="failed")
+)
+```
+
+### Meaningful Test Data
+
+Provide realistic test data for accurate validation:
+
+```json
+{
+  "query": "Analyze customer churn patterns in Q4 2024",
+  "dataset": {
+    "id": "customers_2024_q4",
+    "rows": 45000,
+    "date_range": {
+      "start": "2024-10-01",
+      "end": "2024-12-31"
+    }
+  }
+}
+```
+
+### Iterative Development
+
+Use watch mode during development:
+
+```bash
+# Terminal 1: Watch tests
+erdo test agents/my_agent.py --watch
+
+# Terminal 2: Edit agent
+vim agents/my_agent.py
+# Tests run automatically on save
+```
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+```yaml
+name: Test Agents
+
+on: [push, pull_request]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install Erdo CLI
+        run: brew install erdoai/tap/erdo
+      
+      - name: Run Unit Tests
+        run: erdo test agents/
+```
+
+### Pre-commit Hook
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+erdo test agents/
+```
+
+## Troubleshooting
+
+### Template Hydration Errors
+
+**Error:** `Missing key 'dataset.url' in template data`
+
+**Solution:** Provide the missing field in test data:
+
+```json
+{
+  "dataset": {
+    "url": "https://example.com/data.csv"
+  }
+}
+```
+
+### State Reference Errors
+
+**Error:** `Field 'previous_step.output' is not available`
+
+**Solution:** Check step dependencies:
+
+```python
+# Ensure depends_on is set correctly
+current_step = agent.step(
+    action,
+    depends_on=previous_step  # Required for state access
+)
+```
+
+### Path Coverage Issues
+
+If certain paths aren't tested, review your conditional logic:
+
+```python
+# Ensure all cases are covered
+step.on(IsSuccess() & condition, action1)
+step.on(IsSuccess() & ~condition, action2)  # Inverse condition
+step.on(IsError(), error_action)  # Error path
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Integration Testing" icon="plug" href="/testing/integration-tests">
+    Learn about end-to-end testing with replay mode
+  </Card>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands">
+    Complete CLI testing reference
+  </Card>
+  <Card title="Best Practices" icon="lightbulb" href="/testing/best-practices">
+    Testing strategies and patterns
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/data-analysis">
+    See testing in real agents
+  </Card>
+</CardGroup>
+

@@ -27,6 +27,14 @@
         ]
       },
       {
+        "group": "Testing & Validation",
+        "pages": [
+          "testing/overview",
+          "testing/unit-tests",
+          "why-erdo"
+        ]
+      },
+      {
         "group": "Examples & Use Cases",
         "pages": ["examples/business-automation", "examples/data-analysis"]
       },
