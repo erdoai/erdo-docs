@@ -655,20 +655,30 @@ for event in result.events:
 
 ### Test Module
 
-Run agent tests and validations:
+Write fast, parallel agent tests:
 
 ```python
-from erdo.test import AgentTest, LiveTest
+from erdo import invoke
+from erdo.test import text_contains, json_path_equals
 
-# Local agent testing
-test = AgentTest(agent)
-validation_results = test.validate()
-simulation_results = test.simulate(data={"input": "test data"})
+# Write agent tests with agent_test_* prefix
+def agent_test_basic_query():
+    """Test basic agent invocation."""
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Test query"}],
+        mode="replay",  # Free after first run
+    )
 
-# Live testing via platform
-live = LiveTest()
-results = live.run_all()
-results = live.run_by_agent("data-analyzer")
+    assert response.success
+    assert text_contains(str(response.result), "expected text")
+
+# Run tests with CLI
+# erdo agent-test tests/test_my_agent.py
+
+# Or programmatically
+from erdo.test import run_tests
+exit_code = run_tests("tests/test_my_agent.py", verbose=True)
 ```
 
 ## Best Practices

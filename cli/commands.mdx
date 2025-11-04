@@ -163,18 +163,84 @@ erdo agent run data-analyzer --input data.csv
 erdo agent run sales-bot --params '{"customer_id": "123"}'
 ```
 
-### `erdo agent test`
+### `erdo agent-test`
 
-Test an agent.
+Run agent tests with parallel execution.
 
 ```bash
-erdo agent test <agent-name>
+erdo agent-test <test_file.py>
 ```
+
+**Description:**
+
+The `agent-test` command discovers all `agent_test_*` functions in your Python test files and runs them in parallel for fast execution. Tests use the `invoke()` function with `mode="replay"` for fast, free testing.
 
 **Options:**
 
-- `--test-data`: Test data file
-- `--coverage`: Generate coverage report
+- `-v, --verbose`: Show detailed error traces
+- `-j, --jobs <N>`: Number of parallel jobs (default: auto)
+- `-r, --refresh`: Force refresh cached responses in replay mode
+
+**Examples:**
+
+```bash
+# Run all tests in a file
+erdo agent-test tests/test_my_agent.py
+
+# Verbose output (show full error traces)
+erdo agent-test tests/test_my_agent.py --verbose
+
+# Limit parallel jobs
+erdo agent-test tests/test_my_agent.py -j 4
+
+# Refresh cached responses (bypass cache in replay mode)
+erdo agent-test tests/test_my_agent.py --refresh
+```
+
+**Test Pattern:**
+
+Write test functions with the `agent_test_*` prefix:
+
+```python
+from erdo import invoke
+from erdo.test import text_contains
+
+def agent_test_basic_query():
+    """Test basic agent invocation."""
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Hello"}],
+        mode="replay",  # Free after first run!
+    )
+
+    assert response.success
+    assert text_contains(str(response.result), "expected text")
+```
+
+**Output Example:**
+
+```
+Discovering tests in tests/test_my_agent.py...
+Found 15 tests
+
+Running tests in parallel...
+
+======================================================================
+AGENT TEST RESULTS
+======================================================================
+
+✅ agent_test_csv_sales_total (0.45s)
+✅ agent_test_csv_product_breakdown (0.52s)
+❌ agent_test_invalid_dataset (0.21s)
+
+----------------------------------------------------------------------
+Total: 15 | Passed: 14 | Failed: 1 | Duration: 2.3s
+----------------------------------------------------------------------
+```
+
+**See Also:**
+- [Agent Testing](/sdk/test) - Complete testing guide
+- [Invoke](/sdk/invoke) - Learn about the invoke() function
 
 ### `erdo export-bot`
 

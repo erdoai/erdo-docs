@@ -117,38 +117,55 @@ Choose the approach that best fits your development workflow. The Erdo platform 
 <Tabs>
   <Tab title="CLI">
     ```bash
-    # Test agent locally
-    erdo test my-agent --input '{"query": "analyze data"}'
-    
-    # Run agent with parameters
-    erdo agent run my-agent --param dataset=sales.csv
-    
-    # Interactive testing
-    erdo agent test my-agent --interactive
+    # Invoke agent with message
+    erdo invoke my-agent --message "analyze data"
+
+    # With datasets and parameters
+    erdo invoke my-agent \
+      --message "Query" \
+      --dataset sales-2024 \
+      --parameter key=value
+
+    # Test modes
+    erdo invoke my-agent --message "Test" --mode replay  # Free
+
+    # Output formats
+    erdo invoke my-agent --message "Query" --output text
+    erdo invoke my-agent --message "Query" --output json
+
+    # Streaming
+    erdo invoke my-agent --message "Long task" --stream --verbose
     ```
   </Tab>
   <Tab title="SDK">
     ```python
-    from erdo.invoke import Invoke
-    
-    # Invoke agent by key
-    result = Invoke.by_key(
-        "erdo.my-agent",
-        parameters={"query": "analyze data"}
+    from erdo import invoke
+
+    # Invoke agent
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "analyze data"}],
+        parameters={"query": "test"}
     )
-    print(f"Result: {result.data}")
-    
-    # Invoke agent object directly
-    result = Invoke(agent, parameters={"dataset": "sales.csv"})
-    
+
+    if response.success:
+        print(response.result)
+
+    # With datasets
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Query"}],
+        datasets=["sales-2024"],
+        mode="replay"  # Free after first run
+    )
+
     # Streaming mode
-    result = Invoke.by_key(
-        "erdo.my-agent", 
-        parameters={"query": "large analysis"},
-        stream=True
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Long task"}],
+        stream=True,
+        output_format="text"
     )
-    for event in result.events:
-        print(f"Event: {event.type}")
     ```
   </Tab>
 </Tabs>
@@ -158,32 +175,39 @@ Choose the approach that best fits your development workflow. The Erdo platform 
 <Tabs>
   <Tab title="CLI">
     ```bash
-    # Run all tests
-    erdo test
-    
-    # Test specific agent
-    erdo test --agent my-agent
-    
-    # Integration tests
-    erdo test --integration
-    
-    # Test with custom data
-    erdo test my-agent --test-data test_data.json
+    # Run agent tests (parallel execution)
+    erdo agent-test tests/test_my_agent.py
+
+    # Verbose output
+    erdo agent-test tests/test_my_agent.py --verbose
+
+    # Local validation (static checks)
+    erdo test my_agent.py
+
+    # Test with simulation
+    erdo test --data test_data.json
     ```
   </Tab>
   <Tab title="SDK">
     ```python
-    from erdo.test import AgentTest, LiveTest
-    
-    # Local agent testing
-    test = AgentTest(agent)
-    validation_results = test.validate()
-    simulation_results = test.simulate(data={"input": "test"})
-    
-    # Live testing via platform
-    live = LiveTest()
-    results = live.run_all()
-    results = live.run_by_agent("my-agent")
+    from erdo import invoke
+    from erdo.test import text_contains
+
+    # Write agent tests
+    def agent_test_basic_query():
+        """Test basic agent invocation."""
+        response = invoke(
+            "my-agent",
+            messages=[{"role": "user", "content": "Test"}],
+            mode="replay",  # Free after first run
+        )
+
+        assert response.success
+        assert text_contains(str(response.result), "expected")
+
+    # Run tests programmatically
+    from erdo.test import run_tests
+    exit_code = run_tests("tests/test_my_agent.py", verbose=True)
     ```
   </Tab>
 </Tabs>

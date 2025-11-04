@@ -1,583 +1,569 @@
 ---
-title: "Test Module" 
-description: "Test and validate agents locally and on the platform"
+title: "Agent Testing"
+description: "Write fast, parallel agent tests using the invoke() pattern"
 ---
 
-# Test Module
+# Agent Testing
 
-The Test module provides comprehensive testing capabilities for Erdo agents, supporting both local validation and live testing via the platform.
+Erdo provides a simple, fast testing pattern for agents using the `invoke()` function with parallel execution.
 
-## Installation & Setup
+## Quick Start
 
-```python
-from erdo.test import AgentTest, LiveTest
-from erdo.config import Config
+### 1. Write Test Functions
 
-# Verify configuration for live tests
-config = Config()
-if not config.is_authenticated():
-    print("Please run 'erdo login' for live testing")
-```
-
-## Local Testing
-
-### AgentTest Class
-
-Use `AgentTest` for local validation and simulation without platform calls:
+Create a Python file with `agent_test_*` functions:
 
 ```python
-from erdo import Agent
-from erdo.actions import llm, memory
-from erdo.test import AgentTest
+from erdo import invoke
+from erdo.test import text_contains
 
-# Create your agent
-agent = Agent(
-    name="test_agent", 
-    description="Agent for testing"
-)
-
-step = agent.step(llm.message(
-    model="claude-sonnet-4",
-    context="Process: {{input}}"
-))
-
-# Create test instance
-test = AgentTest(agent)
-
-# Run validation
-validation_results = test.validate()
-print(f"Validation passed: {validation_results.passed}")
-
-if not validation_results.passed:
-    for error in validation_results.errors:
-        print(f"Error: {error}")
-```
-
-### Local Simulation
-
-```python
-from erdo.test import AgentTest
-
-# Simulate agent execution with test data
-test = AgentTest(agent)
-
-simulation_results = test.simulate(
-    data={"input": "test data for simulation"}
-)
-
-print(f"Simulation status: {simulation_results.status}")
-print(f"Steps executed: {len(simulation_results.step_results)}")
-
-for step_result in simulation_results.step_results:
-    print(f"Step: {step_result.step_name}")
-    print(f"Status: {step_result.status}")
-    print(f"Output: {step_result.output}")
-```
-
-## Live Testing
-
-### LiveTest Class
-
-Use `LiveTest` for running tests via the Erdo platform:
-
-```python
-from erdo.test import LiveTest
-
-# Initialize live test client
-live_test = LiveTest()
-
-# Run all available tests
-results = live_test.run_all()
-print(f"Executed {len(results)} tests")
-
-for result in results:
-    print(f"Test: {result.test_name} - {result.status}")
-```
-
-### Test Specific Agent
-
-```python
-from erdo.test import LiveTest
-
-live_test = LiveTest()
-
-# Test specific agent
-results = live_test.run_by_agent("data-analyzer")
-
-for result in results:
-    if result.status == "passed":
-        print(f"✅ {result.test_name}: {result.message}")
-    else:
-        print(f"❌ {result.test_name}: {result.error}")
-```
-
-## API Reference
-
-### AgentTest
-
-```python
-class AgentTest:
-    def __init__(self, agent: Agent):
-        """Initialize local testing for an agent."""
-    
-    def validate(self) -> ValidationResult:
-        """Validate agent structure and configuration."""
-    
-    def simulate(self, data: Dict) -> SimulationResult:
-        """Simulate agent execution with test data."""
-```
-
-### LiveTest
-
-```python
-class LiveTest:
-    def __init__(self, config: Optional[Config] = None):
-        """Initialize live testing client."""
-    
-    def run_all(self) -> List[TestResult]:
-        """Run all available tests."""
-    
-    def run_by_agent(self, agent_name: str) -> List[TestResult]:
-        """Run tests for a specific agent."""
-    
-    def run_by_tag(self, tag: str) -> List[TestResult]:
-        """Run tests matching a specific tag."""
-```
-
-### Result Types
-
-```python
-class ValidationResult:
-    passed: bool                # Whether validation passed
-    errors: List[str]          # Validation errors
-    warnings: List[str]        # Validation warnings
-
-class SimulationResult:
-    status: str                # "success" or "error" 
-    step_results: List[StepResult]  # Results for each step
-    execution_time: float      # Simulation duration
-    error: Optional[str]       # Error message if failed
-
-class TestResult:
-    test_name: str            # Name of the test
-    status: str               # "passed", "failed", "skipped"
-    message: Optional[str]    # Success message
-    error: Optional[str]      # Error details
-    duration: float           # Test execution time
-    metadata: Dict            # Additional test data
-```
-
-## Testing Patterns
-
-### Comprehensive Agent Testing
-
-```python
-from erdo import Agent
-from erdo.actions import llm, memory
-from erdo.test import AgentTest, LiveTest
-from erdo.sync import Sync
-
-def test_agent_thoroughly(agent: Agent):
-    """Complete testing workflow for an agent."""
-    
-    print(f"Testing agent: {agent.name}")
-    
-    # 1. Local validation
-    local_test = AgentTest(agent)
-    validation = local_test.validate()
-    
-    if not validation.passed:
-        print("❌ Local validation failed:")
-        for error in validation.errors:
-            print(f"  - {error}")
-        return False
-    
-    print("✅ Local validation passed")
-    
-    # 2. Local simulation
-    simulation = local_test.simulate(data={
-        "test_input": "sample data for testing"
-    })
-    
-    if simulation.status != "success":
-        print(f"❌ Simulation failed: {simulation.error}")
-        return False
-    
-    print(f"✅ Simulation passed ({len(simulation.step_results)} steps)")
-    
-    # 3. Sync to platform
-    sync_result = Sync(agent)
-    if sync_result.status != "success":
-        print(f"❌ Sync failed: {sync_result.error}")
-        return False
-    
-    print(f"✅ Synced to platform: {sync_result.agent_key}")
-    
-    # 4. Live testing
-    live_test = LiveTest()
-    live_results = live_test.run_by_agent(agent.name)
-    
-    passed_tests = [r for r in live_results if r.status == "passed"]
-    failed_tests = [r for r in live_results if r.status == "failed"]
-    
-    if failed_tests:
-        print(f"❌ {len(failed_tests)} live tests failed:")
-        for result in failed_tests:
-            print(f"  - {result.test_name}: {result.error}")
-        return False
-    
-    print(f"✅ All {len(passed_tests)} live tests passed")
-    return True
-
-# Usage
-my_agent = Agent(name="comprehensive_test")
-# ... define agent steps ...
-
-success = test_agent_thoroughly(my_agent)
-if success:
-    print("🎉 Agent ready for production!")
-```
-
-### Test-Driven Development
-
-```python
-from erdo import Agent
-from erdo.actions import llm
-from erdo.test import AgentTest
-
-def create_agent_with_tdd():
-    """Create agent using test-driven development."""
-    
-    # 1. Define expected behavior
-    test_cases = [
-        {"input": "hello", "expected_contains": "greeting"},
-        {"input": "help me", "expected_contains": "assistance"},
-        {"input": "analyze data", "expected_contains": "analysis"}
-    ]
-    
-    # 2. Create initial agent
-    agent = Agent(
-        name="tdd_agent",
-        description="Agent created with TDD approach"
+def agent_test_basic_query():
+    """Test basic agent invocation."""
+    response = invoke(
+        "data-question-answerer",
+        messages=[{"role": "user", "content": "What were Q4 sales?"}],
+        datasets=["sales-q4-2024"],
+        mode="replay",  # Free after first run!
     )
-    
-    response_step = agent.step(llm.message(
-        model="claude-sonnet-4",
-        context="Respond appropriately to: {{user_input}}"
-    ))
-    
-    # 3. Test iteratively
-    test = AgentTest(agent)
-    
-    for i, test_case in enumerate(test_cases):
-        print(f"Running test case {i+1}...")
-        
-        simulation = test.simulate(data={"user_input": test_case["input"]})
-        
-        if simulation.status == "success":
-            # Check if output contains expected content
-            output = simulation.step_results[0].output
-            if test_case["expected_contains"] in str(output).lower():
-                print(f"✅ Test case {i+1} passed")
-            else:
-                print(f"❌ Test case {i+1} failed: missing '{test_case['expected_contains']}'")
-        else:
-            print(f"❌ Test case {i+1} failed: {simulation.error}")
-    
-    return agent
 
-# Usage
-tdd_agent = create_agent_with_tdd()
+    # Assert invocation succeeded
+    assert response.success, f"Invocation failed: {response.error}"
+
+    # Assert on the result
+    result_text = str(response.result)
+    assert text_contains(result_text, "sales", case_sensitive=False)
 ```
 
-### Regression Testing
+### 2. Run Tests
+
+```bash
+# Run all tests in parallel
+erdo agent-test tests/test_my_agent.py
+
+# Verbose output
+erdo agent-test tests/test_my_agent.py --verbose
+
+# Limit parallel jobs
+erdo agent-test tests/test_my_agent.py -j 4
+```
+
+### 3. See Results
+
+```
+Discovering tests in tests/test_my_agent.py...
+Found 15 tests
+
+Running tests in parallel...
+
+======================================================================
+AGENT TEST RESULTS
+======================================================================
+
+✅ agent_test_csv_sales_total (0.45s)
+✅ agent_test_csv_product_breakdown (0.52s)
+✅ agent_test_postgres_customer_count (0.38s)
+❌ agent_test_invalid_dataset (0.21s)
+
+----------------------------------------------------------------------
+Total: 15 | Passed: 14 | Failed: 1 | Duration: 2.3s
+----------------------------------------------------------------------
+```
+
+## Why This Pattern?
+
+**⚡ 10x Faster**: Tests run in parallel automatically
+
+**🆓 Free Testing**: Use `mode="replay"` for cached responses (free after first run)
+
+**🎯 Simple**: Just name functions `agent_test_*` and use `invoke()`
+
+**📊 Clean Output**: Nice summary with pass/fail counts and timing
+
+**🔧 No pytest**: Pure Python, easy to debug
+
+## Test Modes
+
+Control how bot actions are executed in tests:
+
+| Mode | Description | Cost | Use Case |
+|------|-------------|------|----------|
+| **live** | Real API calls | $$$ per run | Integration tests, fresh data |
+| **replay** | Cached responses | $$$ first run, FREE after | Unit tests, CI/CD |
+| **manual** | Developer mocks | FREE always | Deterministic tests, offline |
+
+### Live Mode (Default)
+Runs against real backend with LLM API (costs $):
 
 ```python
-from erdo.test import LiveTest
-from erdo.sync import Sync
-import json
-import time
+response = invoke("my-agent", messages=[...])  # mode="live" is default
+```
 
-class RegressionTester:
-    """Automated regression testing for agents."""
-    
-    def __init__(self):
-        self.live_test = LiveTest()
-        self.baseline_results = {}
-    
-    def establish_baseline(self, agent_names: List[str]):
-        """Establish performance baseline for agents."""
-        print("Establishing performance baseline...")
-        
-        for agent_name in agent_names:
-            results = self.live_test.run_by_agent(agent_name)
-            self.baseline_results[agent_name] = {
-                "test_count": len(results),
-                "passed": len([r for r in results if r.status == "passed"]),
-                "avg_duration": sum(r.duration for r in results) / len(results) if results else 0
+**Use for:** Integration tests requiring fresh data
+
+### Replay Mode (Recommended)
+Uses cached responses - **first run costs $, subsequent runs FREE**:
+
+```python
+def agent_test_basic():
+    response = invoke("my-agent", messages=[...], mode="replay")
+    assert response.success
+```
+
+**Cache behavior:**
+- First run: Executes live and caches response
+- Subsequent runs: Returns cached response (FREE!)
+- Auto-invalidates when bot is updated
+
+**Use for:** Most agent tests, CI/CD pipelines
+
+#### Replay Mode with Refresh
+
+Force cache refresh while staying in replay mode:
+
+```python
+def agent_test_with_fresh_data():
+    # Bypass cache and get fresh response
+    response = invoke(
+        "my-agent",
+        messages=[...],
+        mode={"mode": "replay", "refresh": True}
+    )
+    assert response.success
+```
+
+**Use for:**
+- Testing with fresh data without leaving replay mode
+- Updating cached responses after bot changes
+- Testing cache refresh behavior
+
+### Manual Mode
+Developer-provided mock responses - always free:
+
+```python
+def agent_test_with_mocks():
+    response = invoke(
+        "my-agent",
+        messages=[...],
+        mode="manual",
+        manual_mocks={
+            "llm.message": {
+                "status": "success",
+                "output": {"content": "Mocked response"}
             }
-        
-        # Save baseline
-        with open("test_baseline.json", "w") as f:
-            json.dump(self.baseline_results, f, indent=2)
-        
-        print(f"Baseline established for {len(agent_names)} agents")
-    
-    def run_regression_tests(self, agent_names: List[str]):
-        """Run regression tests against baseline."""
-        print("Running regression tests...")
-        
-        # Load baseline
-        try:
-            with open("test_baseline.json", "r") as f:
-                baseline = json.load(f)
-        except FileNotFoundError:
-            print("No baseline found. Run establish_baseline() first.")
-            return
-        
-        regression_issues = []
-        
-        for agent_name in agent_names:
-            print(f"Testing {agent_name}...")
-            
-            current_results = self.live_test.run_by_agent(agent_name)
-            baseline_data = baseline.get(agent_name, {})
-            
-            current_stats = {
-                "test_count": len(current_results),
-                "passed": len([r for r in current_results if r.status == "passed"]),
-                "avg_duration": sum(r.duration for r in current_results) / len(current_results) if current_results else 0
-            }
-            
-            # Check for regressions
-            if current_stats["passed"] < baseline_data.get("passed", 0):
-                regression_issues.append(f"{agent_name}: Test failures increased")
-            
-            if current_stats["avg_duration"] > baseline_data.get("avg_duration", 0) * 1.5:
-                regression_issues.append(f"{agent_name}: Performance degraded significantly")
-        
-        if regression_issues:
-            print("❌ Regression issues detected:")
-            for issue in regression_issues:
-                print(f"  - {issue}")
-            return False
-        else:
-            print("✅ No regressions detected")
-            return True
-
-# Usage
-tester = RegressionTester()
-
-# Establish baseline
-agent_names = ["data-analyzer", "report-generator", "file-processor"]
-tester.establish_baseline(agent_names)
-
-# Later, after changes
-regression_passed = tester.run_regression_tests(agent_names)
+        }
+    )
+    assert response.success
+    assert "Mocked" in str(response.result)
 ```
 
-## Integration Examples
+**Use for:**
+- Testing error handling
+- Deterministic test outcomes
+- Offline development
+- Fast unit tests without API calls
 
-### CI/CD Testing
+## Test Helpers
+
+Import assertion helpers from `erdo.test`:
 
 ```python
-#!/usr/bin/env python3
-"""Agent testing for CI/CD pipeline."""
-
-import sys
-import json
-from erdo.sync import Sync
-from erdo.test import LiveTest
-
-def ci_test_pipeline():
-    """Complete CI/CD testing pipeline."""
-    
-    print("Starting CI/CD test pipeline...")
-    
-    # 1. Sync all agents
-    print("Syncing agents...")
-    sync_results = Sync.from_directory("agents/")
-    
-    failed_syncs = [r for r in sync_results if r.status != "success"]
-    if failed_syncs:
-        print(f"❌ {len(failed_syncs)} agents failed to sync:")
-        for result in failed_syncs:
-            print(f"  - {result.agent_name}: {result.error}")
-        return False
-    
-    print(f"✅ Synced {len(sync_results)} agents")
-    
-    # 2. Run live tests
-    print("Running live tests...")
-    live_test = LiveTest()
-    all_results = live_test.run_all()
-    
-    failed_tests = [r for r in all_results if r.status == "failed"]
-    if failed_tests:
-        print(f"❌ {len(failed_tests)} tests failed:")
-        for result in failed_tests:
-            print(f"  - {result.test_name}: {result.error}")
-        return False
-    
-    print(f"✅ All {len(all_results)} tests passed")
-    
-    # 3. Generate test report
-    report = {
-        "synced_agents": len(sync_results),
-        "test_results": len(all_results),
-        "passed_tests": len([r for r in all_results if r.status == "passed"]),
-        "total_duration": sum(r.duration for r in all_results)
-    }
-    
-    with open("test_report.json", "w") as f:
-        json.dump(report, f, indent=2)
-    
-    print("✅ CI/CD pipeline completed successfully")
-    return True
-
-if __name__ == "__main__":
-    success = ci_test_pipeline()
-    sys.exit(0 if success else 1)
+from erdo.test import (
+    text_contains,      # Check if text contains substring
+    text_equals,        # Check exact match
+    text_matches,       # Check regex pattern
+    json_path_equals,   # Check JSON path value
+    json_path_exists,   # Check if JSON path exists
+    has_dataset,        # Check if dataset is present
+)
 ```
 
-### Interactive Testing
+### text_contains
+
+Check if text contains a substring:
 
 ```python
-from erdo.test import AgentTest, LiveTest
-from erdo.sync import Sync
-import json
+result_text = str(response.result)
 
-def interactive_testing_session():
-    """Interactive testing session with user input."""
-    
-    print("🧪 Interactive Agent Testing Session")
-    print("=" * 40)
-    
-    # Get agent from user
-    agent_file = input("Enter agent file path: ").strip()
-    if not agent_file:
-        agent_file = "my_agent.py"
-    
-    # Sync agent
-    print(f"\nSyncing agents from {agent_file}...")
-    sync_results = Sync.from_file(agent_file)
-    
-    if not sync_results:
-        print("❌ No agents found in file")
-        return
-    
-    # Let user choose agent
-    if len(sync_results) > 1:
-        print(f"\nFound {len(sync_results)} agents:")
-        for i, result in enumerate(sync_results):
-            print(f"  {i+1}. {result.agent_name}")
-        
-        choice = int(input("Select agent (number): ")) - 1
-        selected_agent = sync_results[choice]
-    else:
-        selected_agent = sync_results[0]
-    
-    print(f"\nSelected agent: {selected_agent.agent_name}")
-    
-    # Test menu
-    while True:
-        print("\nTesting options:")
-        print("1. Run live tests")
-        print("2. Custom test with input")
-        print("3. View test history")
-        print("4. Exit")
-        
-        choice = input("Choose option (1-4): ").strip()
-        
-        if choice == "1":
-            print("\nRunning live tests...")
-            live_test = LiveTest()
-            results = live_test.run_by_agent(selected_agent.agent_name)
-            
-            for result in results:
-                status_icon = "✅" if result.status == "passed" else "❌"
-                print(f"{status_icon} {result.test_name} ({result.duration:.2f}s)")
-        
-        elif choice == "2":
-            test_input = input("Enter test input (JSON): ").strip()
-            try:
-                input_data = json.loads(test_input)
-                # Here you would invoke the agent with the test data
-                print(f"Testing with input: {input_data}")
-                # result = Invoke.by_key(selected_agent.agent_key, parameters=input_data)
-            except json.JSONDecodeError:
-                print("❌ Invalid JSON input")
-        
-        elif choice == "3":
-            print("Test history feature coming soon...")
-        
-        elif choice == "4":
-            break
-        
-        else:
-            print("Invalid choice")
+assert text_contains(result_text, "expected")
+assert text_contains(result_text, "EXPECTED", case_sensitive=False)
+```
 
-# Run interactive session
-interactive_testing_session()
+### text_equals
+
+Check exact text match:
+
+```python
+assert text_equals(result_text, "exact match")
+assert text_equals(result_text, "EXACT MATCH", case_sensitive=False)
+```
+
+### text_matches
+
+Check regex pattern:
+
+```python
+import re
+
+assert text_matches(result_text, r"\d+ customers")
+assert text_matches(result_text, r"^hello", re.IGNORECASE)
+```
+
+### json_path_equals
+
+Check JSON path values:
+
+```python
+data = {"user": {"name": "Alice", "age": 30}}
+
+assert json_path_equals(data, "user.name", "Alice")
+assert json_path_equals(data, "user.age", 30)
+```
+
+### json_path_exists
+
+Check if JSON path exists:
+
+```python
+assert json_path_exists(data, "user.name")
+assert not json_path_exists(data, "user.email")
+```
+
+### has_dataset
+
+Check if dataset is present in response:
+
+```python
+assert has_dataset(response)
+assert has_dataset(response, dataset_id="abc-123")
+assert has_dataset(response, dataset_key="sales_data")
+```
+
+## Complete Example
+
+```python
+"""
+Agent tests for data question answerer.
+
+To run:
+  erdo agent-test tests/test_data_question_answerer.py
+"""
+
+from erdo import invoke
+from erdo.test import text_contains, text_equals
+
+# Agent key constant
+AGENT_KEY = "data-question-answerer"
+
+def agent_test_csv_sales_total():
+    """Test CSV sales total aggregation."""
+    response = invoke(
+        AGENT_KEY,
+        messages=[{"role": "user", "content": "What were total sales in October?"}],
+        datasets=["sales-q4-2024"],
+        mode="replay",
+    )
+
+    assert response.success
+    result_text = str(response.result)
+    assert text_contains(result_text, "October", case_sensitive=False)
+    assert text_contains(result_text, "total", case_sensitive=False)
+
+
+def agent_test_csv_product_breakdown():
+    """Test CSV product category breakdown."""
+    response = invoke(
+        AGENT_KEY,
+        messages=[{"role": "user", "content": "Show sales by product category"}],
+        datasets=["sales-q4-2024"],
+        mode="replay",
+    )
+
+    assert response.success
+    result_text = str(response.result)
+    assert text_contains(result_text, "category", case_sensitive=False)
+
+
+def agent_test_with_parameters():
+    """Test passing custom parameters."""
+    response = invoke(
+        AGENT_KEY,
+        messages=[{"role": "user", "content": "Analyze the sales data"}],
+        datasets=["sales-q4-2024"],
+        parameters={
+            "analysis_type": "trend",
+            "time_period": "weekly"
+        },
+        mode="replay",
+    )
+
+    assert response.success
+    result_text = str(response.result)
+    assert text_contains(result_text, "trend", case_sensitive=False) or \
+           text_contains(result_text, "weekly", case_sensitive=False)
+
+
+def agent_test_multi_dataset():
+    """Test with multiple datasets."""
+    response = invoke(
+        AGENT_KEY,
+        messages=[{
+            "role": "user",
+            "content": "Is there a correlation between traffic and sales?"
+        }],
+        datasets=["sales-q4-2024", "ga-main-property"],
+        mode="replay",
+    )
+
+    assert response.success
+    result_text = str(response.result)
+    assert text_contains(result_text, "correlation", case_sensitive=False)
+
+
+def agent_test_empty_result():
+    """Test handling of empty results."""
+    response = invoke(
+        AGENT_KEY,
+        messages=[{
+            "role": "user",
+            "content": "Show products costing over $1,000,000"
+        }],
+        datasets=["sales-q4-2024"],
+        mode="replay",
+    )
+
+    assert response.success
+    result_text = str(response.result)
+    # Should gracefully indicate no results
+    assert text_contains(result_text, "no", case_sensitive=False)
 ```
 
 ## Best Practices
 
-1. **Comprehensive Testing**: Use both local validation and live testing
-2. **Test Early**: Run tests during development, not just before deployment
-3. **Automated Testing**: Include testing in CI/CD pipelines
-4. **Regression Testing**: Establish baselines and detect performance regressions
-5. **Test Data Management**: Use realistic test data that covers edge cases
-6. **Error Testing**: Test failure scenarios and error handling
-7. **Documentation**: Document test cases and expected behaviors
+### 1. Use Descriptive Names
+
+```python
+# Good - clear purpose
+def agent_test_csv_sales_aggregation():
+    ...
+
+# Bad - unclear
+def agent_test_test1():
+    ...
+```
+
+### 2. Choose the Right Mode
+
+```python
+# Good - replay mode for most tests (fast, free after first run)
+response = invoke("my-agent", messages=[...], mode="replay")
+
+# Good - manual mode for deterministic tests
+response = invoke("my-agent", messages=[...], mode="manual",
+                  manual_mocks={"llm.message": {...}})
+
+# Good - refresh when you need fresh data
+response = invoke("my-agent", messages=[...], mode={"mode": "replay", "refresh": True})
+
+# Avoid - live mode costs $ every test run
+response = invoke("my-agent", messages=[...])  # mode="live" is expensive
+```
+
+**Mode selection guide:**
+- **Replay mode**: Default choice for most tests (free after first run)
+- **Manual mode**: When you need deterministic, controlled responses
+- **Refresh**: When you need to update cached responses
+- **Live mode**: Only for integration tests requiring fresh data
+
+### 3. Add Good Error Messages
+
+```python
+# Good
+assert response.success, f"Invocation failed: {response.error}"
+assert text_contains(result, "sales"), "Response should mention sales"
+
+# Bad
+assert response.success
+assert "sales" in result
+```
+
+### 4. Test Edge Cases
+
+```python
+def agent_test_empty_dataset():
+    """Test with empty dataset."""
+    response = invoke("my-agent", datasets=[], mode="replay")
+    assert response.success
+
+def agent_test_long_message():
+    """Test with long message."""
+    long_text = "Lorem ipsum " * 100
+    response = invoke("my-agent", messages=[...], mode="replay")
+    assert response.success
+
+def agent_test_special_characters():
+    """Test with special characters."""
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Test: $100 & 50% @ #tag"}],
+        mode="replay"
+    )
+    assert response.success
+```
+
+### 5. Group Related Tests
+
+```python
+# CSV Tests
+def agent_test_csv_basic():
+    ...
+
+def agent_test_csv_aggregation():
+    ...
+
+def agent_test_csv_filtering():
+    ...
+
+# Database Tests
+def agent_test_postgres_query():
+    ...
+
+def agent_test_postgres_join():
+    ...
+```
+
+## CLI Reference
+
+```bash
+# Run all tests in a file
+erdo agent-test tests/test_my_agent.py
+
+# Verbose output (show full error traces)
+erdo agent-test tests/test_my_agent.py --verbose
+
+# Limit parallel jobs
+erdo agent-test tests/test_my_agent.py -j 4
+
+# Refresh cached responses (force re-execution in replay mode)
+erdo agent-test tests/test_my_agent.py --refresh
+
+# Combine flags
+erdo agent-test tests/test_my_agent.py --refresh --verbose -j 8
+
+# Help
+erdo agent-test --help
+```
+
+**CLI Flags:**
+
+- `-v, --verbose`: Show detailed error traces
+- `-j, --jobs <N>`: Number of parallel jobs (default: auto)
+- `-r, --refresh`: Force refresh cached responses in replay mode
+
+**Refresh Flag:**
+
+The `--refresh` flag automatically forces all tests using `mode="replay"` to bypass the cache and get fresh responses. This is useful when:
+- You've updated your bot logic and want to refresh cached responses
+- You need fresh data from APIs without modifying test code
+- You want to verify that tests still pass with current LLM behavior
+
+**Important:** Tests must use `mode="replay"` for the refresh flag to work. Tests using `mode="live"` or `mode="manual"` are unaffected.
+
+## Python API
+
+You can also run tests programmatically:
+
+```python
+from erdo.test import run_tests
+
+# Run tests from a file
+exit_code = run_tests(
+    "tests/test_my_agent.py",
+    verbose=True,
+    max_workers=4
+)
+
+# exit_code is 0 if all tests passed, 1 if any failed
+```
+
+## Performance
+
+**Old Pattern (Sequential)**
+```
+15 tests × 2s each = 30 seconds total
+```
+
+**New Pattern (Parallel)**
+```
+15 tests in parallel = ~2-3 seconds total
+```
+
+**10x faster! 🚀**
 
 ## Troubleshooting
 
-### Common Issues
+### No tests found
 
-**Local Validation Failures**
+Make sure your test functions start with `agent_test_`:
+
 ```python
-from erdo.test import AgentTest
+# Correct
+def agent_test_my_feature():
+    ...
 
-test = AgentTest(agent)
-validation = test.validate()
+# Wrong - won't be discovered
+def test_my_feature():
+    ...
 
-if not validation.passed:
-    print("Validation errors:")
-    for error in validation.errors:
-        print(f"  - {error}")
-    
-    print("Warnings:")
-    for warning in validation.warnings:
-        print(f"  - {warning}")
+def my_test():
+    ...
 ```
 
-**Live Test Authentication**
-```python
-from erdo.config import Config
+### Tests failing with "Bot not found"
 
-config = Config()
-if not config.is_authenticated():
-    print("Run: erdo login")
-    print("Or set: ERDO_AUTH_TOKEN environment variable")
+Make sure the agent is synced to the backend:
+
+```bash
+erdo sync-agent path/to/agent.py
 ```
 
-**Test Timeouts**
-```python
-from erdo.test import LiveTest
+### Authentication errors
 
-# Increase timeout for slow tests
-live_test = LiveTest()
-# Note: Timeout configuration will be added in future versions
+Login first:
+
+```bash
+erdo login
 ```
 
-**Missing Test Data**
-```python
-# Ensure test data is properly formatted
-test_data = {
-    "required_field": "value",
-    "optional_field": "optional_value"
-}
+Or set environment variables:
 
-simulation = test.simulate(data=test_data)
+```bash
+export ERDO_ENDPOINT="https://api.erdo.ai"
+export ERDO_AUTH_TOKEN="your-token"
 ```
+
+### Slow test execution
+
+Use replay mode for faster, free testing:
+
+```python
+# Slow - hits LLM API every time
+response = invoke("my-agent", messages=[...])
+
+# Fast - cached after first run
+response = invoke("my-agent", messages=[...], mode="replay")
+```
+
+### Import errors
+
+Make sure the SDK is installed:
+
+```bash
+cd erdo-agents
+uv pip install -e ../erdo-python-sdk
+```
+
+## See Also
+
+- [Invoke Module](/sdk/invoke) - Learn about the invoke() function
+- [CLI Commands](/cli/commands) - Complete CLI reference
+- [Examples](/examples/data-analysis) - More testing examples

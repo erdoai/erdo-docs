@@ -1,525 +1,647 @@
 ---
-title: "Invoke Module"
-description: "Execute agents programmatically with the Erdo platform"
+title: "Invoke"
+description: "Execute agents programmatically with the invoke() function"
 ---
 
-# Invoke Module
+# Invoke
 
-The Invoke module enables you to execute agents programmatically, providing both streaming and non-streaming modes for different use cases.
+The `invoke()` function allows you to execute agents programmatically from Python code, making it easy to test agents, integrate them into applications, and automate workflows.
 
-## Installation & Setup
+## Quick Start
 
 ```python
-from erdo.invoke import Invoke
-from erdo.config import Config
+from erdo import invoke
 
-# Verify configuration
-config = Config()
-if not config.is_authenticated():
-    print("Please run 'erdo login' first")
+# Simple invocation
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+
+print(f"Success: {response.success}")
+print(f"Result: {response.result}")
 ```
 
 ## Basic Usage
 
-### Invoke by Agent Key
+### Invoke with Messages
 
 ```python
-from erdo.invoke import Invoke
+from erdo import invoke
 
-# Execute agent with parameters
-result = Invoke.by_key(
-    "erdo.data-analyzer",
+response = invoke(
+    "data-question-answerer",
+    messages=[{"role": "user", "content": "What were Q4 sales?"}]
+)
+
+if response.success:
+    print(response.result)
+else:
+    print(f"Error: {response.error}")
+```
+
+### Invoke with Datasets
+
+```python
+response = invoke(
+    "data-question-answerer",
+    messages=[{"role": "user", "content": "Show me the top products"}],
+    datasets=["sales-q4-2024", "products-catalog"]
+)
+```
+
+### Invoke with Parameters
+
+```python
+response = invoke(
+    "data-analyzer",
+    messages=[{"role": "user", "content": "Analyze the data"}],
     parameters={
-        "query": "Analyze sales trends",
-        "dataset": "sales_2024.csv"
+        "analysis_type": "trend",
+        "time_period": "monthly"
     }
 )
-
-print(f"Status: {result.status}")
-print(f"Result: {result.data}")
 ```
 
-### Invoke Agent Object
+## Invocation Modes
+
+Control how bot actions (especially LLM calls) are executed for testing and development:
+
+| Mode | Description | Cost | Use Case |
+|------|-------------|------|----------|
+| **live** | Real API calls | $$$ per run | Production, fresh data |
+| **replay** | Cached responses | $$$ first run, FREE after | Testing, CI/CD |
+| **manual** | Developer-provided mocks | FREE always | Unit tests, deterministic behavior |
+
+### Live Mode (Default)
+
+Runs against the real backend with LLM API (costs $):
 
 ```python
-from erdo import Agent
-from erdo.actions import llm
-from erdo.invoke import Invoke
-from erdo.sync import Sync
-
-# Create and sync agent
-agent = Agent(name="my_analyzer")
-step = agent.step(llm.message(
-    model="claude-sonnet-4",
-    context="Analyze: {{input}}"
-))
-
-sync_result = Sync(agent)
-
-# Invoke the synced agent
-invoke_result = Invoke(
-    agent,
-    parameters={"input": "sample data"}
+response = invoke(
+    "my-agent",
+    messages=[...],
+    mode="live"  # or omit mode parameter
 )
-print(f"Analysis: {invoke_result.data}")
 ```
 
-## Streaming Mode
+**When to use:**
+- Production invocations
+- Development with real-time data
+- When you need fresh LLM responses
 
-For real-time event processing during agent execution:
+### Replay Mode (Recommended for Testing)
+
+Uses cached responses - **first run costs $, subsequent runs FREE**:
 
 ```python
-from erdo.invoke import Invoke
+# Basic replay - uses cache if available
+response = invoke(
+    "my-agent",
+    messages=[...],
+    mode="replay"
+)
 
-# Enable streaming mode
-result = Invoke.by_key(
-    "erdo.data-analyzer",
-    parameters={"dataset": "large_data.csv"},
+# First run: Executes live and caches response
+# Second run: Returns cached response (FREE!)
+```
+
+Perfect for:
+- Development and testing
+- CI/CD pipelines
+- Iterating on agent logic
+- Running test suites
+
+**Cache behavior:**
+- Cache key: SHA256 hash of (bot_id, bot_updated_at, action_type, parameters)
+- Automatic invalidation when bot is updated
+- Multi-tenant isolation (scoped by organization)
+- Only LLM calls are cached (configurable)
+
+#### Replay Mode with Refresh
+
+Force a fresh API call while staying in replay mode:
+
+```python
+# Bypass cache and get fresh response
+response = invoke(
+    "my-agent",
+    messages=[...],
+    mode={"mode": "replay", "refresh": True}
+)
+
+# This will:
+# 1. Bypass the cache lookup
+# 2. Execute live against the LLM API
+# 3. Update the cached response
+# 4. Return the fresh result
+```
+
+**When to use refresh:**
+- Cache contains outdated responses
+- Testing cache refresh behavior
+- Updating cache after bot logic changes
+- Forcing fresh data without switching out of replay mode
+
+**Example workflow:**
+```python
+# Test 1: First run - caches response
+invoke("my-agent", messages=[...], mode="replay")
+
+# Test 2: Uses cached response (free!)
+invoke("my-agent", messages=[...], mode="replay")
+
+# Test 3: Update cache with fresh response
+invoke("my-agent", messages=[...], mode={"mode": "replay", "refresh": True})
+
+# Test 4: Uses newly cached response
+invoke("my-agent", messages=[...], mode="replay")
+```
+
+### Manual Mode
+
+Uses developer-provided mock responses - always free:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
+    mode="manual",
+    manual_mocks={
+        "llm.message": {
+            "status": "success",
+            "output": {
+                "content": "Mocked response content",
+                "model": "mock-model"
+            }
+        }
+    }
+)
+```
+
+**When to use:**
+- Unit testing with deterministic responses
+- Testing error handling
+- CI/CD pipelines
+- Offline development
+
+**Mock format:**
+```python
+manual_mocks = {
+    "llm.message": {  # Action type
+        "status": "success",  # or "error"
+        "output": {
+            "content": "Mocked LLM response",
+            "model": "mock-model",
+            # ... other output fields
+        }
+    },
+    # Add mocks for other action types
+}
+```
+
+**Important:**
+- Manual mode requires mocks for all executed actions
+- Error if no mock provided for an action
+- Action type keys: `llm.message`, `memory.search`, `codeexec.run`, etc.
+
+## Output Formats
+
+### Events Format (Default)
+
+Returns raw events:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
+    output_format="events"  # Default
+)
+
+# Response.result contains raw events
+print(response.result)  # {"events": [...]}
+```
+
+### Text Format
+
+Returns human-readable text:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
+    output_format="text"
+)
+
+# Clean text output
+print(response.result)
+# Bot: my agent
+# Invocation ID: abc-123
+# Result:
+# The answer is 42
+```
+
+### Text with Verbose Steps
+
+Show step-by-step execution:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
+    output_format="text",
+    verbose=True
+)
+
+# Output includes steps
+print(response.result)
+# Bot: my agent
+# Invocation ID: abc-123
+#
+# Steps:
+#   ✓ parse_input (utils.parse_json)
+#   ✓ analyze_data (llm.message)
+#   ✓ format_output (utils.echo)
+#
+# Result:
+# The answer is 42
+```
+
+### JSON Format
+
+Returns structured summary:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
+    output_format="json"
+)
+
+# Structured data
+print(response.result)
+# {
+#   "bot_name": "my agent",
+#   "bot_key": "my-agent",
+#   "invocation_id": "abc-123",
+#   "steps": [...],
+#   "result": "The answer is 42",
+#   "success": true
+# }
+```
+
+## Streaming
+
+Stream events in real-time:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[...],
     stream=True
 )
 
-# Process events as they arrive
-for event in result.events:
-    print(f"Event Type: {event.type}")
-    print(f"Data: {event.data}")
-    
-    if event.type == "step_completed":
-        print(f"Step '{event.data['step_name']}' finished")
-    elif event.type == "agent_completed":
-        print("Agent execution completed")
-        break
+# Access events
+for event in response.events:
+    print(event)
 ```
 
-## API Reference
-
-### Invoke Class
+Stream with formatted output:
 
 ```python
-class Invoke:
-    def __init__(self, agent: Agent, parameters: Optional[Dict] = None, 
-                 dataset_ids: Optional[List[str]] = None, stream: bool = False):
-        """Initialize Invoke for an agent object."""
-    
-    @classmethod
-    def by_key(cls, bot_key: str, parameters: Optional[Dict] = None,
-               dataset_ids: Optional[List[str]] = None, stream: bool = False) -> InvokeResult:
-        """Invoke agent by its platform key."""
+response = invoke(
+    "my-agent",
+    messages=[...],
+    stream=True,
+    output_format="text"
+)
+
+# Output streams to stdout automatically
+# Final result in response.result
 ```
 
-### InvokeResult
+## InvokeResult
+
+The `invoke()` function returns an `InvokeResult` object:
 
 ```python
 class InvokeResult:
-    status: str                    # "success", "error", "running"
-    data: Any                     # Agent output data
-    agent_key: str                # Agent identifier
-    execution_id: str             # Unique execution ID
-    error: Optional[str]          # Error message if failed
-    events: Optional[Iterator]    # SSE event stream (streaming mode)
-    metadata: Dict                # Additional execution metadata
+    success: bool                    # Whether invocation succeeded
+    bot_id: Optional[str]           # Bot key
+    invocation_id: Optional[str]    # Unique invocation ID
+    result: Optional[Any]           # Formatted result (depends on output_format)
+    error: Optional[str]            # Error message if failed
+    events: List[Dict[str, Any]]    # Raw events
 ```
 
-### Event Types (Streaming)
+### Example Usage
 
 ```python
-class SSEEvent:
-    type: str        # Event type
-    data: Dict       # Event data
-    timestamp: str   # ISO timestamp
-    
-# Common event types:
-# - "agent_started"
-# - "step_started" 
-# - "step_completed"
-# - "step_failed"
-# - "agent_completed"
-# - "agent_failed"
-```
+response = invoke("my-agent", messages=[...])
 
-## Advanced Usage
+# Check success
+if response.success:
+    # Get result
+    print(response.result)
 
-### Error Handling
+    # Get invocation ID
+    print(f"Invocation: {response.invocation_id}")
 
-```python
-from erdo.invoke import Invoke, InvokeError
-
-try:
-    result = Invoke.by_key(
-        "erdo.data-analyzer",
-        parameters={"query": "analyze data"}
-    )
-    
-    if result.status == "success":
-        print(f"Success: {result.data}")
-    else:
-        print(f"Agent returned error: {result.error}")
-        
-except InvokeError as e:
-    print(f"Invocation failed: {e}")
-except Exception as e:
-    print(f"Unexpected error: {e}")
-```
-
-### Custom Configuration
-
-```python
-from erdo.config import Config
-from erdo.invoke import Invoke
-
-# Custom configuration
-config = Config(
-    api_url="https://staging.erdo.ai",
-    auth_token="custom-token"
-)
-
-# Use with invoke
-result = Invoke.by_key(
-    "erdo.data-analyzer",
-    parameters={"data": "test"},
-    config=config
-)
-```
-
-### Dataset Integration
-
-```python
-from erdo.invoke import Invoke
-
-# Invoke with dataset references
-result = Invoke.by_key(
-    "erdo.data-processor",
-    parameters={
-        "analysis_type": "trend_analysis"
-    },
-    dataset_ids=["dataset_123", "dataset_456"]
-)
-
-print(f"Analysis result: {result.data}")
-```
-
-## Streaming Examples
-
-### Progress Tracking
-
-```python
-from erdo.invoke import Invoke
-
-def track_agent_progress(bot_key: str, parameters: Dict):
-    """Track agent execution with progress updates."""
-    
-    result = Invoke.by_key(bot_key, parameters=parameters, stream=True)
-    
-    step_count = 0
-    completed_steps = 0
-    
-    for event in result.events:
-        if event.type == "step_started":
-            step_count += 1
-            print(f"Step {step_count} started: {event.data.get('step_name')}")
-            
-        elif event.type == "step_completed":
-            completed_steps += 1
-            print(f"Step {completed_steps}/{step_count} completed")
-            
-        elif event.type == "agent_completed":
-            print(f"✅ Agent completed successfully!")
-            print(f"Final result: {event.data}")
-            break
-            
-        elif event.type == "agent_failed":
-            print(f"❌ Agent failed: {event.data.get('error')}")
-            break
-
-# Usage
-track_agent_progress(
-    "erdo.data-analyzer",
-    {"query": "complex analysis task"}
-)
-```
-
-### Real-time Data Processing
-
-```python
-from erdo.invoke import Invoke
-import json
-
-def process_streaming_results(bot_key: str, data_stream):
-    """Process data as agent generates results."""
-    
-    result = Invoke.by_key(
-        bot_key,
-        parameters={"mode": "streaming"},
-        stream=True
-    )
-    
-    results = []
-    
-    for event in result.events:
-        if event.type == "step_completed":
-            step_result = event.data.get('output')
-            if step_result:
-                results.append(step_result)
-                print(f"Intermediate result: {step_result}")
-                
-        elif event.type == "agent_completed":
-            final_result = event.data
-            print(f"Final aggregated result: {final_result}")
-            return final_result
-    
-    return results
-
-# Usage
-final_data = process_streaming_results(
-    "erdo.stream-processor",
-    {"input_stream": "real_time_data"}
-)
-```
-
-## Integration Examples
-
-### Jupyter Notebook
-
-```python
-# Cell 1: Setup
-from erdo.invoke import Invoke
-from erdo.sync import Sync
-import matplotlib.pyplot as plt
-
-# Cell 2: Quick analysis
-result = Invoke.by_key(
-    "erdo.data-visualizer", 
-    parameters={
-        "data_source": "sales_data.csv",
-        "chart_type": "trend_analysis"
-    }
-)
-
-# Cell 3: Display results
-if result.status == "success":
-    chart_data = result.data["chart_data"]
-    plt.plot(chart_data["x"], chart_data["y"])
-    plt.show()
+    # Access raw events
+    for event in response.events:
+        print(event)
 else:
-    print(f"Analysis failed: {result.error}")
+    # Handle error
+    print(f"Error: {response.error}")
 ```
 
-### Web Application
+## Complete API Reference
 
 ```python
-from flask import Flask, request, jsonify
-from erdo.invoke import Invoke
+def invoke(
+    bot_key: str,
+    messages: Optional[List[Dict[str, str]]] = None,
+    parameters: Optional[Dict[str, Any]] = None,
+    datasets: Optional[List[str]] = None,
+    mode: Optional[Union[str, Dict[str, Any]]] = None,
+    manual_mocks: Optional[Dict[str, Dict[str, Any]]] = None,
+    stream: bool = False,
+    output_format: str = "events",
+    verbose: bool = False,
+    print_events: bool = False,
+    **kwargs
+) -> InvokeResult
+```
 
-app = Flask(__name__)
+### Parameters
 
-@app.route('/analyze', methods=['POST'])
-def analyze_data():
-    """API endpoint for data analysis."""
-    
-    data = request.get_json()
-    
-    try:
-        result = Invoke.by_key(
-            "erdo.api-analyzer",
-            parameters={
-                "input_data": data["data"],
-                "analysis_type": data.get("type", "basic")
-            }
-        )
-        
-        if result.status == "success":
-            return jsonify({
-                "success": True,
-                "result": result.data,
-                "execution_id": result.execution_id
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": result.error
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+- `bot_key` (str, required): Bot key (e.g., "my-agent", "data-question-answerer")
+- `messages` (list, optional): Messages in format `[{"role": "user", "content": "..."}]`
+- `parameters` (dict, optional): Parameters to pass to the bot
+- `datasets` (list, optional): Dataset slugs to include (e.g., ["sales-2024", "customers"])
+- `mode` (str or dict, optional): Invocation mode
+  - String: "live" (default), "replay", or "manual"
+  - Dict: `{"mode": "replay", "refresh": True}` for advanced options
+- `manual_mocks` (dict, optional): Manual mock responses for mode="manual"
+  - Format: `{"action_type": {"status": "success", "output": {...}}}`
+- `stream` (bool, optional): Whether to stream events (default: False)
+- `output_format` (str, optional): Output format - "events" (raw), "text" (formatted), or "json" (summary) (default: "events")
+- `verbose` (bool, optional): Show detailed steps (only for text format) (default: False)
+- `print_events` (bool, optional): Print events as they arrive (default: False)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+### Keyword Arguments
+
+- `endpoint` (str): Custom API endpoint
+- `auth_token` (str): Custom auth token
+
+## Examples
+
+### Testing Agents
+
+```python
+from erdo import invoke
+from erdo.test import text_contains
+
+# Test an agent
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "Test input"}],
+    mode="replay",  # Free after first run
+)
+
+assert response.success
+assert text_contains(str(response.result), "expected output")
+```
+
+### Multi-turn Conversation
+
+```python
+response = invoke(
+    "chatbot",
+    messages=[
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi! How can I help?"},
+        {"role": "user", "content": "Tell me about Erdo"}
+    ],
+    mode="replay"
+)
+```
+
+### Data Analysis
+
+```python
+response = invoke(
+    "data-question-answerer",
+    messages=[{"role": "user", "content": "What were Q4 sales by region?"}],
+    datasets=["sales-2024"],
+    parameters={
+        "time_period": "Q4",
+        "group_by": "region"
+    },
+    mode="live"
+)
+
+if response.success:
+    print(response.result)
+```
+
+### Streaming with Progress
+
+```python
+response = invoke(
+    "long-running-agent",
+    messages=[{"role": "user", "content": "Process large dataset"}],
+    datasets=["large-dataset"],
+    stream=True,
+    output_format="text",
+    verbose=True
+)
+
+# Output streams as agent executes
+# Steps shown in real-time
 ```
 
 ### Batch Processing
 
 ```python
-from erdo.invoke import Invoke
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+from concurrent.futures import ThreadPoolExecutor
 
-def process_batch_data(data_items, bot_key="erdo.batch-processor"):
-    """Process multiple data items concurrently."""
-    
-    def process_item(item):
-        """Process a single item."""
-        try:
-            result = Invoke.by_key(
-                bot_key,
-                parameters={"data": item}
-            )
-            return {"item": item, "result": result.data, "status": "success"}
-        except Exception as e:
-            return {"item": item, "error": str(e), "status": "error"}
-    
-    results = []
-    
-    # Process items concurrently
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_item = {
-            executor.submit(process_item, item): item 
-            for item in data_items
-        }
-        
-        for future in as_completed(future_to_item):
-            result = future.result()
-            results.append(result)
-            print(f"Processed item: {result['status']}")
-    
-    return results
+def process_query(query):
+    return invoke(
+        "data-analyzer",
+        messages=[{"role": "user", "content": query}],
+        mode="replay"
+    )
 
-# Usage
-data_items = [
-    {"id": 1, "value": "data_1"},
-    {"id": 2, "value": "data_2"}, 
-    {"id": 3, "value": "data_3"}
-]
+queries = ["Query 1", "Query 2", "Query 3"]
 
-results = process_batch_data(data_items)
-successful = [r for r in results if r["status"] == "success"]
-print(f"Successfully processed {len(successful)}/{len(data_items)} items")
+# Process in parallel
+with ThreadPoolExecutor(max_workers=3) as executor:
+    results = list(executor.map(process_query, queries))
+
+for i, result in enumerate(results):
+    if result.success:
+        print(f"Query {i+1}: {result.result}")
 ```
 
-### Automated Workflow
+### Integration with Flask
 
 ```python
-from erdo.invoke import Invoke
-from erdo.sync import Sync
-import schedule
-import time
+from flask import Flask, request, jsonify
+from erdo import invoke
 
-def automated_analysis_workflow():
-    """Automated daily analysis workflow."""
-    
-    print("Starting daily analysis...")
-    
-    # Step 1: Data collection
-    collection_result = Invoke.by_key(
-        "erdo.data-collector",
-        parameters={"source": "daily_reports", "date": "today"}
+app = Flask(__name__)
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.json
+
+    response = invoke(
+        "data-analyzer",
+        messages=[{"role": "user", "content": data["query"]}],
+        datasets=data.get("datasets", []),
+        parameters=data.get("parameters"),
+        mode="live"
     )
-    
-    if collection_result.status != "success":
-        print(f"Data collection failed: {collection_result.error}")
-        return
-    
-    # Step 2: Analysis
-    analysis_result = Invoke.by_key(
-        "erdo.daily-analyzer",
-        parameters={
-            "data": collection_result.data,
-            "analysis_type": "comprehensive"
-        }
-    )
-    
-    if analysis_result.status != "success":
-        print(f"Analysis failed: {analysis_result.error}")
-        return
-    
-    # Step 3: Report generation
-    report_result = Invoke.by_key(
-        "erdo.report-generator",
-        parameters={
-            "analysis": analysis_result.data,
-            "format": "executive_summary"
-        }
-    )
-    
-    if report_result.status == "success":
-        print("✅ Daily analysis completed successfully")
-        print(f"Report: {report_result.data['report_url']}")
+
+    if response.success:
+        return jsonify({
+            "success": True,
+            "result": response.result,
+            "invocation_id": response.invocation_id
+        })
     else:
-        print(f"Report generation failed: {report_result.error}")
+        return jsonify({
+            "success": False,
+            "error": response.error
+        }), 400
 
-# Schedule the workflow
-schedule.every().day.at("09:00").do(automated_analysis_workflow)
+if __name__ == "__main__":
+    app.run()
+```
 
-# Run scheduler
-print("Starting automated workflow scheduler...")
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+### Error Handling
+
+```python
+from erdo import invoke
+
+try:
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Hello"}]
+    )
+
+    if response.success:
+        print(response.result)
+    else:
+        # Agent returned an error
+        print(f"Agent error: {response.error}")
+
+except Exception as e:
+    # Network or other error
+    print(f"Invocation failed: {e}")
 ```
 
 ## Best Practices
 
-1. **Error Handling**: Always check result status and handle errors gracefully
-2. **Timeouts**: Set appropriate timeouts for long-running operations
-3. **Streaming**: Use streaming mode for long-running agents to track progress
-4. **Resource Management**: Clean up resources and handle connection errors
-5. **Logging**: Log execution details for debugging and monitoring
-6. **Retry Logic**: Implement retry logic for transient failures
-7. **Concurrency**: Use threading/async for batch processing multiple agents
+### 1. Use Replay Mode for Testing
+
+```python
+# Good - fast, free after first run
+response = invoke("my-agent", messages=[...], mode="replay")
+
+# Avoid - slow, costs $ every time
+response = invoke("my-agent", messages=[...])
+```
+
+### 2. Always Check Success
+
+```python
+# Good
+response = invoke("my-agent", messages=[...])
+if response.success:
+    print(response.result)
+else:
+    print(f"Error: {response.error}")
+
+# Bad - may crash
+response = invoke("my-agent", messages=[...])
+print(response.result)  # Could be None if failed
+```
+
+### 3. Use Appropriate Output Format
+
+```python
+# For humans
+response = invoke("my-agent", messages=[...], output_format="text")
+
+# For integration/parsing
+response = invoke("my-agent", messages=[...], output_format="json")
+
+# For custom processing
+response = invoke("my-agent", messages=[...], output_format="events")
+```
+
+### 4. Stream Long-Running Agents
+
+```python
+# Good for long-running agents
+response = invoke(
+    "long-agent",
+    messages=[...],
+    stream=True,
+    output_format="text"
+)
+
+# Bad - may timeout
+response = invoke("long-agent", messages=[...])
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Bot Not Found
 
-**Agent Not Found**
-```python
-from erdo.invoke import Invoke, InvokeError
+Make sure the agent is synced:
 
-try:
-    result = Invoke.by_key("nonexistent.agent")
-except InvokeError as e:
-    if "not found" in str(e).lower():
-        print("Agent doesn't exist - check agent key")
+```bash
+erdo sync-agent path/to/agent.py
 ```
 
-**Parameter Validation**
-```python
-# Ensure required parameters are provided
-result = Invoke.by_key(
-    "erdo.data-analyzer",
-    parameters={
-        "query": "required field",
-        "dataset": "optional field"
-    }
-)
+### Authentication Errors
+
+Login first:
+
+```bash
+erdo login
 ```
 
-**Timeout Issues**
-```python
-# For long-running agents, use streaming mode
-result = Invoke.by_key(
-    "erdo.long-running-agent",
-    parameters={"large_dataset": "data.csv"},
-    stream=True  # Prevents timeout
-)
+Or set environment variables:
+
+```bash
+export ERDO_ENDPOINT="https://api.erdo.ai"
+export ERDO_AUTH_TOKEN="your-token"
 ```
 
-**Network Issues**
-```python
-import time
-from erdo.invoke import InvokeError
+### Slow Invocations
 
-def invoke_with_retry(bot_key, parameters, max_retries=3):
-    """Invoke with retry logic."""
-    
-    for attempt in range(max_retries):
-        try:
-            result = Invoke.by_key(bot_key, parameters=parameters)
-            return result
-        except InvokeError as e:
-            if attempt == max_retries - 1:
-                raise e
-            print(f"Attempt {attempt + 1} failed, retrying...")
-            time.sleep(2 ** attempt)  # Exponential backoff
+Use replay mode:
+
+```python
+# Fast - cached after first run
+response = invoke("my-agent", messages=[...], mode="replay")
 ```
+
+### Import Errors
+
+Install the SDK:
+
+```bash
+cd erdo-agents
+uv pip install -e ../erdo-python-sdk
+```
+
+## See Also
+
+- [Agent Testing](/sdk/test) - Learn about testing agents
+- [CLI Invoke Command](/cli/commands#invoke) - CLI usage
+- [Examples](/examples/data-analysis) - More examples
