@@ -5,26 +5,26 @@ description: "Choose between CLI and Python SDK approaches for your workflow"
 
 # CLI vs SDK Comparison
 
-Choose the approach that best fits your development workflow. The Erdo platform supports both traditional CLI tools and pure Python SDK approaches.
+Choose the approach that best fits your development workflow. The Erdo platform supports both command-line and programmatic Python interfaces.
 
 ## Quick Comparison
 
 <Tabs>
-  <Tab title="CLI (Traditional)">
-    **Best for:** Command-line workflows, CI/CD pipelines, quick setup
+  <Tab title="CLI">
+    **Best for:** Command-line workflows, CI/CD pipelines, shell scripting
 
     **Pros:**
     - Quick installation with Homebrew
     - Familiar command-line interface
     - Great for scripts and automation
     - Works with any editor
-    
+
     **Cons:**
     - Requires separate Go binary installation
     - Less IDE integration
     - Context switching between Python and CLI
   </Tab>
-  <Tab title="SDK (New)">
+  <Tab title="SDK">
     **Best for:** Python-first workflows, Jupyter notebooks, programmatic control
 
     **Pros:**
@@ -32,10 +32,10 @@ Choose the approach that best fits your development workflow. The Erdo platform 
     - Excellent IDE integration and type hints
     - Programmatic control over all operations
     - Perfect for notebooks and interactive development
-    
+
     **Cons:**
-    - Newer approach (less battle-tested)
     - Python-only (no other language support)
+    - May require more initial setup for complex workflows
   </Tab>
 </Tabs>
 
@@ -396,17 +396,41 @@ sync = Sync(config=config)
 ### Choose Both if you:
 - Want the best of both worlds
 - Have a team with mixed preferences
-- Need CLI for some tasks (like templates) and SDK for others (like programmatic control)
-- Are migrating from CLI to SDK gradually
+- Need CLI for some tasks (like file watching) and SDK for others (like programmatic control)
+- Want flexibility to use whichever tool fits the specific task
 
-## Migration Path
+## Using Both Together
 
-If you're currently using CLI and want to try the SDK:
+You can freely mix CLI and SDK in your workflow - they share configuration and authentication:
 
-1. **Keep using CLI for authentication**: `erdo login`
-2. **Install SDK**: `pip install erdo`
-3. **Start with sync**: Replace `erdo sync` with `Sync.from_file()`
-4. **Add invoke**: Replace test commands with `Invoke.by_key()`
-5. **Gradually adopt**: Use SDK for new development, CLI for existing workflows
+1. **Shared authentication**: `erdo login` works for both CLI and SDK
+2. **Shared configuration**: Both use `~/.erdo/config.yaml`
+3. **Same platform**: Both interact with the same backend and agents
 
-The configuration and authentication are shared, so you can switch between approaches seamlessly.
+**Example mixed workflow:**
+
+```bash
+# Use CLI for authentication and project setup
+erdo login
+erdo init my-project
+```
+
+```python
+# Use SDK for programmatic agent development
+from erdo import Agent
+from erdo.sync import Sync
+
+agent = Agent(name="my_agent")
+# ... define agent ...
+Sync(agent)  # Deploy to platform
+```
+
+```bash
+# Use CLI for file watching during development
+erdo dev --watch
+
+# Use CLI for deployment
+erdo deploy my-agent --env production
+```
+
+You can switch between approaches seamlessly - use whichever tool is best for the task at hand.

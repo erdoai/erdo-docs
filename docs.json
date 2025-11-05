@@ -31,12 +31,17 @@
         "pages": [
           "testing/overview",
           "testing/unit-tests",
+          "testing/integration-tests",
           "why-erdo"
         ]
       },
       {
         "group": "Examples & Use Cases",
-        "pages": ["examples/business-automation", "examples/data-analysis"]
+        "pages": [
+          "examples/business-automation",
+          "examples/data-analysis",
+          "examples/code-execution"
+        ]
       },
       {
         "group": "Python SDK",
@@ -81,7 +86,11 @@
       },
       {
         "group": "Integrations",
-        "pages": ["integrations/overview", "integrations/creating-integrations"]
+        "pages": [
+          "integrations/overview",
+          "integrations/creating-integrations",
+          "integration-configs"
+        ]
       }
     ]
   },

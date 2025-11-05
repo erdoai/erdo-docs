@@ -857,38 +857,36 @@ config = TemplateString('''
   </Accordion>
 </AccordionGroup>
 
-## Migration Guide
+## Different Syntax Approaches
 
-### From Old Template Syntax
-
-If you're migrating from the old template syntax:
+Erdo supports multiple ways to reference state data, depending on your use case:
 
 ```python
-# Old way (still supported via TemplateString)
-old_style = llm.message(
-    query="{{query}}",
-    context="{{previous_analysis}}"
-)
-
-# New way (preferred)
-new_style = llm.message(
+# Approach 1: State object (cleanest for direct field access)
+direct_access = llm.message(
     query=state.query,
     context=state.previous_analysis
 )
 
-# Complex expressions still use TemplateString
-complex_style = llm.message(
+# Approach 2: TemplateString (for dynamic content and expressions)
+dynamic_content = llm.message(
+    query=TemplateString("Analyzing {{dataset.name}} for {{customer.name}}"),
+    context=state.previous_analysis
+)
+
+# Approach 3: TemplateString with functions (for complex logic)
+complex_logic = llm.message(
     query=state.query,
     organization_scope=TemplateString("{{if is_org_specific}}specific{{else}}none{{end}}")
 )
 ```
 
-### Best Migration Strategy
+### Choosing the Right Approach
 
-1. **Start with simple fields**: Convert basic `"{{field}}"` to `state.field` for direct value access
-2. **Use TemplateString for dynamic content**: Replace string templates with `TemplateString("{{field}}")`
-3. **Keep complex templates**: Use `TemplateString` for complex expressions and functions
-4. **Test incrementally**: Migrate and test one step at a time
+1. **Use `state.field`** when you need direct value access without string interpolation
+2. **Use `TemplateString`** when you need dynamic content, conditionals, or template functions
+3. **Avoid raw strings** like `"{{field}}"` - use either `state.field` or `TemplateString("{{field}}")`
+4. **Mix approaches freely** - use whichever syntax fits each specific parameter
 
 ## Troubleshooting
 
