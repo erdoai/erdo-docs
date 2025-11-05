@@ -21,11 +21,38 @@ Erdo addresses these through:
 3. **Intelligent caching** for cost-effective integration testing
 4. **Parallel execution** for rapid feedback
 
+## Test Types Comparison
+
+Erdo provides two distinct test types, each serving different purposes:
+
+| Aspect | Unit Tests (`erdo test`) | Integration Tests (`erdo agent-test`) |
+|--------|--------------------------|---------------------------------------|
+| **What it does** | Validates agent structure & logic locally | Executes agents with real backend/LLM calls |
+| **Backend calls** | ❌ None - pure static analysis | ✅ Yes - actual execution |
+| **Speed** | ⚡ 2-5 seconds for full coverage | 🐢 Depends on LLM response time (or fast with replay cache) |
+| **Cost** | 💰 Free - no API calls | 💰 First run costs API fees, replay mode caches for free reruns |
+| **Coverage** | 🔍 All execution paths (2^n for n conditions) | 🎯 Specific test scenarios you write |
+| **Use case** | Validate logic, catch template errors, rapid development | End-to-end validation, integration verification |
+| **When to run** | Every save/commit - instant feedback | Before deployment, CI/CD, regression testing |
+| **Test files** | Any agent Python file | Functions with `agent_test_*` prefix |
+| **Command** | `erdo test my_agent.py` | `erdo agent-test tests/test_my_agent.py` |
+
+<Info>
+**Quick Decision Guide:**
+- **Use Unit Tests** when you want fast feedback on agent structure, template syntax, and execution paths
+- **Use Integration Tests** when you need to validate actual LLM behavior and end-to-end functionality
+- **Use Both** for comprehensive coverage: unit tests catch structure issues instantly, integration tests validate real behavior
+</Info>
+
 ## Unit Testing
+
+<Note>
+**Local Validation Only**: Unit tests run entirely on your machine with NO backend or LLM calls. They're free, fast, and perfect for rapid development iteration. See the [Unit Testing Guide](/testing/unit-tests) for complete details.
+</Note>
 
 ### Overview
 
-Unit tests validate agent structure and logic without making LLM API calls:
+Unit tests validate agent structure and logic through static analysis and path enumeration:
 
 ```bash
 erdo test my_agent.py
@@ -125,9 +152,13 @@ erdo test my_agent.py --data test_data.json
 
 ## Integration Testing
 
+<Note>
+**Live Agent Execution**: Integration tests execute your agents with real backend and LLM calls. Use replay mode to cache responses and minimize API costs. See the [Integration Testing Guide](/testing/integration-tests) for complete details on modes and best practices.
+</Note>
+
 ### Overview
 
-Integration tests execute agents with real LLM calls, using replay mode for efficient test execution:
+Integration tests execute agents with real LLM calls. They support three modes (live, replay, manual) for different testing needs:
 
 ```python
 from erdo import invoke

@@ -1,0 +1,852 @@
+---
+title: "Integration Testing"
+description: "Test agents with real execution using live, replay, and manual modes"
+---
+
+# Integration Testing
+
+Integration tests execute your agents with real backend and LLM calls, validating end-to-end functionality and actual behavior. Erdo provides three execution modes to balance test coverage, speed, and cost.
+
+<Info>
+**Live Execution**: Unlike [unit tests](/testing/unit-tests) which validate structure locally, integration tests make actual API calls to the erdo backend and LLM providers. Use replay mode to cache responses and minimize costs.
+</Info>
+
+## Overview
+
+Integration tests are written as Python functions with the `agent_test_*` prefix and executed with the `erdo agent-test` command:
+
+```bash
+erdo agent-test tests/test_my_agent.py
+```
+
+**Key Capabilities:**
+- Execute agents with real LLM and backend calls
+- Three modes: live (production), replay (cached), manual (mocked)
+- Parallel execution for fast test runs
+- Rich assertion helpers for validation
+- Automatic test discovery
+
+## Writing Integration Tests
+
+### Basic Test Structure
+
+```python
+from erdo import invoke
+from erdo.test import text_contains, json_path_equals
+
+def agent_test_sales_analysis():
+    """Test sales data analysis agent."""
+    response = invoke(
+        "data-analyst",                          # Agent key
+        messages=[{
+            "role": "user",
+            "content": "Analyze Q4 sales trends"
+        }],
+        datasets=["sales_2024_q4"],             # Optional: datasets to include
+        mode="replay"                            # Execution mode
+    )
+
+    # Assertions
+    assert response.success, f"Agent failed: {response.error}"
+    assert text_contains(str(response.result), "revenue")
+    assert json_path_equals(response.result, "analysis.confidence", 0.95)
+```
+
+### Test Discovery
+
+The test runner automatically discovers functions matching these criteria:
+
+- **Function name**: Starts with `agent_test_`
+- **Location**: Any Python file (typically in `tests/` directory)
+- **No imports needed**: Functions are discovered by pattern matching
+
+```python
+# tests/test_data_analyst.py
+
+def agent_test_basic_query():
+    """Test basic data query."""
+    pass  # ✅ Discovered
+
+def agent_test_csv_analysis():
+    """Test CSV file analysis."""
+    pass  # ✅ Discovered
+
+def helper_function():
+    """Helper for tests."""
+    pass  # ❌ Not discovered (no agent_test_ prefix)
+
+def test_something():
+    """Regular test."""
+    pass  # ❌ Not discovered (wrong prefix)
+```
+
+## Execution Modes
+
+Erdo supports three execution modes, each optimized for different testing scenarios:
+
+### Live Mode
+
+**Real API calls every time** - no caching, production behavior:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "test query"}],
+    mode="live"  # or omit mode parameter (live is default)
+)
+```
+
+**Behavior:**
+- Makes real API calls to LLM providers every execution
+- Non-deterministic results (LLM responses may vary)
+- Incurs API costs per test run
+- Latest model behavior and responses
+
+**When to Use:**
+- ✅ Validating latest model performance
+- ✅ Testing with fresh, current data
+- ✅ Verifying cache integrity (compare with replay)
+- ✅ Production smoke tests
+- ❌ CI/CD pipelines (expensive)
+- ❌ Rapid development iteration (slow)
+
+**Example Use Case:**
+```python
+def agent_test_production_validation():
+    """Weekly validation with latest model behavior."""
+    response = invoke(
+        "customer-support",
+        messages=[{"role": "user", "content": "How do I reset my password?"}],
+        mode="live"  # Always get fresh LLM response
+    )
+
+    assert response.success
+    assert text_contains(str(response.result), "password reset link")
+```
+
+---
+
+### Replay Mode (Recommended)
+
+**Intelligent caching** - first run executes, subsequent runs use cached responses:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "test query"}],
+    mode="replay"  # 🌟 Recommended for most tests
+)
+```
+
+**Behavior:**
+
+**First Execution:**
+1. Executes agent with real LLM API calls
+2. Generates cache key from bot definition and parameters
+3. Stores LLM responses in database
+4. Returns result (same as live mode)
+
+**Subsequent Executions:**
+1. Computes same cache key
+2. Retrieves cached LLM response from database
+3. Returns result instantly (no API call)
+4. Deterministic, identical response
+
+**When to Use:**
+- ✅ **CI/CD pipelines** (fast, free after first run)
+- ✅ **Development iteration** (instant feedback)
+- ✅ **Regression testing** (deterministic results)
+- ✅ **Most integration tests** (99% use case)
+- ❌ Testing latest model updates
+- ❌ Validating real-time data
+
+**Example Use Case:**
+```python
+def agent_test_csv_analysis():
+    """Test CSV analysis - runs instantly after first execution."""
+    response = invoke(
+        "data-analyst",
+        messages=[{"role": "user", "content": "Analyze this CSV"}],
+        datasets=["sample_data.csv"],
+        mode="replay"  # First run: API calls + caching, subsequent: instant
+    )
+
+    assert response.success
+    assert json_path_exists(response.result, "summary.total_rows")
+```
+
+#### How Replay Caching Works
+
+**Cache Key Generation:**
+
+The cache key is computed from:
+- `bot_id`: Unique identifier for the agent
+- `bot_updated_at`: Timestamp of last bot definition change
+- `action_type`: Type of action (e.g., `llm.message`, `codeexec.execute`)
+- `parameters`: Action parameters (messages, model, temperature, etc.)
+
+```python
+# Internally, the system computes:
+cache_key = SHA256(
+    bot_id +
+    bot_updated_at +
+    action_type +
+    serialize(cacheable_parameters)
+)
+```
+
+**What Gets Cached:**
+- ✅ `llm.message` - LLM API responses
+- ✅ Other deterministic actions (varies by action type)
+- ❌ Runtime metadata (invocation_id, thread_id, timestamps)
+- ❌ Non-deterministic actions
+
+**Cache Invalidation:**
+
+The cache automatically invalidates when:
+- **Bot definition changes**: `bot_updated_at` changes when you modify your agent
+- **Parameters change**: Different messages, model, or configuration
+- **Manual refresh**: Use refresh option (see below)
+
+```python
+# Cache invalidates automatically when bot changes
+# Edit agent definition → save → sync
+# Next test run will execute live and create new cache
+```
+
+**Storage:**
+- Cached responses are stored in the erdo backend database
+- Table: `cached_action_response`
+- Scoped to bot and parameters
+- No local file cache (accessible across machines)
+
+#### Refresh Cache
+
+Force cache refresh to re-execute and update cached responses:
+
+```python
+# Option 1: In code
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "test"}],
+    mode={"mode": "replay", "refresh": True}  # Re-execute and update cache
+)
+
+# Option 2: CLI flag
+# erdo agent-test tests/ --refresh
+```
+
+**When to Refresh:**
+- After significant agent changes
+- Testing new model behavior
+- Suspecting stale cache data
+- Intentional cache reset
+
+---
+
+### Manual Mode
+
+**Developer-controlled responses** - fully deterministic with explicit mocks:
+
+```python
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "test"}],
+    mode="manual",
+    manual_mocks={
+        "llm.message": {
+            "status": "success",
+            "output": {"content": "Mocked LLM response here"}
+        },
+        "codeexec.execute": {
+            "status": "success",
+            "output": {"stdout": "Execution output", "stderr": ""}
+        }
+    }
+)
+```
+
+**Behavior:**
+- No API calls - all responses come from `manual_mocks`
+- Completely deterministic and fast
+- Requires explicit mock for each action
+- Fails if action executed but mock not provided
+
+**When to Use:**
+- ✅ **Error handling tests** (simulate specific errors)
+- ✅ **Deterministic scenarios** (controlled outputs)
+- ✅ **Offline development** (no backend connection needed)
+- ✅ **Edge case testing** (rare scenarios)
+- ❌ Real behavior validation
+- ❌ End-to-end integration tests
+
+**Mock Structure:**
+
+```python
+manual_mocks = {
+    "action_type": {              # Action type (llm.message, codeexec.execute, etc.)
+        "status": "success|error", # Execution status
+        "output": {...},           # Action output (varies by action type)
+        "error": "..."            # Optional: error message if status="error"
+    }
+}
+```
+
+**Example Use Cases:**
+
+**Testing Error Handling:**
+```python
+def agent_test_llm_error_handling():
+    """Test agent behavior when LLM call fails."""
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "test"}],
+        mode="manual",
+        manual_mocks={
+            "llm.message": {
+                "status": "error",
+                "error": "Rate limit exceeded"
+            }
+        }
+    )
+
+    # Verify error handler was triggered
+    assert not response.success
+    assert "rate limit" in response.error.lower()
+```
+
+**Testing Specific Edge Cases:**
+```python
+def agent_test_empty_dataset():
+    """Test agent handling of empty dataset."""
+    response = invoke(
+        "data-analyst",
+        messages=[{"role": "user", "content": "Analyze data"}],
+        mode="manual",
+        manual_mocks={
+            "llm.message": {
+                "status": "success",
+                "output": {
+                    "content": "The dataset appears to be empty. No analysis possible."
+                }
+            }
+        }
+    )
+
+    assert response.success
+    assert text_contains(str(response.result), "empty")
+```
+
+**Deterministic Multi-Step Tests:**
+```python
+def agent_test_multi_step_workflow():
+    """Test complex workflow with controlled outputs."""
+    response = invoke(
+        "complex-agent",
+        messages=[{"role": "user", "content": "Process this"}],
+        mode="manual",
+        manual_mocks={
+            # First step: LLM analysis
+            "llm.message": {
+                "status": "success",
+                "output": {"content": "Analysis: High priority item"}
+            },
+            # Second step: Code execution
+            "codeexec.execute": {
+                "status": "success",
+                "output": {"stdout": "Item processed successfully"}
+            },
+            # Third step: Memory storage
+            "memory.store": {
+                "status": "success",
+                "output": {"memory_id": "mem_123"}
+            }
+        }
+    )
+
+    assert response.success
+```
+
+---
+
+## Mode Comparison
+
+| Aspect | Live | Replay | Manual |
+|--------|------|--------|--------|
+| **API Calls** | ✅ Every run | ✅ First run only | ❌ None |
+| **Deterministic** | ❌ No | ✅ Yes (after first run) | ✅ Yes |
+| **Speed** | 🐢 Slow | ⚡ Fast (cached) / 🐢 Slow (first) | ⚡ Very fast |
+| **Cost** | 💰 High (every run) | 💰 Low (first run only) | 💰 Free |
+| **Real Behavior** | ✅ Current | ✅ Snapshot | ❌ Mocked |
+| **Setup Required** | None | None | Mock definitions |
+| **Best For** | Production validation | CI/CD, development | Error handling, edge cases |
+
+<Info>
+**Recommended Strategy:**
+- Use **replay mode** for 90% of your integration tests
+- Use **live mode** for weekly production validation
+- Use **manual mode** for error scenarios and edge cases
+</Info>
+
+## Test Helpers
+
+Erdo provides assertion helpers for common validation patterns:
+
+### Text Assertions
+
+```python
+from erdo.test import text_contains, text_equals, text_matches
+
+def agent_test_text_validation():
+    response = invoke("agent", messages=[...], mode="replay")
+    result = str(response.result)
+
+    # Contains substring (case-insensitive by default)
+    assert text_contains(result, "analysis", case_sensitive=False)
+
+    # Exact match
+    assert text_equals(result, "Expected exact output")
+
+    # Regex pattern match
+    assert text_matches(result, r"\d+ recommendations found")
+    assert text_matches(result, r"confidence: \d+\.\d+%")
+```
+
+### JSON Path Assertions
+
+```python
+from erdo.test import json_path_equals, json_path_exists
+
+def agent_test_json_validation():
+    response = invoke("agent", messages=[...], mode="replay")
+
+    # Check if path exists
+    assert json_path_exists(response.result, "analysis.summary")
+    assert json_path_exists(response.result, "recommendations[0].title")
+
+    # Check path value
+    assert json_path_equals(response.result, "analysis.confidence", 0.95)
+    assert json_path_equals(response.result, "status", "completed")
+```
+
+### Response Object
+
+```python
+def agent_test_response_structure():
+    response = invoke("agent", messages=[...], mode="replay")
+
+    # Basic properties
+    assert response.success                    # Execution succeeded
+    assert response.result is not None         # Result data
+    assert response.error is None              # No error
+
+    # Result access
+    result = response.result                   # Agent output
+    result_str = str(response.result)          # String representation
+
+    # Error handling
+    if not response.success:
+        print(f"Agent failed: {response.error}")
+```
+
+## Running Integration Tests
+
+### Basic Execution
+
+```bash
+# Run all tests in file
+erdo agent-test tests/test_my_agent.py
+
+# Run all tests in directory
+erdo agent-test tests/
+
+# Run with verbose output
+erdo agent-test tests/ --verbose
+```
+
+### Parallel Execution
+
+Tests run in parallel by default for faster execution:
+
+```bash
+# Default: Parallel execution
+erdo agent-test tests/
+
+# Control parallelism (8 concurrent tests)
+erdo agent-test tests/ -j 8
+
+# Sequential execution
+erdo agent-test tests/ -j 1
+```
+
+### Cache Management
+
+```bash
+# Refresh all cached responses
+erdo agent-test tests/ --refresh
+
+# Normal run (use cache if available)
+erdo agent-test tests/
+```
+
+## Test Organization
+
+### Recommended File Structure
+
+```
+my_project/
+├── agents/
+│   ├── data_analyst.py          # Agent definitions
+│   └── report_generator.py
+├── tests/
+│   ├── test_data_analyst.py     # Integration tests
+│   ├── test_report_generator.py
+│   └── fixtures/
+│       ├── sample_data.csv      # Test data files
+│       └── test_scenarios.json
+└── .github/
+    └── workflows/
+        └── test.yml              # CI/CD configuration
+```
+
+### Naming Conventions
+
+```python
+# ✅ Good: Clear, descriptive names
+def agent_test_csv_analysis_with_missing_values():
+    """Test CSV analysis when data has missing values."""
+    pass
+
+def agent_test_error_recovery_after_llm_timeout():
+    """Test agent recovery when LLM times out."""
+    pass
+
+# ❌ Bad: Vague names
+def agent_test_1():
+    pass
+
+def agent_test_test():
+    pass
+```
+
+### Grouping Tests
+
+```python
+# tests/test_data_analyst.py
+
+# Group 1: Basic functionality
+def agent_test_basic_query():
+    """Test basic data query."""
+    pass
+
+def agent_test_csv_upload():
+    """Test CSV file upload and analysis."""
+    pass
+
+# Group 2: Error handling
+def agent_test_invalid_dataset():
+    """Test handling of invalid dataset."""
+    pass
+
+def agent_test_llm_timeout():
+    """Test recovery from LLM timeout."""
+    pass
+
+# Group 3: Advanced features
+def agent_test_multi_dataset_analysis():
+    """Test analysis across multiple datasets."""
+    pass
+
+def agent_test_iterative_refinement():
+    """Test iterative analysis refinement."""
+    pass
+```
+
+## Best Practices
+
+### 1. Default to Replay Mode
+
+```python
+# ✅ Good: Use replay for most tests
+def agent_test_standard_workflow():
+    response = invoke("agent", messages=[...], mode="replay")
+    assert response.success
+
+# ⚠️ Use live sparingly
+def agent_test_weekly_production_check():
+    """Run weekly to validate latest model behavior."""
+    response = invoke("agent", messages=[...], mode="live")
+    assert response.success
+```
+
+### 2. Test Critical User Journeys
+
+```python
+# Test the most important user paths
+def agent_test_new_user_onboarding():
+    """Test complete new user onboarding flow."""
+    response = invoke(
+        "onboarding-agent",
+        messages=[{"role": "user", "content": "I'm a new user"}],
+        mode="replay"
+    )
+    assert response.success
+    assert text_contains(str(response.result), "welcome")
+
+def agent_test_data_export():
+    """Test critical data export functionality."""
+    response = invoke(
+        "export-agent",
+        messages=[{"role": "user", "content": "Export my data"}],
+        datasets=["user_data"],
+        mode="replay"
+    )
+    assert response.success
+    assert json_path_exists(response.result, "export_url")
+```
+
+### 3. Use Manual Mode for Error Scenarios
+
+```python
+# ✅ Good: Manual mode for controlled error testing
+def agent_test_handles_llm_error():
+    """Test error handling when LLM fails."""
+    response = invoke(
+        "agent",
+        messages=[{"role": "user", "content": "test"}],
+        mode="manual",
+        manual_mocks={
+            "llm.message": {
+                "status": "error",
+                "error": "API timeout"
+            }
+        }
+    )
+    assert not response.success
+    assert "timeout" in response.error.lower()
+```
+
+### 4. Clear Assertions with Messages
+
+```python
+# ✅ Good: Descriptive assertion messages
+def agent_test_analysis_confidence():
+    response = invoke("agent", messages=[...], mode="replay")
+
+    assert response.success, f"Agent execution failed: {response.error}"
+
+    confidence = json_path_equals(response.result, "analysis.confidence", 0.9)
+    assert confidence, "Expected confidence score of 0.9 or higher"
+
+    has_recommendations = json_path_exists(response.result, "recommendations")
+    assert has_recommendations, "Analysis should include recommendations"
+```
+
+### 5. Organize Tests by Feature
+
+```python
+# tests/test_data_analyst.py - organized by feature area
+
+# === CSV Analysis ===
+def agent_test_csv_basic_analysis():
+    pass
+
+def agent_test_csv_with_headers():
+    pass
+
+def agent_test_csv_missing_values():
+    pass
+
+# === JSON Analysis ===
+def agent_test_json_simple_structure():
+    pass
+
+def agent_test_json_nested_objects():
+    pass
+
+# === Error Handling ===
+def agent_test_invalid_file_format():
+    pass
+
+def agent_test_file_too_large():
+    pass
+```
+
+## Continuous Integration
+
+### GitHub Actions Example
+
+```yaml
+# .github/workflows/test.yml
+name: Test Agents
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Erdo CLI
+        run: |
+          brew install erdoai/tap/erdo
+          erdo login --token ${{ secrets.ERDO_TOKEN }}
+
+      - name: Unit Tests (Fast)
+        run: erdo test agents/
+
+      - name: Integration Tests (Replay Mode)
+        run: erdo agent-test tests/
+        # First run on new branch will cache responses
+        # Subsequent runs are instant and free
+```
+
+### Cost Optimization
+
+```yaml
+# Only run expensive live tests on main branch
+- name: Production Validation (Live Mode)
+  if: github.ref == 'refs/heads/main'
+  run: erdo agent-test tests/production/ --live
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cache Not Hitting">
+    **Symptom**: Tests run slowly even with replay mode
+
+    **Common Causes**:
+    - Agent definition changed (invalidates cache)
+    - Different parameters or messages
+    - First run (cache being created)
+
+    **Solutions**:
+    - Check if you recently modified the agent file
+    - Verify parameters are exactly the same
+    - Look for `bot_updated_at` changes in agent metadata
+    - First run is expected to be slow - subsequent runs will be fast
+  </Accordion>
+
+  <Accordion title="Manual Mock Format Errors">
+    **Symptom**: `Mock not found` or `Invalid mock format` errors
+
+    **Common Causes**:
+    - Missing mock for executed action
+    - Incorrect action type name
+    - Invalid output structure
+
+    **Solutions**:
+    - Ensure mock key matches action type exactly (e.g., `llm.message`)
+    - Include both `status` and `output` fields
+    - Match output structure to action type requirements
+    - Check agent execution path to see which actions are called
+
+    ```python
+    # ✅ Correct format
+    manual_mocks={
+        "llm.message": {
+            "status": "success",
+            "output": {"content": "Response"}
+        }
+    }
+
+    # ❌ Incorrect - missing status
+    manual_mocks={
+        "llm.message": {"content": "Response"}
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Tests Not Discovered">
+    **Symptom**: `erdo agent-test` finds 0 tests
+
+    **Common Causes**:
+    - Function name doesn't start with `agent_test_`
+    - File not in specified directory
+    - Syntax errors in test file
+
+    **Solutions**:
+    - Verify function name starts with `agent_test_`
+    - Check file path is correct
+    - Run `python test_file.py` to check for syntax errors
+    - Ensure file has `.py` extension
+
+    ```python
+    # ✅ Discovered
+    def agent_test_my_feature():
+        pass
+
+    # ❌ Not discovered
+    def test_my_feature():  # Wrong prefix
+        pass
+
+    def my_test():  # Wrong prefix
+        pass
+    ```
+  </Accordion>
+
+  <Accordion title="Parallel Execution Failures">
+    **Symptom**: Tests pass individually but fail when run in parallel
+
+    **Common Causes**:
+    - Shared state between tests
+    - Resource contention (datasets, memory)
+    - Non-idempotent operations
+
+    **Solutions**:
+    - Ensure tests are independent (no shared global state)
+    - Use unique datasets per test
+    - Run with `-j 1` to debug: `erdo agent-test tests/ -j 1`
+    - Add test isolation (separate namespaces, IDs)
+  </Accordion>
+
+  <Accordion title="Replay Mode Showing Stale Data">
+    **Symptom**: Cache returns old responses after agent changes
+
+    **Common Causes**:
+    - Cache not invalidated (shouldn't happen - automatic)
+    - Using old agent definition
+    - Multiple agent versions
+
+    **Solutions**:
+    - Force refresh: `erdo agent-test tests/ --refresh`
+    - Verify you synced the latest agent: `erdo sync`
+    - Check `bot_updated_at` timestamp
+    - Clear and recreate cache with refresh flag
+  </Accordion>
+
+  <Accordion title="Dataset Not Found in Tests">
+    **Symptom**: `Dataset not found` error in integration tests
+
+    **Common Causes**:
+    - Dataset not uploaded to erdo
+    - Incorrect dataset ID/name
+    - Dataset not accessible to user
+
+    **Solutions**:
+    - Upload dataset: `erdo upload-dataset data.csv`
+    - Verify dataset name matches exactly
+    - Check dataset permissions
+    - Use test fixtures directory for test data
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Unit Testing" icon="flask" href="/testing/unit-tests">
+    Learn about local validation without API calls
+  </Card>
+  <Card title="Testing Overview" icon="clipboard-check" href="/testing/overview">
+    Compare unit vs integration testing strategies
+  </Card>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands">
+    Complete reference for erdo test commands
+  </Card>
+  <Card title="SDK Reference" icon="code" href="/sdk/test">
+    Python SDK testing functions and helpers
+  </Card>
+</CardGroup>

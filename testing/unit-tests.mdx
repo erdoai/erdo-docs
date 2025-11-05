@@ -7,9 +7,13 @@ description: "Validate agent logic and execution paths without LLM costs"
 
 Unit tests validate agent structure, logic, and all execution paths through static analysis and mock execution. This enables rapid development iteration with immediate feedback.
 
+<Warning>
+**No Backend or LLM Calls**: Unit tests run entirely locally using static analysis and simulated execution. They validate your agent's structure and logic but don't make actual API calls. For testing with real LLM execution, see [Integration Tests](/testing/integration-tests).
+</Warning>
+
 ## Overview
 
-The `erdo test` command analyzes your agent's declarative structure and simulates execution:
+The `erdo test` command analyzes your agent's declarative structure and simulates execution without any backend calls:
 
 ```bash
 erdo test my_agent.py

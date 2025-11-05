@@ -60,33 +60,39 @@ data_step = agent.step(
 )
 ```
 
-### F-string Integration
+### Dynamic Content with TemplateString
 
-Use state variables naturally in f-strings:
+For dynamic content that combines text with state variables, use `TemplateString`:
 
 ```python
-# F-strings with state variables
+from erdo.template import TemplateString
+
+# Simple dynamic messages
 context_step = agent.step(
-    utils.echo(message=f"Analyzing {state.dataset.name} for {state.customer.name}")
+    utils.echo(message=TemplateString("Analyzing {{dataset.name}} for {{customer.name}}"))
 )
 
-# Multi-line f-strings
+# Multi-line dynamic content
 report_step = agent.step(
     llm.message(
         model="claude-sonnet-4",
-        query=f"""
+        query=TemplateString("""
         Generate a comprehensive analysis report for:
 
-        Dataset: {state.dataset.name}
-        Customer: {state.customer.name}
-        Analysis Type: {state.analysis_type}
-        Time Period: {state.date_range}
+        Dataset: {{dataset.name}}
+        Customer: {{customer.name}}
+        Analysis Type: {{analysis_type}}
+        Time Period: {{date_range}}
 
         Focus on key insights and actionable recommendations.
-        """
+        """)
     )
 )
 ```
+
+<Warning>
+**Note on F-strings**: While Python f-strings work for static strings, they don't properly integrate with erdo's template system for dynamic state resolution. Always use `TemplateString` for dynamic content.
+</Warning>
 
 ### Step Output Access
 
@@ -107,7 +113,7 @@ insights_step = agent.step(
     memory.store(
         memory={
             "content": analysis_step.output.insights,
-            "description": f"Analysis of {state.dataset.name}",
+            "description": TemplateString("Analysis of {{dataset.name}}"),
             "type": "data_analysis",
             "tags": ["analysis", state.project_name],
             "extra": {
@@ -221,56 +227,586 @@ params_step = agent.step(
 
 Erdo provides built-in template functions for common operations:
 
-### Data Manipulation
+### Understanding Template Functions
+
+Erdo's template system includes two categories of functions that work together to provide powerful data manipulation capabilities:
+
+<AccordionGroup>
+  <Accordion title="Basic Functions (Pure Functions)">
+    **Pure functions that work standalone** without needing access to the state data structure:
+
+    - **No automatic parameters**: Called exactly as written
+    - **Examples**: `genUUID`, `now`, `toJSON`, `truncateString`, `eq`, `ne`, `gt`, `lt`
+    - **Use cases**: Utilities, comparisons, string operations, type conversions
+
+    ```python
+    # Basic functions - standalone operations
+    TemplateString("{{genUUID}}")                              # Generate UUID
+    TemplateString("{{now}}")                                  # Current timestamp
+    TemplateString("{{eq status \"active\"}}")                 # Simple comparison
+    TemplateString("{{truncateString description 100}}")       # String operation
+    ```
+  </Accordion>
+
+  <Accordion title="Data Functions (Stateful Functions)">
+    **Stateful functions that access the state data** and require `.Data` and `.MissingKeys`:
+
+    - **Automatic parameter injection**: System automatically adds `.Data` and `.MissingKeys` parameters
+    - **Examples**: `get`, `find`, `filter`, `addkey`, `slice`, `merge`
+    - **Use cases**: Data access, array manipulation, object operations, lookups
+
+    ```python
+    # Data functions - automatically receive state context
+    # You write:
+    TemplateString('{{get "dataset.id"}}')
+
+    # System processes as:
+    # {{get "dataset.id" $.Data $.MissingKeys}}
+
+    # Complex nested calls:
+    TemplateString('{{get "dataset.id" (find "resources" "id" "memory.resource_id")}}')
+    # System handles all parameter injection automatically
+    ```
+
+    **Key Benefit**: You never need to manually add `.Data` or `.MissingKeys` parameters—the template engine handles this automatically, making templates cleaner and easier to write.
+  </Accordion>
+
+  <Accordion title="How It Works">
+    The template system preprocesses your templates to inject required parameters:
+
+    1. **Parse**: Identifies all function calls in your template
+    2. **Classify**: Determines which functions need data access
+    3. **Inject**: Automatically adds `.Data` and `.MissingKeys` to data functions
+    4. **Execute**: Runs the hydrated template with full state context
+
+    This automatic injection means:
+    - ✅ Cleaner template syntax
+    - ✅ Less room for errors
+    - ✅ Consistent parameter handling
+    - ✅ Better performance through optimized data access
+  </Accordion>
+</AccordionGroup>
+
+### Function Reference by Use Case
+
+The following sections organize template functions by common use cases with practical examples.
+
+#### Data Access & Lookup
+
+Access nested data and perform lookups within your state:
 
 ```python
-# Data manipulation functions
-manipulation_step = agent.step(
-    utils.echo(
-        data={
-            # Add/remove keys from objects
-            "updated_memory": TemplateString('{{addkey "memory" "processed_at" "current_timestamp"}}'),
-            "cleaned_data": TemplateString('{{removekey "data" "sensitive_field"}}'),
+# Get nested values by path
+dataset_id = TemplateString('{{get "dataset.id"}}')                    # Simple field access
+metadata = TemplateString('{{get "resources.dataset.metadata.id"}}')   # Deep nesting
+array_item = TemplateString('{{get "items.0.name"}}')                  # Array indexing
 
-            # Array operations
-            "recent_messages": TemplateString("{{sliceEndKeepFirstUserMessage system.messages 10}}"),
-            "filtered_items": TemplateString('{{filter "items" "status" "active"}}'),
+# Find items in arrays
+resource = TemplateString('{{find "resources" "id" "memory.resource_id"}}')
+user = TemplateString('{{findByValue "users" "email" "user@example.com"}}')
 
-            # JSON operations
-            "parsed_json": TemplateString('{{toJSON data}}'),
-            "merged_data": TemplateString('{{merge "object1" "object2"}}')
-        }
-    )
-)
+# Get item at specific index
+first_item = TemplateString('{{getAtIndex "messages" 0}}')
+last_item = TemplateString('{{getAtIndex "messages" -1}}')
+
+# Nested lookups
+dataset_from_resource = TemplateString('{{get "dataset.id" (find "resources" "id" "memory.resource_id")}}')
+
+# Fallback values
+value_or_default = TemplateString('{{coalesce "optional_field" "default_value"}}')
 ```
 
-### Conditional Logic
+#### Array Operations
+
+Manipulate arrays and lists in your state:
 
 ```python
-# Conditional operations
-conditional_step = agent.step(
-    memory.search(
-        query=state.search_term,
-        limit=TemplateString("{{if eq analysis_type \"detailed\"}}20{{else}}5{{end}}"),
-        organization_scope=TemplateString("{{if is_organization_specific}}specific{{else}}none{{end}}"),
-        time_filter=TemplateString("{{if recent_only}}7d{{else}}all{{end}}")
-    )
-)
+# Slice arrays
+last_five = TemplateString('{{sliceEnd "messages" 5}}')               # Last 5 items
+range_slice = TemplateString('{{slice "items" 2 5}}')                 # Items 2-5
+first_ten = TemplateString('{{slice "items" 0 10}}')                  # First 10 items
+
+# Special message handling
+recent_with_context = TemplateString('{{sliceEndKeepFirstUserMessage "system.messages" 5}}')
+
+# Extract fields from array items
+names = TemplateString('{{extractSlice "users" "name"}}')             # Get all names
+ids = TemplateString('{{extractSlice "datasets" "id"}}')              # Get all IDs
+
+# Filter arrays by criteria
+active_items = TemplateString('{{filter "items" "status" "eq" "active"}}')
+high_priority = TemplateString('{{filter "tasks" "priority" "gt" 5}}')
+
+# Remove duplicates
+unique_tags = TemplateString('{{dedupeBy "tags" "name"}}')
+unique_users = TemplateString('{{dedupeBy "users" "id"}}')
+
+# Merge arrays
+all_items = TemplateString('{{merge "local_items" "remote_items"}}')
+combined = TemplateString('{{mergeRaw list1 list2}}')                 # Merge without lookup
 ```
 
-### String Operations
+#### Object Manipulation
+
+Add, remove, and transform object fields:
+
+```python
+# Add keys to objects
+with_timestamp = TemplateString('{{addkey "memory" "processed_at" "{{now}}"}}')
+with_flag = TemplateString('{{addkey "data" "processed" "true"}}')
+
+# Remove sensitive fields
+cleaned = TemplateString('{{removekey "user_data" "password"}}')
+public_data = TemplateString('{{removekey "record" "internal_id"}}')
+
+# Add key to all items in array
+tagged_items = TemplateString('{{addkeytoall "items" "batch_id" "batch_123"}}')
+marked_users = TemplateString('{{addkeytoall "users" "verified" "true"}}')
+
+# Transform data structures
+list_of_dicts = TemplateString('{{mapToDict "user_ids" "users"}}')
+key_value_array = TemplateString('{{mapToArray "metadata"}}')         # {k: v} -> [{key: k, value: v}]
+```
+
+#### Conditionals & Comparison
+
+Make decisions based on data values:
+
+```python
+# If/else conditionals
+scope = TemplateString('{{if is_organization_specific}}specific{{else}}none{{end}}')
+limit = TemplateString('{{if eq analysis_type "detailed"}}20{{else}}5{{end}}')
+
+# Equality comparisons (pointer-aware)
+is_active = TemplateString('{{eq status "active"}}')                  # Simple equality
+is_match = TemplateString('{{eq dataset.id target_id}}')              # Field comparison
+not_empty = TemplateString('{{ne description ""}}')                   # Not equal (treats nil as "")
+
+# Numeric comparisons
+is_high_priority = TemplateString('{{gt priority 5}}')                # Greater than
+is_valid = TemplateString('{{lt error_count 10}}')                    # Less than
+
+# Truthiness checks
+has_data = TemplateString('{{if truthy "dataset.data"}}yes{{else}}no{{end}}')
+
+# Complex conditional logic
+result = TemplateString('''
+{{if eq status "active"}}
+  {{if gt priority 5}}urgent{{else}}normal{{end}}
+{{else}}
+  inactive
+{{end}}
+''')
+```
+
+#### String Operations
+
+Manipulate and transform strings:
 
 ```python
 # String manipulation
-string_step = agent.step(
+short_desc = TemplateString('{{truncateString description 200}}')
+clean_input = TemplateString('{{toString user_input}}')
+
+# Pattern matching
+starts_with_prefix = TemplateString('{{startsWith name "prefix_"}}')
+ends_with_suffix = TemplateString('{{endsWith filename ".json"}}')
+
+# Regex operations
+cleaned = TemplateString('{{regexReplace "[^a-zA-Z0-9]" "_" user_input}}')
+
+# Null handling
+safe_string = TemplateString('{{nilToEmptyString optional_field}}')
+```
+
+#### Utilities & Helpers
+
+Common utility functions:
+
+```python
+# Generate unique identifiers
+request_id = TemplateString('{{genUUID}}')
+correlation_id = TemplateString('{{generateUUID}}')                    # Alias for genUUID
+
+# Timestamps
+timestamp = TemplateString('{{now}}')                                  # Current UTC time
+
+# Counters (useful for loops)
+count = TemplateString('{{incrementCounter "batch_counter"}}')         # Increment by 1
+count_by_n = TemplateString('{{incrementCounterBy "page_counter" 10}}')  # Increment by N
+
+# Data conversion
+json_string = TemplateString('{{toJSON data}}')                        # Convert to JSON
+list_items = TemplateString('{{list "item1" "item2" "item3"}}')        # Create list
+
+# Get collection with fallback
+items = TemplateString('{{coalescelist "items"}}')                     # Returns [] if missing
+
+# Whitespace control
+clean = TemplateString('{{noop}}')                                     # Returns empty string
+
+# Length operations
+count = TemplateString('{{len items}}')                                # Length of array/map/string
+
+# Arithmetic
+sum = TemplateString('{{add 5 3}}')                                    # Addition
+difference = TemplateString('{{sub 10 4}}')                            # Subtraction
+```
+
+## Error Handling & Debugging
+
+Understanding how to debug template errors and handle missing data is crucial for building robust agents.
+
+### Understanding InfoNeededError
+
+When erdo encounters missing state data during template hydration, it raises an `InfoNeededError` with comprehensive debugging information:
+
+```python
+# Example error output
+InfoNeededError: Missing required keys for template hydration
+
+Missing Keys (with full path information):
+  - dataset.id
+    Path: step_3 -> memory.search -> dataset_id
+    Available at level: dataset (but 'id' field is missing)
+
+  - customer.email
+    Path: step_5 -> llm.message -> context
+    Available at level: customer (but 'email' field is missing)
+
+Available Keys in State:
+  - query
+  - dataset.name
+  - dataset.filename
+  - customer.name
+  - customer.organization
+  - system.current_date
+  - memory.results
+```
+
+**Key Information Provided:**
+- **Missing Keys**: Exact fields that are missing
+- **Full Path**: Where in your workflow the missing key is referenced
+- **Available Keys**: What data is actually available in state
+- **Context Level**: Shows which parent objects exist to help narrow down the issue
+
+### Optional Parameters
+
+Make template parameters optional using the `?` suffix to prevent errors when data might not be available:
+
+```python
+# Required parameter - will error if missing
+required = TemplateString('{{dataset.id}}')
+
+# Optional parameter - won't error if missing
+optional = TemplateString('{{dataset.description?}}')
+
+# Conditional with optional
+conditional = TemplateString('''
+{{if ne dataset.description? ""}}
+  Description: {{dataset.description}}
+{{else}}
+  No description available
+{{end}}
+''')
+
+# Useful for optional metadata
+metadata = {
+    "dataset_id": state.dataset.id,                                   # Required
+    "tags": TemplateString('{{dataset.tags?}}'),                      # Optional
+    "custom_fields": TemplateString('{{dataset.custom_metadata?}}')   # Optional
+}
+```
+
+**When to Use Optional Parameters:**
+- Optional metadata fields that may not always be present
+- User-specific data that might not be set
+- Conditional features that depend on optional config
+- Graceful degradation scenarios
+
+### Debugging Missing Keys
+
+When you encounter a missing key error:
+
+1. **Check the full path** to understand where the key is being accessed
+2. **Review available keys** to see what data is actually in state
+3. **Verify spelling and case** - keys are case-sensitive
+4. **Check data flow** - ensure previous steps are setting the data you need
+5. **Use optional syntax** if the data might not always be present
+
+```python
+# Debug strategy example
+from erdo import Agent, state
+from erdo.template import TemplateString
+
+# Instead of assuming data exists:
+# BAD: TemplateString('{{user.preferences.theme}}')
+
+# Use optional or provide defaults:
+theme = TemplateString('{{coalesce "user.preferences.theme" "light"}}')
+
+# Or check if it exists first:
+conditional_theme = TemplateString('''
+{{if truthy "user.preferences.theme"}}
+  {{user.preferences.theme}}
+{{else}}
+  light
+{{end}}
+''')
+```
+
+### Common Error Patterns
+
+<AccordionGroup>
+  <Accordion title="Missing Nested Field">
+    **Error**: `dataset.metadata.id` is missing
+
+    **Available**: `dataset.name`, `dataset.filename`
+
+    **Diagnosis**: The `dataset` object exists, but doesn't have a `metadata` field or `metadata.id`
+
+    **Solution**:
+    - Check if the field should be `dataset.id` instead
+    - Ensure the previous step that sets `dataset` includes the `metadata` field
+    - Use optional syntax if metadata might not always be present: `{{dataset.metadata.id?}}`
+  </Accordion>
+
+  <Accordion title="Array Index Out of Bounds">
+    **Error**: Template function failed on `{{getAtIndex "items" 5}}`
+
+    **Diagnosis**: The `items` array has fewer than 6 elements
+
+    **Solution**:
+    - Use `{{if gt (len items) 5}}{{getAtIndex "items" 5}}{{end}}` to check length first
+    - Use `{{sliceEnd "items" 1}}` to get last item safely
+    - Ensure previous steps populate the array with expected items
+  </Accordion>
+
+  <Accordion title="Function Parameter Type Mismatch">
+    **Error**: Template function expected string, got number
+
+    **Diagnosis**: Function received wrong type (e.g., passing number where string expected)
+
+    **Solution**:
+    - Use `{{toString value}}` to convert to string
+    - Check function signature in documentation
+    - Ensure upstream data has correct types
+  </Accordion>
+
+  <Accordion title="Nil Pointer in Comparison">
+    **Error**: Cannot compare nil value
+
+    **Diagnosis**: Trying to compare a field that doesn't exist or is null
+
+    **Solution**:
+    - Use `eq`/`ne` functions which handle nil as empty string: `{{ne field ""}}`
+    - Check existence first: `{{if truthy "field"}}{{field}}{{end}}`
+    - Use coalesce for defaults: `{{coalesce "field" "default"}}`
+  </Accordion>
+</AccordionGroup>
+
+### Validation During Development
+
+Erdo's CLI performs static analysis on templates to catch errors early:
+
+```bash
+# Test mode validates all templates
+./erdo test
+
+# Export mode checks for missing keys
+./erdo export my-agent
+
+# Sync validates templates before deployment
+./erdo sync
+```
+
+The static analysis:
+- ✅ Validates template syntax
+- ✅ Checks for common function mistakes
+- ✅ Identifies potential missing key issues
+- ✅ Enumerates all execution paths
+- ✅ Warns about unreachable code
+
+## Go Interoperability
+
+Erdo's backend is written in Go, and the templating system is designed to work seamlessly with Go's type system, including pointer handling.
+
+### Pointer-Aware Comparisons
+
+The `eq` and `ne` functions automatically handle Go pointers and nil values, making it easy to work with data from the Go backend:
+
+```python
+# Go backend might have pointer fields like:
+# type Dataset struct {
+#     ID          string
+#     Name        string
+#     Description *string  // Pointer field - might be nil
+#     Tags        *[]string // Pointer to array
+# }
+
+# The eq/ne functions handle these automatically
+has_description = TemplateString('{{ne dataset.Description ""}}')
+
+# How it works:
+# - If Description is a pointer to "some text" -> compares "some text" to ""
+# - If Description is a nil pointer -> treats as "" and compares to ""
+# - Result: safe comparison without nil pointer errors
+```
+
+**Key Behaviors:**
+
+1. **Automatic Dereferencing**: Pointer values are automatically dereferenced
+2. **Nil as Empty String**: Nil pointers are treated as empty strings (`""`)
+3. **Type Safety**: The system handles the Go type conversion transparently
+4. **No Manual Checking**: You don't need to check for nil before comparing
+
+### Working with Optional Go Fields
+
+Many Go structs use pointers for optional fields. The templating system handles this elegantly:
+
+```python
+# Example with optional fields
+agent_config = agent.step(
     utils.echo(
         data={
-            "truncated_text": TemplateString("{{truncateString long_description 200}}"),
-            "formatted_name": TemplateString("{{title customer_name}}"),
-            "sanitized_input": TemplateString("{{sanitize user_input}}")
+            # Required field (not a pointer in Go)
+            "dataset_id": state.dataset.id,
+
+            # Optional field (pointer in Go) - handle with ne
+            "description": TemplateString('''
+                {{if ne dataset.Description ""}}
+                  {{dataset.Description}}
+                {{else}}
+                  No description provided
+                {{end}}
+            '''),
+
+            # Optional metadata
+            "has_tags": TemplateString('{{ne dataset.Tags ""}}'),
+
+            # Safe equality check
+            "is_public": TemplateString('{{eq dataset.Visibility "public"}}')
         }
     )
 )
+```
+
+### Nil Handling Best Practices
+
+<AccordionGroup>
+  <Accordion title="Checking for Non-Empty Values">
+    Use `ne` to check if a field has a value (works for both pointers and regular fields):
+
+    ```python
+    # Check if description exists and is not empty
+    TemplateString('{{if ne dataset.Description ""}}{{dataset.Description}}{{end}}')
+
+    # Check if tags exist
+    TemplateString('{{if ne dataset.Tags ""}}Has tags{{else}}No tags{{end}}')
+    ```
+
+    This works because:
+    - Nil pointers are treated as `""`
+    - Empty strings remain `""`
+    - Non-empty values compare correctly
+  </Accordion>
+
+  <Accordion title="Providing Defaults for Optional Fields">
+    Use `coalesce` or conditional logic for optional fields:
+
+    ```python
+    # Using coalesce (recommended)
+    description = TemplateString('{{coalesce "dataset.Description" "No description"}}')
+
+    # Using conditional (more control)
+    description = TemplateString('''
+        {{if ne dataset.Description ""}}
+          {{dataset.Description}}
+        {{else}}
+          No description available
+        {{end}}
+    ''')
+    ```
+  </Accordion>
+
+  <Accordion title="Working with Pointer Arrays">
+    Go pointer arrays are handled transparently:
+
+    ```python
+    # Go struct might have: Tags *[]string
+
+    # Access array length safely
+    tag_count = TemplateString('{{len dataset.Tags}}')
+
+    # Iterate over pointer array
+    tag_list = TemplateString('''
+        {{range $tag := dataset.Tags}}
+          - {{$tag}}
+        {{end}}
+    ''')
+
+    # Check if array exists and has items
+    has_tags = TemplateString('{{if gt (len dataset.Tags) 0}}yes{{else}}no{{end}}')
+    ```
+  </Accordion>
+
+  <Accordion title="Comparing Pointer Fields">
+    When comparing fields that might be pointers:
+
+    ```python
+    # Safe comparison (handles nil)
+    is_match = TemplateString('{{eq dataset.Status "active"}}')
+
+    # Compare two potentially nil fields
+    same_owner = TemplateString('{{eq dataset.Owner user.ID}}')
+
+    # Check if not equal to specific value
+    not_archived = TemplateString('{{ne dataset.Status "archived"}}')
+    ```
+
+    **Why it works**: The `eq`/`ne` functions dereference both sides of the comparison and treat nil as empty string, so you never get nil pointer errors.
+  </Accordion>
+</AccordionGroup>
+
+### Type Conversions
+
+The template system handles common type conversions between Go and template types:
+
+```python
+# Numeric types (Go int, int64, float64, etc.)
+is_large = TemplateString('{{gt dataset.SizeBytes 1000000}}')    # Works with any numeric type
+count = TemplateString('{{add dataset.RecordCount 1}}')          # Handles integer types
+
+# String conversions
+size_str = TemplateString('{{toString dataset.SizeBytes}}')      # Convert number to string
+
+# JSON types (from Go to template)
+# Go float64 from JSON -> template int (when appropriate)
+# Go map[string]interface{} -> template map
+```
+
+### Common Go Patterns
+
+When working with data from erdo's Go backend:
+
+```python
+# Checking resource availability (pointer fields)
+has_resource = TemplateString('{{ne resource.dataset ""}}')
+
+# Working with memory results (array of pointers)
+recent_memories = TemplateString('{{sliceEnd "memory.results" 5}}')
+
+# Accessing nested Go structs
+dataset_id = TemplateString('{{get "resource.dataset.metadata.id"}}')
+
+# Handling optional configuration (pointer fields in Go config structs)
+config = TemplateString('''
+{{if ne config.MaxRetries ""}}
+  Max retries: {{config.MaxRetries}}
+{{else}}
+  Using default max retries
+{{end}}
+''')
 ```
 
 ## Best Practices
@@ -280,14 +816,16 @@ string_step = agent.step(
     **Use State Syntax For:**
     - Simple field access (`state.query`, `state.dataset.id`)
     - Step outputs (`step.output.result`)
-    - F-string integration (`f"Analysis for {state.customer}"`)
+    - Direct value references without string interpolation
     - IDE autocomplete and type safety
 
     **Use TemplateString For:**
+    - Dynamic text with variable interpolation (`TemplateString("Analyzing {{dataset.name}}")`)
     - Conditional logic (`{{if condition}}value{{else}}other{{end}}`)
     - Complex data manipulation (`{{addkey "obj" "key" "value"}}`)
     - Template functions (`{{sliceEndKeepFirstUserMessage messages 5}}`)
     - Advanced Go template expressions
+    - Any string that needs runtime state resolution
 
   </Accordion>
 
@@ -347,9 +885,9 @@ complex_style = llm.message(
 
 ### Best Migration Strategy
 
-1. **Start with simple fields**: Convert basic `"{{field}}"` to `state.field`
-2. **Use f-strings**: Replace template concatenation with f-strings
-3. **Keep complex templates**: Use `TemplateString` for complex expressions
+1. **Start with simple fields**: Convert basic `"{{field}}"` to `state.field` for direct value access
+2. **Use TemplateString for dynamic content**: Replace string templates with `TemplateString("{{field}}")`
+3. **Keep complex templates**: Use `TemplateString` for complex expressions and functions
 4. **Test incrementally**: Migrate and test one step at a time
 
 ## Troubleshooting
@@ -357,29 +895,134 @@ complex_style = llm.message(
 <AccordionGroup>
   <Accordion title="State Field Not Found">
     **Error**: `AttributeError: 'StateMagic' object has no attribute 'field'`
-    
+
+    **Cause**: Trying to access a field on the state object that doesn't exist
+
     **Solutions**:
     - Check if the field exists in your workflow context
-    - Use `state.get_accessed_fields()` to debug
+    - Use `state.get_accessed_fields()` to debug what fields are available
     - Verify field names match exactly (case-sensitive)
-    - For dynamic fields, use `TemplateString` instead
+    - For dynamic fields or fields with special characters, use `TemplateString` instead
   </Accordion>
 
-{" "}
-<Accordion title="Template Compilation Errors">
-  **Error**: Template compilation failed **Solutions**: - Validate
-  TemplateString syntax - Check for unescaped quotes in templates - Ensure
-  proper Go template syntax - Use template validation tools in development
-</Accordion>
+  <Accordion title="InfoNeededError - Missing Keys">
+    **Error**: `InfoNeededError: Missing required keys for template hydration`
+
+    **Cause**: Template references state fields that aren't available yet
+
+    **Solutions**:
+    - Check the "Missing Keys" list in the error to see what's missing
+    - Review the "Full Path" to understand where the key is referenced
+    - Compare against "Available Keys" to see what you can use
+    - Ensure previous steps are setting the required data with `depends_on`
+    - Use optional syntax `{{field?}}` if the field might not always be present
+    - Add `coalesce` for fallback values: `{{coalesce "field" "default"}}`
+  </Accordion>
+
+  <Accordion title="Template Compilation Errors">
+    **Error**: `Template compilation failed` or `template: invalid syntax`
+
+    **Cause**: Invalid Go template syntax in TemplateString
+
+    **Solutions**:
+    - Validate TemplateString syntax - check for balanced `{{` and `}}`
+    - Check for unescaped quotes in templates - use `\"` for literal quotes
+    - Ensure proper Go template syntax - `{{if condition}}...{{end}}` must be balanced
+    - Check for typos in function names (e.g., `getAtindex` should be `getAtIndex`)
+    - Use template validation with `./erdo test` during development
+    - Verify all `{{if}}` statements have matching `{{end}}`
+  </Accordion>
+
+  <Accordion title="Template Function Errors">
+    **Error**: `error calling function: wrong number of arguments`
+
+    **Cause**: Calling a template function with incorrect parameters
+
+    **Solutions**:
+    - Check the function signature in the documentation above
+    - Remember: data functions automatically get `.Data` and `.MissingKeys` - don't add them manually
+    - Example: Use `{{get "field"}}` not `{{get "field" .Data .MissingKeys}}`
+    - For basic functions, provide all required parameters explicitly
+    - Example: `{{truncateString text 100}}` requires both text and length
+  </Accordion>
+
+  <Accordion title="Array/Slice Index Out of Bounds">
+    **Error**: `template function failed` on array operations
+
+    **Cause**: Trying to access array index that doesn't exist
+
+    **Solutions**:
+    - Check array length first: `{{if gt (len items) 5}}{{getAtIndex "items" 5}}{{end}}`
+    - Use `sliceEnd` for safe last-N access: `{{sliceEnd "items" 5}}`
+    - Use negative indices for end access: `{{getAtIndex "items" -1}}` for last item
+    - Verify the array is actually populated before slicing
+    - Use `{{len array}}` to debug array size
+  </Accordion>
 
   <Accordion title="Type Conversion Issues">
-    **Error**: Type mismatch in template evaluation
-    
+    **Error**: `Type mismatch in template evaluation` or `cannot convert`
+
+    **Cause**: Template function received unexpected type
+
     **Solutions**:
-    - Ensure state fields have correct types
-    - Use explicit type conversion in templates
-    - Validate data types before template usage
-    - Check for null/undefined values
+    - Use `{{toString value}}` to convert to string explicitly
+    - For numeric comparisons, ensure both sides are numbers
+    - JSON numbers are often float64 - use type conversion if needed
+    - Check function documentation for expected parameter types
+    - Use `{{toJSON value}}` to debug what type a value actually is
+    - Validate data types before template usage in previous steps
+  </Accordion>
+
+  <Accordion title="Nil Pointer / Null Value Errors">
+    **Error**: `nil pointer dereference` or `invalid memory address`
+
+    **Cause**: Accessing a field on a nil/null object
+
+    **Solutions**:
+    - Use `eq`/`ne` functions which handle nil automatically: `{{ne field ""}}`
+    - Check existence before accessing: `{{if truthy "parent.child"}}{{parent.child}}{{end}}`
+    - Use optional syntax: `{{field?}}` won't error if field is nil
+    - Use `coalesce` for safe defaults: `{{coalesce "optional.field" "default"}}`
+    - The Go interoperability section above explains pointer handling in detail
+  </Accordion>
+
+  <Accordion title="Find/Filter Returns Nothing">
+    **Error**: No error, but `find` or `filter` returns unexpected results
+
+    **Cause**: Query doesn't match any items in array, or wrong field name
+
+    **Solutions**:
+    - Verify the array exists: `{{len array}}` should be > 0
+    - Check field names are correct (case-sensitive)
+    - Ensure the value you're searching for exists in the data
+    - Use `{{toJSON array}}` to inspect the actual data structure
+    - For `find`: verify the field name and value exactly match
+    - For `filter`: check operator (eq, ne, gt, lt) and value type
+  </Accordion>
+
+  <Accordion title="Nested Function Calls Not Working">
+    **Error**: `unexpected function call` or incorrect nesting
+
+    **Cause**: Incorrect syntax for nested function calls
+
+    **Solutions**:
+    - Use parentheses for nested calls: `{{get "field" (find "items" "id" "value")}}`
+    - Don't manually add `.Data` parameters - system injects them automatically
+    - Ensure inner function completes before outer function uses result
+    - Test complex nesting in isolation to identify the problematic level
+    - Break down complex nesting into multiple steps if needed
+  </Accordion>
+
+  <Accordion title="Reserved Word Conflicts">
+    **Error**: `unexpected keyword` or parsing errors with field names
+
+    **Cause**: Using Go template reserved words as field names
+
+    **Solutions**:
+    - Avoid these reserved words: `if`, `range`, `with`, `end`, `else`, `template`, `block`, `define`
+    - If your data has these field names, use `{{get "reserved_word"}}` instead of `{{reserved_word}}`
+    - Example: Use `{{get "end"}}` instead of `{{end}}` if you have a field named "end"
+    - Consider renaming fields in your data structures to avoid conflicts
   </Accordion>
 </AccordionGroup>
 
