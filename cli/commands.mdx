@@ -344,6 +344,113 @@ erdo sync agent-with-files.py --name-suffix="_from_package"
 
 ### `erdo sync`
 
+### `erdo invoke`
+
+Invoke an agent from the command line.
+
+```bash
+erdo invoke <agent-name> [options]
+```
+
+**Description:**
+
+Execute an agent with messages and parameters directly from the CLI. Returns structured results following the executor pattern with clean separation of result, messages, steps, and events.
+
+**Options:**
+
+- `-m, --message <text>`: User message to send to the agent
+- `-p, --parameters <json>`: Parameters as JSON string
+- `-d, --datasets <list>`: Comma-separated dataset slugs
+- `--mode <mode>`: Invocation mode (live, replay, manual)
+- `--json`: Output full structured JSON result
+- `-v, --verbose`: Show detailed steps during execution
+- `--stream`: Stream output in real-time
+
+**Examples:**
+
+```bash
+# Simple invocation
+erdo invoke data-question-answerer -m "What were Q4 sales?"
+
+# With datasets
+erdo invoke data-analyzer -m "Analyze trends" -d sales-2024,customers
+
+# With parameters
+erdo invoke file-processor -m "Process files" -p '{"format": "csv"}'
+
+# Verbose output (shows steps)
+erdo invoke data-question-answerer -m "Hello" --verbose
+
+# JSON output (full structured result)
+erdo invoke data-analyzer -m "Analyze" --json
+
+# Using replay mode (cached responses)
+erdo invoke my-agent -m "Test" --mode replay
+```
+
+**Output Formats:**
+
+By default, `erdo invoke` outputs the agent's text response:
+
+```bash
+$ erdo invoke data-question-answerer -m "Hello"
+Hello! I'm ready to help answer questions about your data.
+```
+
+With `--verbose`, it shows steps before the output:
+
+```bash
+$ erdo invoke data-question-answerer -m "Hello" --verbose
+Steps:
+  ✓ parse_input (utils.parse_json)
+  ✓ generate_response (llm.message)
+  ✓ format_output (utils.echo)
+
+Hello! I'm ready to help answer questions about your data.
+```
+
+With `--json`, it returns the complete structured result:
+
+```bash
+$ erdo invoke data-analyzer -m "Test" --json
+{
+  "success": true,
+  "bot_id": "data-analyzer",
+  "invocation_id": "inv_abc123",
+  "result": {
+    "status": "success",
+    "parameters": {},
+    "output": {
+      "content": [
+        {"content_type": "text", "content": "Analysis complete..."}
+      ]
+    },
+    "message": null,
+    "error": null
+  },
+  "messages": [
+    {"role": "assistant", "content": "Analysis complete..."}
+  ],
+  "steps": [
+    {"key": "analyze", "action": "llm.message", "status": "completed"}
+  ],
+  "error": null
+}
+```
+
+**Result Structure:**
+
+The invoke command follows the executor pattern with clean separation:
+
+- **result**: The types.Result object with status/parameters/output/message/error
+- **messages**: All messages from all steps (including sub-agents)
+- **steps**: Information about executed steps
+- **events**: Complete raw event stream (only in JSON mode)
+
+**See Also:**
+- [SDK Invoke](/sdk/invoke) - Programmatic invoke() usage
+- [Integration Testing](/testing/integration-tests) - Testing with invoke
+
 ## Integration Commands
 
 ### `erdo integration add`

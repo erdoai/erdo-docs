@@ -48,8 +48,124 @@ def agent_test_sales_analysis():
 
     # Assertions
     assert response.success, f"Agent failed: {response.error}"
-    assert text_contains(str(response.result), "revenue")
-    assert json_path_equals(response.result, "analysis.confidence", 0.95)
+    assert response.result['status'] == 'success', "Agent execution should succeed"
+
+    # Extract text content from result.output.content
+    content_text = ""
+    if response.result.get('output'):
+        for item in response.result['output'].get('content', []):
+            if item.get('content_type') == 'text':
+                content_text += item['content']
+
+    assert text_contains(content_text, "revenue")
+
+    # Verify steps executed
+    assert len(response.steps) > 0, "Should have executed steps"
+```
+
+## InvokeResult Structure
+
+The `invoke()` function returns an `InvokeResult` object with clean separation following the **executor pattern**. This structure provides organized access to results, messages, steps, and events:
+
+```python
+class InvokeResult:
+    success: bool                    # Whether invocation succeeded
+    bot_id: Optional[str]           # Bot identifier
+    invocation_id: Optional[str]    # Unique invocation ID
+    result: Optional[Dict]          # types.Result object (status/parameters/output/message/error)
+    messages: List[Dict[str, Any]]  # All messages from all steps (including sub-agents)
+    steps: List[Dict[str, Any]]     # Information about executed steps
+    events: List[Dict[str, Any]]    # Complete raw event stream for debugging
+    error: Optional[str]            # Error message if failed
+```
+
+### Accessing Result Data
+
+The `result` field is a **types.Result** object with this structure:
+
+```python
+{
+    "status": "success",           # "success" or "error"
+    "parameters": {...},           # Input parameters
+    "output": {                    # Output content
+        "content": [               # Array of content items
+            {
+                "content_type": "text",
+                "content": "The agent's response..."
+            }
+        ]
+    },
+    "message": None,               # Optional message
+    "error": None                  # Error details if status is "error"
+}
+```
+
+**Example:**
+
+```python
+response = invoke("my-agent", messages=[...], mode="replay")
+
+# Check result status
+assert response.result['status'] == 'success'
+
+# Extract text content from result.output.content
+content_text = ""
+if response.result.get('output'):
+    for item in response.result['output'].get('content', []):
+        if item.get('content_type') == 'text':
+            content_text += item['content']
+
+print(content_text)  # "The agent's response..."
+```
+
+### Accessing Messages
+
+The `messages` field contains **all messages from all steps**, including intermediate steps and sub-agents:
+
+```python
+response = invoke("agent-with-sub-agents", messages=[...], mode="replay")
+
+# Iterate through all messages
+for msg in response.messages:
+    print(f"{msg['role']}: {msg['content']}")
+
+# Output might include:
+# assistant: Processing your request...
+# assistant: Calling data analyzer sub-agent...
+# assistant: Analysis complete. Here are the results...
+```
+
+### Accessing Steps
+
+The `steps` field provides execution information:
+
+```python
+response = invoke("my-agent", messages=[...], mode="replay")
+
+print(f"Executed {len(response.steps)} steps:")
+for step in response.steps:
+    print(f"  ✓ {step['key']} ({step['action']}) [{step['status']}]")
+
+# Output:
+# Executed 3 steps:
+#   ✓ parse_input (utils.parse_json) [completed]
+#   ✓ analyze (llm.message) [completed]
+#   ✓ format_output (utils.echo) [completed]
+```
+
+### Accessing Raw Events
+
+The `events` field contains the complete raw event stream for debugging:
+
+```python
+response = invoke("my-agent", messages=[...], mode="replay")
+
+print(f"Total events: {len(response.events)}")
+
+# Access specific events for debugging
+for event in response.events:
+    if event.get('metadata', {}).get('user_visibility') == 'visible':
+        print(f"Event: {event.get('payload')}")
 ```
 
 ### Test Discovery
@@ -431,18 +547,44 @@ def agent_test_json_validation():
 
 ### Response Object
 
+The `invoke()` function returns an `InvokeResult` object with clean separation following the executor pattern:
+
 ```python
 def agent_test_response_structure():
     response = invoke("agent", messages=[...], mode="replay")
 
     # Basic properties
-    assert response.success                    # Execution succeeded
-    assert response.result is not None         # Result data
-    assert response.error is None              # No error
+    assert response.success                             # Execution succeeded
+    assert response.result is not None                  # Result object (types.Result)
+    assert response.error is None                       # No error
 
-    # Result access
-    result = response.result                   # Agent output
-    result_str = str(response.result)          # String representation
+    # Result structure (types.Result object)
+    assert response.result['status'] == 'success'       # Status: success or error
+    assert response.result.get('output') is not None    # Output with content array
+    assert response.result.get('parameters') is not None # Input parameters
+
+    # Messages from all steps (including sub-agents)
+    assert len(response.messages) > 0                   # All messages captured
+    for msg in response.messages:
+        assert 'role' in msg                            # Each message has role
+        assert 'content' in msg                         # Each message has content
+
+    # Steps execution info
+    assert len(response.steps) > 0                      # Steps were executed
+    for step in response.steps:
+        assert 'key' in step                            # Step key
+        assert 'action' in step                         # Action type
+        assert 'status' in step                         # Execution status
+
+    # Raw events for debugging
+    assert len(response.events) > 0                     # Raw event stream
+
+    # Extract text content
+    content_text = ""
+    if response.result.get('output'):
+        for item in response.result['output'].get('content', []):
+            if item.get('content_type') == 'text':
+                content_text += item['content']
 
     # Error handling
     if not response.success:

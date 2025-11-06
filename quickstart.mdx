@@ -314,9 +314,21 @@ Erdo provides two complementary testing approaches:
             }],
             mode="replay"  # Caches response after first run
         )
-        
+
+        # Check success and result status
         assert response.success
-        assert text_contains(str(response.result), "organize")
+        assert response.result['status'] == 'success'
+
+        # Extract and check text content
+        if response.result.get('output'):
+            content_text = ""
+            for item in response.result['output'].get('content', []):
+                if item.get('content_type') == 'text':
+                    content_text += item['content']
+            assert text_contains(content_text, "organize")
+
+        # Verify steps were executed
+        assert len(response.steps) > 0
     ```
 
     ```bash
@@ -362,7 +374,19 @@ Erdo provides two complementary testing approaches:
             "content": "Organize my email inbox"
         }]
     )
-    print(f"Result: {response.result}")
+
+    # Access the structured result
+    if response.success:
+        print(f"Status: {response.result['status']}")
+
+        # Extract text content
+        if response.result.get('output'):
+            for item in response.result['output'].get('content', []):
+                if item.get('content_type') == 'text':
+                    print(f"Response: {item['content']}")
+
+        # Show execution steps
+        print(f"Executed {len(response.steps)} steps")
     ```
   </Tab>
 </Tabs>
