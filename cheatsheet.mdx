@@ -1,0 +1,1069 @@
+---
+title: "Cheatsheet"
+description: "Quick reference for Erdo CLI commands, agent creation, steps, actions, and result handlers"
+---
+
+# Erdo Cheatsheet
+
+A comprehensive quick reference for building agents with Erdo.
+
+## CLI Commands
+
+### Setup & Authentication
+
+```bash
+# Configure CLI settings
+erdo configure
+erdo configure --endpoint https://api.erdo.ai
+
+# Login (OAuth flow)
+erdo login
+erdo login --token YOUR_TOKEN  # For CI/CD
+```
+
+### Agent Management
+
+```bash
+# Sync agents to platform
+erdo sync-agent my_agent.py
+erdo sync-agent ./agents/
+erdo sync-agent ./agents/ --dry-run
+
+# Intelligent sync (agents, integrations, tests)
+erdo sync ./agents/
+erdo sync ./agents/ --name-suffix "_test"
+
+# List and export bots
+erdo list-bots
+erdo list-bots --plain --source codebase
+erdo export-bot --key my-bot-key -o my_bot.py
+erdo export-bot  # Export all
+
+# Delete bot
+erdo delete-bot "my bot name"
+```
+
+### Testing
+
+```bash
+# Validate agents locally
+erdo test
+erdo test my_agent.py
+erdo test --data test_data.json
+erdo test --watch  # Watch mode
+
+# Generate test data template
+erdo test-data my_agent.py -o test_data.json
+
+# Run agent tests (pytest-style)
+erdo agent-test tests/test_my_agent.py
+erdo agent-test tests/ -j 4 --verbose
+```
+
+### Invocation
+
+```bash
+# Invoke an agent
+erdo invoke my-agent --message "Hello"
+erdo invoke my-agent -m "Query" --dataset csv_sales_123
+erdo invoke my-agent -m "Query" --parameter key=value
+erdo invoke my-agent -m "Query" --mode replay --stream
+```
+
+### Development
+
+```bash
+# Development server
+erdo dev --agent my-agent
+erdo dev --sync-watch  # Auto-sync on changes
+
+# Introspect agent structure
+erdo introspect my_agent.py
+
+# Generate Python client
+erdo gen-client
+```
+
+### Integrations
+
+```bash
+erdo sync-integration-config ./integrations/
+erdo list-integration-configs
+erdo export-integration "My Integration" -o my_int.py
+```
+
+---
+
+## Agent Creation
+
+### Minimal Agent
+
+```python
+from erdo import Agent
+from erdo.actions import llm
+
+# Create agent
+agent = Agent(
+    name="my agent",
+    description="What this agent does",
+)
+
+# Add step
+agent.step(
+    llm.message(
+        model="claude-3-5-haiku-20241022",
+        user_prompt="{{query}}",
+    ),
+    key="respond",
+)
+
+# REQUIRED: Export agents list
+agents = [agent]
+```
+
+### Full Agent Options
+
+```python
+from erdo import Agent, ParameterDefinition, ParameterType
+
+agent = Agent(
+    name="my agent",                        # REQUIRED
+    key="org.my-agent",                     # Unique identifier
+    description="Agent description",        # What it does
+    persona="You are a helpful assistant",  # Agent personality
+    visibility="public",                    # "public" or "private"
+    running_message="Processing...",        # Status while running
+    finished_message="Done!",               # Status when complete
+    version="1.0",
+    timeout=300,                            # Seconds
+    retry_attempts=3,
+    tags=["analysis", "data"],
+    parameter_definitions=[
+        ParameterDefinition(
+            name="Query",
+            key="query",
+            type=ParameterType.STRING,
+            description="User's question",
+            is_required=True,
+        ),
+        ParameterDefinition(
+            name="Context",
+            key="context",
+            type=ParameterType.JSON,
+            is_required=False,
+        ),
+    ],
+)
+
+agents = [agent]
+```
+
+### Parameter Types
+
+```python
+from erdo import ParameterType
+
+ParameterType.STRING   # Text
+ParameterType.INTEGER  # Whole numbers
+ParameterType.FLOAT    # Decimal numbers
+ParameterType.BOOLEAN  # true/false
+ParameterType.JSON     # JSON objects
+```
+
+---
+
+## Steps
+
+### Creating Steps
+
+```python
+# Basic step
+step = agent.step(
+    action,
+    key="step_name",           # Optional, auto-generated if omitted
+    depends_on=previous_step,  # Step object or key string
+)
+
+# With dependencies
+step = agent.step(
+    action,
+    key="analyze",
+    depends_on=["search", "prepare"],  # Multiple dependencies
+)
+
+# With metadata
+from erdo import StepMetadata, OutputVisibility, OutputBehaviorType
+
+step = agent.step(
+    action,
+    step_metadata=StepMetadata(
+        key="my_step",
+        user_output_visibility=OutputVisibility.VISIBLE,
+        bot_output_visibility=OutputVisibility.HIDDEN,
+        output_behavior={"result": OutputBehaviorType.MERGE},
+        running_message="Processing...",
+        finished_message="Done",
+    ),
+)
+```
+
+### Execution Modes
+
+```python
+from erdo import ExecutionMode, ExecutionModeType
+
+# Sequential (default)
+step_metadata=StepMetadata(
+    execution_mode=ExecutionMode(mode=ExecutionModeType.ALL)
+)
+
+# Iterate over collection
+step_metadata=StepMetadata(
+    execution_mode=ExecutionMode(
+        mode=ExecutionModeType.ITERATE_OVER,
+        data="resources",  # Field name to iterate
+    )
+)
+
+# Background execution
+step_metadata=StepMetadata(
+    execution_mode=ExecutionMode(mode=ExecutionModeType.ALL_BACKGROUND)
+)
+```
+
+### Code Execution with @exec Decorator
+
+```python
+from erdo.types import PythonFile, StepContext
+
+# Basic - function name becomes step key, body is pass
+@agent.exec(
+    code_files=[
+        PythonFile(filename="my_files/main.py"),
+        PythonFile(filename="my_files/utils.py"),
+    ],
+    entrypoint="my_files/main.py",
+)
+def execute_code(context: StepContext):
+    """Optional docstring for documentation."""
+    pass
+
+# With step metadata
+@agent.exec(
+    code_files=[PythonFile(filename="my_files/main.py")],
+    entrypoint="my_files/main.py",
+    step_metadata=StepMetadata(
+        key="custom_key",
+        depends_on=["previous_step"],
+    ),
+)
+def my_step(context: StepContext):
+    pass
+```
+
+---
+
+## Actions Reference
+
+Actions are always used within steps (via `agent.step()`) or result handlers (via `step.on()`).
+
+### LLM Actions
+
+```python
+from erdo.actions import llm
+from erdo import LlmModel, JSONSchema, JSONSchemaProperty, JSONSchemaType
+
+# Simple message step
+response_step = agent.step(
+    llm.message(
+        model="claude-sonnet-4-20250514",
+        system_prompt="You are a helpful assistant.",
+        user_prompt=TemplateString("{{query}}"),
+    ),
+    key="respond",
+)
+
+# With message history and structured output
+analyze_step = agent.step(
+    llm.message(
+        model=LlmModel.CLAUDE_SONNET_4_5,
+        message_history=TemplateString("{{system.messages}}"),
+        system_prompt=TemplateString(prompts["analyze"].content),
+        response_format=JSONSchema(
+            name="analysis",
+            properties={
+                "issues": JSONSchemaProperty(type=JSONSchemaType.ARRAY),
+                "score": JSONSchemaProperty(type=JSONSchemaType.NUMBER),
+            },
+        ),
+    ),
+    key="analyze",
+    output_content_type=OutputContentType.JSON,
+)
+```
+
+### Memory Actions
+
+```python
+from erdo.actions import memory
+
+# Search memories (as a step)
+search_step = agent.step(
+    memory.search(
+        query=TemplateString("{{query}}"),
+        limit=10,
+        max_distance=0.8,
+        organization_scope="specific",
+    ),
+    key="search_context",
+)
+
+# Store memory (in a result handler)
+analyze_step.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(
+        memory={
+            "content": analyze_step.output.insights,
+            "type": "analysis",
+            "tags": ["high-confidence", TemplateString("{{query}}")],
+        },
+        step_metadata=StepMetadata(key="store_result"),
+    ),
+)
+```
+
+### Bot Invocation
+
+```python
+from erdo.actions import bot
+
+# Simple invocation
+data_analyst.step(
+    bot.invoke(
+        bot_key="erdo.get-attached-resources",
+        parameters={"resources": TemplateString("{{resources}}")},
+    ),
+    key="get_resources",
+    user_output_visibility=OutputVisibility.HIDDEN,
+)
+
+# With transparent output (passes through to caller)
+swe_step = data_analyst.step(
+    bot.invoke(
+        bot_key="erdo.software-engineer",
+        parameters={
+            "query": TemplateString("{{query}}"),
+            "context": TemplateString("{{context?}}"),
+            "resource_definitions": TemplateString("{{steps.search.resource_definitions?}}"),
+        },
+        transparent=True,
+    ),
+    key="swe",
+    depends_on=["search"],
+    bot_output_visibility=OutputVisibility.VISIBLE,
+)
+
+# Invoke for quality checking
+data_analyst.step(
+    bot.invoke(
+        bot_key="erdo.data-quality-checker",
+        parameters={
+            "code": TemplateString("{{steps.swe.code?}}"),
+            "output": TemplateString("{{steps.swe.output?}}"),
+            "query": TemplateString("{{query}}"),
+        },
+    ),
+    key="check_quality",
+    depends_on=["swe"],
+)
+```
+
+### Code Execution
+
+```python
+from erdo.actions import codeexec
+from erdo import ExecutionMode, ExecutionModeType, StepMetadata
+
+# Execute code (as a step) - prefer @exec decorator for this
+agent.step(
+    codeexec.execute(
+        entrypoint="main.py",
+        code_files=[{"filename": "main.py", "content": "print('hello')"}],
+        parameters=TemplateString("{{params}}"),
+    ),
+    key="run_code",
+)
+
+# Parse files as JSON (in result handler, with iteration)
+swe_step.on(
+    IsSuccess(),
+    codeexec.parse_file_as_json(
+        file=TemplateString("{{files?}}"),
+        step_metadata=StepMetadata(
+            key="parse_results",
+            execution_mode=ExecutionMode(
+                mode=ExecutionModeType.ITERATE_OVER,
+                data="file",
+                if_condition=TextEndsWith(text=TemplateString("{{name}}"), value=".json"),
+            ),
+        ),
+    ),
+)
+```
+
+### Utility Actions
+
+```python
+from erdo.actions import utils
+from erdo import Status, StepMetadata, OutputVisibility
+
+# Echo data (as a step)
+agent.step(
+    utils.echo(data={"key": "value", "combined": TemplateString("{{step1.output}} {{step2.output}}")}),
+    key="combine_results",
+    depends_on=["step1", "step2"],
+    user_output_visibility=OutputVisibility.HIDDEN,
+)
+
+# Parse JSON (in a result handler)
+llm_step.on(
+    IsSuccess(),
+    utils.parse_json(
+        json_data="{{output}}",
+        step_metadata=StepMetadata(key="parse_response"),
+    ),
+)
+
+# Raise error (in a result handler)
+swe_step.on(
+    And(IsSuccess(), IsAny(key="code", value=["", None])),
+    utils.raise_error(
+        message=TemplateString("No code generated: {{message?}}"),
+        status=Status.ERROR,
+        step_metadata=StepMetadata(key="raise_no_code"),
+    ),
+    handler_type=HandlerType.FINAL,
+)
+
+# Capture exception (in error handler)
+step.on(
+    IsError(),
+    utils.capture_exception(
+        exception=TemplateString("Error on {{system.invocation_id}}: {{error?}}"),
+        step_metadata=StepMetadata(key="capture_exception"),
+    ),
+)
+```
+
+### Web Actions
+
+```python
+from erdo.actions import websearch, webparser
+
+# Web search (as a step)
+search_step = agent.step(
+    websearch.search(
+        query=TemplateString("{{topic}} latest research"),
+        language="en",
+        country="us",
+    ),
+    key="search",
+)
+
+# Parse web content (depends on search)
+agent.step(
+    webparser.parse(
+        url=TemplateString("{{steps.search.results[0].url}}"),
+        include_links=True,
+    ),
+    key="parse_result",
+    depends_on=search_step,
+)
+```
+
+### Data Analysis Actions
+
+```python
+from erdo.actions import analysis
+
+# Analyze CSV (as a step)
+agent.step(
+    analysis.analyze_csv(file=TemplateString("{{resource}}")),
+    key="analyze_csv",
+)
+
+# Create analysis record (in result handler)
+analyze_step.on(
+    IsSuccess(),
+    analysis.create_analysis(
+        analysis=TemplateString("{{output}}"),
+        dataset_slug=TemplateString("{{dataset_slug}}"),
+        step_metadata=StepMetadata(key="store_analysis"),
+    ),
+)
+```
+
+### Resource Actions
+
+```python
+from erdo.actions import resource_definitions
+
+# List resource definitions (as a step)
+agent.step(
+    resource_definitions.list(
+        dataset_id=TemplateString("{{dataset_id}}"),
+        limit=100,
+    ),
+    key="list_resources",
+)
+
+# Search resources (as a step)
+agent.step(
+    resource_definitions.search(
+        query=TemplateString("{{query}}"),
+        limit=10,
+        thread_id=TemplateString("{{system.thread_id}}"),
+    ),
+    key="search_resources",
+)
+```
+
+---
+
+## Tools (LLM Function Calling)
+
+Tools allow the LLM to call actions during a conversation. Define tools in an `llm.message()` step.
+
+### Basic Tool Definition
+
+```python
+from erdo import (
+    Tool, JSONSchema, JSONSchemaProperty, JSONSchemaType,
+    OutputVisibility, TemplateString,
+)
+from erdo.actions import llm
+
+answer_step = agent.step(
+    llm.message(
+        model=LlmModel.CLAUDE_SONNET_4_5,
+        system_prompt="You are a helpful assistant with tools.",
+        message_history=TemplateString("{{system.messages}}"),
+        tools=[
+            Tool(
+                name="search_web",
+                action_type="websearch.search",
+                description="Search the web for current information.",
+                input_schema=JSONSchema(
+                    type=JSONSchemaType.OBJECT,
+                    properties={
+                        "query": JSONSchemaProperty(
+                            type=JSONSchemaType.STRING,
+                            description="The search query.",
+                        ),
+                        "num_results": JSONSchemaProperty(
+                            type=JSONSchemaType.NUMBER,
+                            description="Number of results (default: 5).",
+                        ),
+                    },
+                    required=["query"],
+                ),
+                parameters={
+                    "query": TemplateString("{{query}}"),
+                    "num_results": TemplateString("{{num_results?}}"),
+                },
+                running_message=TemplateString('Searching for "{{query}}"...'),
+                finished_message=TemplateString('Searched for "{{query}}"'),
+            ),
+        ],
+    ),
+    key="answer",
+)
+```
+
+### Tool Calling Another Bot
+
+```python
+Tool(
+    name="analyze_data",
+    action_type="bot.invoke",
+    description="Run Python-based analysis on data.",
+    as_root=True,  # Execute at root level
+    bot_output_visibility=OutputVisibility.VISIBLE,
+    history_content_type="resource_creation",
+    input_schema=JSONSchema(
+        type=JSONSchemaType.OBJECT,
+        properties={
+            "query": JSONSchemaProperty(
+                type=JSONSchemaType.STRING,
+                description="The analysis query.",
+            ),
+            "dataset_slugs": JSONSchemaProperty(
+                type=JSONSchemaType.ARRAY,
+                description="Dataset slugs to analyze.",
+                items=JSONSchemaProperty(type=JSONSchemaType.STRING),
+            ),
+        },
+        required=["query"],
+    ),
+    parameters={
+        "bot_key": "erdo.data-analyst",
+        "parameters": {
+            "query": TemplateString("{{query?}}"),
+            "dataset_slugs": TemplateString("{{dataset_slugs?}}"),
+        },
+    },
+)
+```
+
+### Tool Usage Loop
+
+Loop back to the same step when the LLM wants to use more tools:
+
+```python
+from erdo import Status, HandlerType
+from erdo.conditions import And, IsSuccess, TextContains, LessThan
+
+# When LLM returns tool_use, loop back (up to 15 times)
+answer_step.on(
+    And(
+        IsSuccess(),
+        TextContains(text=TemplateString("{{stop_reason}}"), value="tool_use"),
+        LessThan(number=TemplateString("{{loops}}"), value="15"),
+    ),
+    utils.raise_error(
+        message="answer",  # Step key to go back to
+        status=Status.GO_TO_STEP,
+        step_metadata=StepMetadata(key="loop_back"),
+    ),
+    handler_type=HandlerType.FINAL,
+)
+```
+
+### Multiple Tools Example
+
+```python
+tools=[
+    # Web search tool
+    Tool(
+        name="search_web",
+        action_type="websearch.search",
+        description="Search the web for information.",
+        input_schema=JSONSchema(
+            type=JSONSchemaType.OBJECT,
+            properties={
+                "query": JSONSchemaProperty(type=JSONSchemaType.STRING, description="Search query."),
+            },
+            required=["query"],
+        ),
+        parameters={"query": TemplateString("{{query}}")},
+        running_message=TemplateString('Searching "{{query}}"...'),
+        history_content_type="web_search",
+    ),
+    # Web parser tool
+    Tool(
+        name="parse_website",
+        action_type="webparser.parse",
+        description="Extract content from a URL.",
+        input_schema=JSONSchema(
+            type=JSONSchemaType.OBJECT,
+            properties={
+                "url": JSONSchemaProperty(type=JSONSchemaType.STRING, description="URL to parse."),
+            },
+            required=["url"],
+        ),
+        parameters={"url": TemplateString("{{url}}")},
+        running_message=TemplateString("Reading {{url}}..."),
+        history_content_type="web_parse",
+    ),
+    # Bot invocation tool
+    Tool(
+        name="run_sql",
+        action_type="bot.invoke",
+        description="Run SQL queries against databases.",
+        as_root=True,
+        input_schema=JSONSchema(
+            type=JSONSchemaType.OBJECT,
+            properties={
+                "query": JSONSchemaProperty(type=JSONSchemaType.STRING, description="Data question."),
+                "dataset_slug": JSONSchemaProperty(type=JSONSchemaType.STRING, description="Database slug."),
+            },
+            required=["query", "dataset_slug"],
+        ),
+        parameters={
+            "bot_key": "erdo.sql-data-analyst",
+            "parameters": {
+                "query": TemplateString("{{query?}}"),
+                "dataset_slugs": [TemplateString("{{dataset_slug?}}")],
+            },
+        },
+    ),
+]
+```
+
+---
+
+## Result Handlers
+
+### Basic Usage
+
+```python
+from erdo import Agent
+from erdo.actions import llm, utils, memory
+from erdo.conditions import IsSuccess, IsError
+
+agent = Agent(name="my agent")
+
+# Create step and capture reference
+analyze_step = agent.step(
+    llm.message(model="claude-sonnet-4-20250514", user_prompt="{{query}}"),
+    key="analyze",
+)
+
+# Add handlers using the step reference
+analyze_step.on(IsSuccess(), utils.echo(data={"status": "ok"}))
+
+analyze_step.on(IsError(), utils.raise_error(message="Failed"))
+
+# Multiple actions in handler
+analyze_step.on(
+    IsSuccess(),
+    utils.parse_json(json_data="{{output}}"),
+    memory.store(memory={"content": "{{output}}"}),
+)
+```
+
+### Handler Types
+
+```python
+from erdo import HandlerType
+
+# Intermediate (default) - continues to next handler
+analyze_step.on(IsSuccess(), action, handler_type=HandlerType.INTERMEDIATE)
+
+# Final - stops handler chain
+analyze_step.on(IsError(), action, handler_type=HandlerType.FINAL)
+```
+
+### Accessing Step Output
+
+```python
+# In templates
+"{{steps.analyze.output}}"
+"{{steps.analyze.field_name}}"
+
+# Using step.output reference (resolved at sync time)
+analyze_step.on(
+    IsSuccess(),
+    memory.store(memory={"content": analyze_step.output.insights})
+)
+```
+
+---
+
+## Conditions
+
+### Basic Conditions
+
+```python
+from erdo.conditions import (
+    IsSuccess, IsError,
+    GreaterThan, LessThan,
+    TextContains, TextEquals, TextEndsWith,
+    IsAny, IsNull,
+    And, Or, Not,
+)
+
+# Success/Error
+IsSuccess()
+IsError()
+
+# Numeric comparisons
+GreaterThan(number="{{score}}", value="0.8")
+LessThan(number="{{count}}", value="10")
+
+# Text conditions
+TextContains(text="{{output}}", value="error")
+TextEquals(text="{{status}}", value="complete")
+TextEndsWith(text="{{filename}}", value=".csv")
+
+# Value checking
+IsAny(key="type", value=["csv", "json", "excel"])
+IsNull(key="optional_field")
+```
+
+### Combining Conditions
+
+```python
+# AND (both must be true)
+IsSuccess() & GreaterThan("confidence", "0.8")
+
+# OR (either can be true)
+IsError() | LessThan("score", "0.3")
+
+# NOT (negate)
+~TextContains("output", "error")
+IsSuccess() & ~IsNull("result")
+
+# Complex combinations
+analyze_step.on(
+    IsSuccess() &
+    (GreaterThan("confidence", "0.8") | TextContains("priority", "high")) &
+    ~TextContains("status", "draft"),
+    memory.store(memory={"content": "{{output}}"})
+)
+```
+
+---
+
+## State & Templates
+
+### State References
+
+```python
+from erdo import state
+
+# Reference state in templates
+query = f"{state.query}"                    # -> "{{query}}"
+user_name = f"{state.user.name}"           # -> "{{user.name}}"
+config = f"{state.dataset.config.type}"    # -> "{{dataset.config.type}}"
+
+# Use in agent definition
+agent = Agent(
+    name="analyzer",
+    description=f"Analyzes {state.dataset.type} data",
+)
+```
+
+### Template Syntax
+
+```python
+from erdo import TemplateString
+
+# Basic variable
+TemplateString("{{query}}")
+
+# Step output
+TemplateString("{{steps.search.output}}")
+TemplateString("{{steps.analyze.memories}}")
+
+# Optional fields (with ?)
+TemplateString("{{files?}}")
+TemplateString("{{coalesce 'optional_field' 'default_value'}}")
+
+# System variables
+TemplateString("{{now}}")       # Current timestamp
+TemplateString("{{genUUID}}")   # Generate UUID
+
+# Conditionals
+TemplateString('{{if gt (len "items") 0}}has items{{else}}empty{{end}}')
+```
+
+### Test State Setup
+
+```python
+from erdo import setup_test_state
+
+setup_test_state(
+    query="test query",
+    code="print('hello')",
+    user={"id": "user123", "name": "Alice"},
+    dataset={"id": "ds123", "type": "csv"},
+)
+```
+
+---
+
+## Python SDK Modules
+
+### Sync Module
+
+```python
+from erdo.sync import Sync
+
+# Sync agent object
+result = Sync(agent)
+print(f"Synced: {result.agent_key}")
+
+# Sync from file
+results = Sync.from_file("my_agent.py")
+
+# Sync directory
+results = Sync.from_directory("agents/")
+```
+
+### Invoke Module
+
+```python
+from erdo.invoke import Invoke, invoke
+
+# By agent object
+result = Invoke(agent, parameters={"query": "test"})
+
+# By key
+result = Invoke.by_key("erdo.my-agent", parameters={...})
+
+# Convenience function
+response = invoke(
+    "my-agent",
+    messages=[{"role": "user", "content": "Hello"}],
+    mode="replay",  # replay, mock, or live
+)
+```
+
+### Test Module
+
+```python
+from erdo import invoke
+from erdo.test import text_contains, json_path_exists
+
+def agent_test_basic():
+    """Test basic invocation."""
+    response = invoke(
+        "my-agent",
+        messages=[{"role": "user", "content": "Test"}],
+        mode="replay",
+    )
+    assert response.success
+    assert text_contains(str(response.result), "expected")
+```
+
+---
+
+## Common Patterns
+
+### Sequential Workflow
+
+```python
+search = agent.step(memory.search(query="{{query}}"), key="search")
+analyze = agent.step(
+    llm.message(model="claude-sonnet-4", user_prompt="Analyze: {{steps.search.output}}"),
+    key="analyze",
+    depends_on=search,
+)
+report = agent.step(
+    llm.message(model="claude-sonnet-4", user_prompt="Create report: {{steps.analyze.output}}"),
+    key="report",
+    depends_on=analyze,
+)
+```
+
+### Parallel Steps
+
+```python
+sales = agent.step(codeexec.execute(...), key="sales")
+marketing = agent.step(codeexec.execute(...), key="marketing")
+
+# Combine after both complete
+combine = agent.step(
+    llm.message(user_prompt="Combine: {{steps.sales.output}} {{steps.marketing.output}}"),
+    depends_on=[sales, marketing],
+)
+```
+
+### Conditional Branching
+
+```python
+analyze = agent.step(llm.message(...), key="analyze")
+
+# High confidence path
+analyze.on(
+    IsSuccess() & GreaterThan("confidence", "0.8"),
+    memory.store(memory={"type": "high_confidence", "content": "{{output}}"}),
+)
+
+# Low confidence path
+analyze.on(
+    IsSuccess() & ~GreaterThan("confidence", "0.8"),
+    utils.send_status(status="review_needed", message="Low confidence result"),
+)
+
+# Error path
+analyze.on(
+    IsError(),
+    utils.capture_exception(message="{{exception}}"),
+    handler_type=HandlerType.FINAL,
+)
+```
+
+### Iteration Pattern
+
+```python
+from erdo import ExecutionMode, ExecutionModeType
+
+agent.step(
+    bot.invoke(bot_key="erdo.file-analyzer", parameters={"file": "{{item}}"}),
+    step_metadata=StepMetadata(
+        key="analyze_each",
+        execution_mode=ExecutionMode(
+            mode=ExecutionModeType.ITERATE_OVER,
+            data="files",
+        ),
+    ),
+)
+```
+
+---
+
+## File Structure
+
+### Standard Agent Project
+
+```
+my_agent/
+├── agent.py          # Main agent definition (REQUIRED)
+├── __init__.py       # Package init
+├── prompts/          # Prompt templates
+│   └── *.prompt
+├── schemas/          # JSON schemas
+│   └── *_schema.py
+└── my_agent_files/   # Code execution files
+    └── *.py / *.tpy
+```
+
+### Prompt Files
+
+```python
+from erdo import Prompt
+
+# Load prompts from directory
+prompts = Prompt.load_from_directory("prompts")
+
+# Use in action
+llm.message(
+    system_prompt=TemplateString(prompts["system"].content),
+    user_prompt=TemplateString(prompts["user"].content),
+)
+```
+
+### Schema Files
+
+```python
+# schemas/response_schema.py
+from erdo import JSONSchema, JSONSchemaProperty, JSONSchemaType
+
+response_schema = JSONSchema(
+    name="response",
+    properties={
+        "answer": JSONSchemaProperty(type=JSONSchemaType.STRING),
+        "confidence": JSONSchemaProperty(type=JSONSchemaType.NUMBER),
+        "sources": JSONSchemaProperty(
+            type=JSONSchemaType.ARRAY,
+            items={"type": "string"},
+        ),
+    },
+    required=["answer"],
+)
+```
+
+---
+
+## Quick Tips
+
+1. **Always export agents**: End files with `agents = [my_agent]`
+2. **Use descriptive keys**: `key="search_memories"` not `key="step1"`
+3. **Handle errors**: Add `IsError()` handlers for robustness
+4. **Set visibility**: Use `visibility="private"` for internal agents
+5. **Use depends_on**: Explicit dependencies > implicit ordering
+6. **Test with replay mode**: `mode="replay"` is free after first run
+7. **Dry run syncs**: `erdo sync --dry-run` before syncing
+8. **Watch mode for dev**: `erdo test --watch` for rapid iteration

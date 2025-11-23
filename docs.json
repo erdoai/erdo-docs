@@ -12,7 +12,7 @@
     "groups": [
       {
         "group": "Get Started",
-        "pages": ["introduction", "quickstart", "installation", "cli-vs-sdk", "changelog"]
+        "pages": ["introduction", "quickstart", "installation", "cli-vs-sdk", "cheatsheet", "changelog"]
       },
       {
         "group": "Core Concepts",
