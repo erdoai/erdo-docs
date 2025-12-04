@@ -274,9 +274,13 @@ All chart components accept these common props:
 
 ## Styling
 
-Components use Tailwind CSS classes. Ensure your app has Tailwind configured, or provide your own styles.
+`@erdo/ui` components use Tailwind CSS classes and CSS custom properties (variables). You need to configure both for the components to render correctly.
 
-```tsx
+### 1. Tailwind Configuration
+
+Add `@erdo/ui` to your Tailwind content paths:
+
+```js
 // tailwind.config.js
 module.exports = {
   content: [
@@ -285,3 +289,96 @@ module.exports = {
   ],
 };
 ```
+
+### 2. CSS Variables
+
+Components rely on CSS variables for theming. If you're using [shadcn/ui](https://ui.shadcn.com/), these are already defined. Otherwise, add them to your global CSS:
+
+```css
+/* globals.css or app.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+```
+
+### Using with shadcn/ui
+
+If you're already using shadcn/ui, the CSS variables are configured automatically. Just ensure `@erdo/ui` is in your Tailwind content paths.
+
+### Minimal Setup (No shadcn/ui)
+
+If you're not using shadcn/ui but want Erdo charts to work:
+
+1. Add the CSS variables above to your global styles
+2. Configure Tailwind content paths
+3. Components will use your theme colors automatically
+
+<Note>
+The `--chart-1` through `--chart-5` variables are used for chart colors. Customize these to match your brand.
+</Note>
