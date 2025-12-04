@@ -5,12 +5,12 @@ description: "React components for rendering Erdo agent results"
 
 # UI Components
 
-The `@erdo/ui` package provides React components for rendering agent results, including charts, tables, and formatted content.
+The `@erdoai/ui` package provides React components for rendering agent results, including charts, tables, and formatted content.
 
 ## Installation
 
 ```bash
-npm install @erdo/ui
+npm install @erdoai/ui
 ```
 
 **Peer Dependencies:**
@@ -24,8 +24,8 @@ npm install react react-dom @tanstack/react-query
 Wrap your app with `ErdoProvider` to configure the SDK:
 
 ```tsx
-import { ErdoProvider } from '@erdo/ui';
-import { ErdoClient } from '@erdo/server';
+import { ErdoProvider } from '@erdoai/ui';
+import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
   authToken: process.env.NEXT_PUBLIC_ERDO_API_KEY,
@@ -61,7 +61,7 @@ function App() {
 Invoke agents with streaming support:
 
 ```tsx
-import { useInvocation } from '@erdo/ui';
+import { useInvocation } from '@erdoai/ui';
 
 function ChatInterface() {
   const { result, isStreaming, error, invoke, cancel } = useInvocation({
@@ -97,7 +97,7 @@ function ChatInterface() {
 Fetch dataset contents for charts:
 
 ```tsx
-import { useDatasetContents } from '@erdo/ui';
+import { useDatasetContents } from '@erdoai/ui';
 
 function DataView({ datasetSlug, invocationId }) {
   const { data, isLoading, error } = useDatasetContents(datasetSlug, invocationId);
@@ -116,7 +116,7 @@ function DataView({ datasetSlug, invocationId }) {
 Auto-routes to the appropriate renderer based on content type:
 
 ```tsx
-import { Content } from '@erdo/ui';
+import { Content } from '@erdoai/ui';
 
 function ResultView({ content }) {
   return <Content item={content} />;
@@ -132,7 +132,7 @@ import {
   MarkdownContent,
   TableContent,
   ChartContent,
-} from '@erdo/ui';
+} from '@erdoai/ui';
 
 // Text
 <TextContent content="Hello world" />
@@ -157,7 +157,7 @@ All charts support download functionality via the download button.
 ### BarChart
 
 ```tsx
-import { BarChart } from '@erdo/ui';
+import { BarChart } from '@erdoai/ui';
 
 <BarChart
   title="Monthly Sales"
@@ -181,7 +181,7 @@ import { BarChart } from '@erdo/ui';
 ### LineChart
 
 ```tsx
-import { LineChart } from '@erdo/ui';
+import { LineChart } from '@erdoai/ui';
 
 <LineChart
   title="Revenue Trend"
@@ -199,7 +199,7 @@ import { LineChart } from '@erdo/ui';
 ### PieChart
 
 ```tsx
-import { PieChart } from '@erdo/ui';
+import { PieChart } from '@erdoai/ui';
 
 <PieChart
   title="Sales by Category"
@@ -221,7 +221,7 @@ import { PieChart } from '@erdo/ui';
 ### ScatterChart
 
 ```tsx
-import { ScatterChart } from '@erdo/ui';
+import { ScatterChart } from '@erdoai/ui';
 
 <ScatterChart
   title="Price vs Quantity"
@@ -239,7 +239,7 @@ import { ScatterChart } from '@erdo/ui';
 ### HeatmapChart
 
 ```tsx
-import { HeatmapChart } from '@erdo/ui';
+import { HeatmapChart } from '@erdoai/ui';
 
 <HeatmapChart
   title="Activity Heatmap"
@@ -274,17 +274,17 @@ All chart components accept these common props:
 
 ## Styling
 
-`@erdo/ui` components use Tailwind CSS classes and CSS custom properties (variables). You need to configure both for the components to render correctly.
+`@erdoai/ui` components use Tailwind CSS classes and CSS custom properties (variables). You need to configure both for the components to render correctly.
 
 ### 1. Tailwind Configuration
 
-Add `@erdo/ui` to your Tailwind content paths:
+Add `@erdoai/ui` to your Tailwind content paths:
 
 ```js
 // tailwind.config.js
 module.exports = {
   content: [
-    './node_modules/@erdo/ui/**/*.js',
+    './node_modules/@erdoai/ui/**/*.js',
     // ... your content paths
   ],
 };
@@ -369,7 +369,7 @@ Components rely on CSS variables for theming. If you're using [shadcn/ui](https:
 
 ### Using with shadcn/ui
 
-If you're already using shadcn/ui, the CSS variables are configured automatically. Just ensure `@erdo/ui` is in your Tailwind content paths.
+If you're already using shadcn/ui, the CSS variables are configured automatically. Just ensure `@erdoai/ui` is in your Tailwind content paths.
 
 ### Minimal Setup (No shadcn/ui)
 

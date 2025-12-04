@@ -1,16 +1,16 @@
 ---
 title: "Client Reference"
-description: "API reference for @erdo/server"
+description: "API reference for @erdoai/server"
 ---
 
 # Client Reference
 
-The `@erdo/server` package provides the `ErdoClient` class for invoking Erdo agents from server-side code.
+The `@erdoai/server` package provides the `ErdoClient` class for invoking Erdo agents from server-side code.
 
 ## Installation
 
 ```bash
-npm install @erdo/server
+npm install @erdoai/server
 ```
 
 ## ErdoClient
@@ -18,7 +18,7 @@ npm install @erdo/server
 ### Constructor
 
 ```typescript
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
   endpoint?: string;   // API endpoint (default: ERDO_ENDPOINT env or https://api.erdo.ai)
@@ -188,7 +188,7 @@ try {
 ## Node.js Example
 
 ```typescript
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 async function main() {
   const client = new ErdoClient({

@@ -11,23 +11,23 @@ The Erdo TypeScript SDK enables you to integrate Erdo's AI agents directly into 
 
 | Package | Description |
 |---------|-------------|
-| `@erdo/server` | Server-side client for invoking Erdo agents |
-| `@erdo/ui` | React components for rendering agent results |
+| `@erdoai/server` | Server-side client for invoking Erdo agents |
+| `@erdoai/ui` | React components for rendering agent results |
 
 ## Installation
 
 <CodeGroup>
 
 ```bash npm
-npm install @erdo/server @erdo/ui
+npm install @erdoai/server @erdoai/ui
 ```
 
 ```bash yarn
-yarn add @erdo/server @erdo/ui
+yarn add @erdoai/server @erdoai/ui
 ```
 
 ```bash pnpm
-pnpm add @erdo/server @erdo/ui
+pnpm add @erdoai/server @erdoai/ui
 ```
 
 </CodeGroup>
@@ -41,7 +41,7 @@ Get your API token from the [Erdo dashboard](https://erdo.ai/settings/api-token)
 ### 2. Invoke an Agent
 
 ```typescript
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
   authToken: process.env.ERDO_API_KEY,
@@ -80,8 +80,8 @@ for await (const event of client.invokeStream('data-analyst', {
 ### 4. Render Results in React
 
 ```tsx
-import { ErdoProvider, Content, useInvocation } from '@erdo/ui';
-import { ErdoClient } from '@erdo/server';
+import { ErdoProvider, Content, useInvocation } from '@erdoai/ui';
+import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
   authToken: process.env.NEXT_PUBLIC_ERDO_API_KEY,

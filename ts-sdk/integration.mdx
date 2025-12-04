@@ -15,7 +15,7 @@ Fetch data on the server:
 
 ```tsx
 // app/analysis/page.tsx
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 export default async function AnalysisPage() {
   const client = new ErdoClient({
@@ -42,8 +42,8 @@ export default async function AnalysisPage() {
 // app/chat/page.tsx
 'use client';
 
-import { ErdoProvider, useInvocation, Content } from '@erdo/ui';
-import { ErdoClient } from '@erdo/server';
+import { ErdoProvider, useInvocation, Content } from '@erdoai/ui';
+import { ErdoClient } from '@erdoai/server';
 import { useState } from 'react';
 
 const client = new ErdoClient({
@@ -99,7 +99,7 @@ Use Erdo as a tool in your AI chat application:
 import { openai } from '@ai-sdk/openai';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 const erdoClient = new ErdoClient({
   authToken: process.env.ERDO_API_KEY,
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
 'use client';
 
 import { useChat } from 'ai/react';
-import { Content } from '@erdo/ui';
+import { Content } from '@erdoai/ui';
 
 export function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat();
@@ -181,7 +181,7 @@ export function Chat() {
 ```typescript
 // server.ts
 import express from 'express';
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 const app = express();
 const client = new ErdoClient({
@@ -295,7 +295,7 @@ For more control over how data is fetched (e.g., using a typed API client), prov
 
 ```tsx
 // lib/erdo-fetcher.ts - Create ONCE outside components
-import { DataFetcher } from '@erdo/ui';
+import { DataFetcher } from '@erdoai/ui';
 
 export const erdoDataFetcher: DataFetcher = {
   fetchDatasetContents: async (slug, invocationId) => {
@@ -308,7 +308,7 @@ export const erdoDataFetcher: DataFetcher = {
 
 ```tsx
 // providers/erdo-provider.tsx
-import { ErdoProvider } from '@erdo/ui';
+import { ErdoProvider } from '@erdoai/ui';
 import { erdoDataFetcher } from '../lib/erdo-fetcher';
 
 export function AppProvider({ children }) {
@@ -334,7 +334,7 @@ When using a custom `dataFetcher`, the `baseUrl` is still used by the `useInvoca
 ### Client-Side Error Boundary
 
 ```tsx
-import { ErrorBoundary } from '@erdo/ui';
+import { ErrorBoundary } from '@erdoai/ui';
 
 function App() {
   return (
@@ -409,7 +409,7 @@ Create a session token from your backend using your API key:
 
 ```typescript
 // Your backend API route
-import { ErdoClient } from '@erdo/server';
+import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
   authToken: process.env.ERDO_API_KEY,
@@ -450,7 +450,7 @@ Pass the session token to `ErdoProvider`:
 ```tsx
 'use client';
 
-import { ErdoProvider, DatasetChart } from '@erdo/ui';
+import { ErdoProvider, DatasetChart } from '@erdoai/ui';
 import { useEffect, useState } from 'react';
 
 function Dashboard() {
@@ -556,7 +556,7 @@ Add the following to your CSP configuration:
 connect-src 'self' https://api.erdo.ai;
 ```
 
-This allows the `@erdo/ui` components to:
+This allows the `@erdoai/ui` components to:
 - Fetch dataset contents for rendering charts and tables
 - Stream agent invocation results in real-time
 
