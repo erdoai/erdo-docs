@@ -47,11 +47,20 @@
         "group": "Python SDK",
         "pages": [
           "sdk/overview",
-          "sdk/sync", 
+          "sdk/sync",
           "sdk/invoke",
           "sdk/test",
           "sdk/actions",
           "sdk/workflows"
+        ]
+      },
+      {
+        "group": "TypeScript SDK",
+        "pages": [
+          "ts-sdk/overview",
+          "ts-sdk/client",
+          "ts-sdk/ui-components",
+          "ts-sdk/integration"
         ]
       },
       {

@@ -1,0 +1,287 @@
+---
+title: "UI Components"
+description: "React components for rendering Erdo agent results"
+---
+
+# UI Components
+
+The `@erdo/ui` package provides React components for rendering agent results, including charts, tables, and formatted content.
+
+## Installation
+
+```bash
+npm install @erdo/ui
+```
+
+**Peer Dependencies:**
+
+```bash
+npm install react react-dom @tanstack/react-query
+```
+
+## ErdoProvider
+
+Wrap your app with `ErdoProvider` to configure the SDK:
+
+```tsx
+import { ErdoProvider } from '@erdo/ui';
+import { ErdoClient } from '@erdo/server';
+
+const client = new ErdoClient({
+  authToken: process.env.NEXT_PUBLIC_ERDO_API_KEY,
+});
+
+function App() {
+  return (
+    <ErdoProvider
+      config={{
+        baseUrl: 'https://api.erdo.ai',
+        client: client,  // For useInvocation hook
+      }}
+    >
+      {children}
+    </ErdoProvider>
+  );
+}
+```
+
+**Config Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `baseUrl` | `string` | API base URL |
+| `authToken` | `string` | Optional auth token for REST calls |
+| `client` | `ErdoClient` | Optional client for `useInvocation` |
+| `dataFetcher` | `DataFetcher` | Optional custom data fetcher |
+
+## Hooks
+
+### useInvocation
+
+Invoke agents with streaming support:
+
+```tsx
+import { useInvocation } from '@erdo/ui';
+
+function ChatInterface() {
+  const { result, isStreaming, error, invoke, cancel } = useInvocation({
+    onEvent: (event) => console.log('Event:', event),
+    onFinish: (result) => console.log('Done:', result),
+    onError: (error) => console.error('Error:', error),
+  });
+
+  const handleSubmit = async (query: string) => {
+    await invoke('data-analyst', {
+      messages: [{ role: 'user', content: query }],
+    });
+  };
+
+  return (
+    <div>
+      <button onClick={() => handleSubmit('Analyze data')}>
+        {isStreaming ? 'Analyzing...' : 'Analyze'}
+      </button>
+
+      {error && <div className="error">{error.message}</div>}
+
+      {result?.result?.output?.content?.map((item, i) => (
+        <Content key={i} item={item} />
+      ))}
+    </div>
+  );
+}
+```
+
+### useDatasetContents
+
+Fetch dataset contents for charts:
+
+```tsx
+import { useDatasetContents } from '@erdo/ui';
+
+function DataView({ datasetSlug, invocationId }) {
+  const { data, isLoading, error } = useDatasetContents(datasetSlug, invocationId);
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return <pre>{JSON.stringify(data, null, 2)}</pre>;
+}
+```
+
+## Content Renderers
+
+### Content
+
+Auto-routes to the appropriate renderer based on content type:
+
+```tsx
+import { Content } from '@erdo/ui';
+
+function ResultView({ content }) {
+  return <Content item={content} />;
+}
+```
+
+### Individual Renderers
+
+```tsx
+import {
+  TextContent,
+  JsonContent,
+  MarkdownContent,
+  TableContent,
+  ChartContent,
+} from '@erdo/ui';
+
+// Text
+<TextContent content="Hello world" />
+
+// JSON
+<JsonContent content={{ key: 'value' }} />
+
+// Markdown
+<MarkdownContent text="# Heading\n\nParagraph text" />
+
+// Table
+<TableContent
+  columns={[{ key: 'name', column_name: 'Name' }]}
+  data={[{ name: 'Alice' }, { name: 'Bob' }]}
+/>
+```
+
+## Chart Components
+
+All charts support download functionality via the download button.
+
+### BarChart
+
+```tsx
+import { BarChart } from '@erdo/ui';
+
+<BarChart
+  title="Monthly Sales"
+  data={[
+    { month: 'Jan', revenue: 1000 },
+    { month: 'Feb', revenue: 1200 },
+  ]}
+  displayConfig={{
+    month: { label: 'Month' },
+    revenue: { label: 'Revenue', color: '#3b82f6' },
+  }}
+  dataConfig={{
+    chartType: 'bar',
+    xAxis: { key: 'month', label: 'Month', type: 'category' },
+    yAxes: [{ key: 'revenue', label: 'Revenue ($)', type: 'number' }],
+    series: [{ key: 'revenue', name: 'Revenue', color: '#3b82f6' }],
+  }}
+/>
+```
+
+### LineChart
+
+```tsx
+import { LineChart } from '@erdo/ui';
+
+<LineChart
+  title="Revenue Trend"
+  data={data}
+  displayConfig={config}
+  dataConfig={{
+    chartType: 'line',
+    xAxis: { key: 'date', label: 'Date', type: 'date', format: 'MMM yyyy' },
+    yAxes: [{ key: 'revenue', label: 'Revenue', type: 'number' }],
+    series: [{ key: 'revenue', name: 'Revenue', color: '#10b981' }],
+  }}
+/>
+```
+
+### PieChart
+
+```tsx
+import { PieChart } from '@erdo/ui';
+
+<PieChart
+  title="Sales by Category"
+  data={[
+    { category: 'Electronics', sales: 45 },
+    { category: 'Clothing', sales: 30 },
+    { category: 'Food', sales: 25 },
+  ]}
+  displayConfig={config}
+  dataConfig={{
+    chartType: 'pie',
+    xAxis: { key: 'category', label: 'Category' },
+    yAxes: [{ key: 'sales', label: 'Sales %' }],
+    series: [{ key: 'sales', name: 'Sales', color: '#6366f1' }],
+  }}
+/>
+```
+
+### ScatterChart
+
+```tsx
+import { ScatterChart } from '@erdo/ui';
+
+<ScatterChart
+  title="Price vs Quantity"
+  data={data}
+  displayConfig={config}
+  dataConfig={{
+    chartType: 'scatter',
+    xAxis: { key: 'price', label: 'Price', type: 'number' },
+    yAxes: [{ key: 'quantity', label: 'Quantity', type: 'number' }],
+    series: [{ key: 'quantity', name: 'Quantity', color: '#f59e0b' }],
+  }}
+/>
+```
+
+### HeatmapChart
+
+```tsx
+import { HeatmapChart } from '@erdo/ui';
+
+<HeatmapChart
+  title="Activity Heatmap"
+  data={data}
+  displayConfig={config}
+  dataConfig={{
+    chartType: 'heatmap',
+    xAxis: { key: 'hour', label: 'Hour', type: 'number' },
+    yAxes: [{ key: 'day', label: 'Day', type: 'category' }],
+    series: [{ key: 'value', name: 'Activity', color: '#ef4444' }],
+  }}
+/>
+```
+
+## Chart Props
+
+All chart components accept these common props:
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | `string` | Chart title |
+| `subtitle` | `string` | Optional subtitle |
+| `data` | `any[]` | Data array |
+| `displayConfig` | `ChartConfig` | Display configuration |
+| `dataConfig` | `DataConfig` | Data mapping configuration |
+| `stacked` | `boolean` | Stack series (bar charts) |
+| `disableAnimation` | `boolean` | Disable animations |
+| `enableDownload` | `boolean` | Show download button (default: true) |
+| `onDownloadSuccess` | `(fileName) => void` | Download success callback |
+| `onDownloadError` | `(error) => void` | Download error callback |
+| `onZoomChange` | `(domain) => void` | Zoom change callback |
+
+## Styling
+
+Components use Tailwind CSS classes. Ensure your app has Tailwind configured, or provide your own styles.
+
+```tsx
+// tailwind.config.js
+module.exports = {
+  content: [
+    './node_modules/@erdo/ui/**/*.js',
+    // ... your content paths
+  ],
+};
+```

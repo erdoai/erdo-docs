@@ -1,0 +1,210 @@
+---
+title: "Client Reference"
+description: "API reference for @erdo/server"
+---
+
+# Client Reference
+
+The `@erdo/server` package provides the `ErdoClient` class for invoking Erdo agents from server-side code.
+
+## Installation
+
+```bash
+npm install @erdo/server
+```
+
+## ErdoClient
+
+### Constructor
+
+```typescript
+import { ErdoClient } from '@erdo/server';
+
+const client = new ErdoClient({
+  endpoint?: string;   // API endpoint (default: ERDO_ENDPOINT env or https://api.erdo.ai)
+  authToken?: string;  // API key (default: ERDO_AUTH_TOKEN env)
+});
+```
+
+### invoke()
+
+Invoke an agent and wait for the complete result.
+
+```typescript
+const result = await client.invoke(botKey: string, params: InvokeParams): Promise<InvokeResult>;
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `botKey` | `string` | The agent identifier (e.g., `'data-analyst'`) |
+| `params` | `InvokeParams` | Invocation parameters |
+
+**InvokeParams:**
+
+```typescript
+interface InvokeParams {
+  messages?: Message[];              // Messages to send to the agent
+  parameters?: Record<string, any>;  // Additional parameters
+  datasets?: string[];               // Dataset slugs to include
+  mode?: InvocationMode;             // 'live' | 'replay' | 'manual'
+}
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+```
+
+**InvokeResult:**
+
+```typescript
+interface InvokeResult {
+  success: boolean;
+  botId?: string;
+  invocationId?: string;
+  result?: {
+    status?: string;
+    output?: {
+      content?: ContentItem[];
+    };
+  };
+  messages: MessageContent[];
+  events: SSEEvent[];
+  steps: StepInfo[];
+  error?: string;
+}
+```
+
+**Example:**
+
+```typescript
+const result = await client.invoke('data-analyst', {
+  messages: [
+    { role: 'user', content: 'What were our top 10 products by revenue?' }
+  ],
+  datasets: ['sales-data'],
+});
+
+if (result.success) {
+  console.log('Status:', result.result?.status);
+  console.log('Content:', result.result?.output?.content);
+}
+```
+
+### invokeStream()
+
+Invoke an agent and stream results as they arrive.
+
+```typescript
+const stream = client.invokeStream(botKey: string, params: InvokeParams): AsyncGenerator<SSEEvent>;
+```
+
+**SSEEvent:**
+
+```typescript
+interface SSEEvent {
+  type?: 'content' | 'status' | 'error' | 'done' | string;
+  payload?: any;
+  metadata?: {
+    user_visibility?: 'visible' | 'hidden';
+    content_type?: string;
+    ui_content_type?: string;
+  };
+}
+```
+
+**Example:**
+
+```typescript
+const events: SSEEvent[] = [];
+
+for await (const event of client.invokeStream('data-analyst', {
+  messages: [{ role: 'user', content: 'Analyze trends in our data' }],
+})) {
+  events.push(event);
+
+  switch (event.type) {
+    case 'content':
+      // New content item (chart, text, etc.)
+      console.log('Content:', event.payload);
+      break;
+    case 'status':
+      // Status update (step started, completed, etc.)
+      console.log('Status:', event.payload);
+      break;
+    case 'error':
+      console.error('Error:', event.payload);
+      break;
+    case 'done':
+      console.log('Stream complete');
+      break;
+  }
+}
+```
+
+## Content Types
+
+Agents can return various content types:
+
+| Type | Description |
+|------|-------------|
+| `text` | Plain text response |
+| `json` | Structured JSON data |
+| `markdown` | Formatted markdown text |
+| `chart` | Chart configuration with data |
+| `table` | Tabular data |
+| `code` | Code snippets |
+
+**ContentItem:**
+
+```typescript
+interface ContentItem {
+  content_type: 'text' | 'json' | 'code' | 'table' | 'image' | 'error';
+  ui_content_type?: 'chart' | 'bar_chart' | 'line_chart' | 'pie_chart' | 'table' | 'markdown';
+  content?: string;
+  data?: any;
+}
+```
+
+## Error Handling
+
+```typescript
+try {
+  const result = await client.invoke('data-analyst', {
+    messages: [{ role: 'user', content: 'Analyze data' }],
+  });
+
+  if (!result.success) {
+    console.error('Invocation failed:', result.error);
+  }
+} catch (error) {
+  // Network errors, auth errors, etc.
+  console.error('Request failed:', error);
+}
+```
+
+## Node.js Example
+
+```typescript
+import { ErdoClient } from '@erdo/server';
+
+async function main() {
+  const client = new ErdoClient({
+    authToken: process.env.ERDO_API_KEY,
+  });
+
+  console.log('Invoking agent...');
+
+  for await (const event of client.invokeStream('data-analyst', {
+    messages: [{ role: 'user', content: 'What insights can you find?' }],
+  })) {
+    if (event.type === 'content') {
+      console.log('Received:', event.payload?.content_type);
+    }
+  }
+}
+
+main();
+```

@@ -1,0 +1,179 @@
+---
+title: "TypeScript SDK Overview"
+description: "Integrate Erdo AI agents into your TypeScript/JavaScript applications"
+---
+
+# TypeScript SDK Overview
+
+The Erdo TypeScript SDK enables you to integrate Erdo's AI agents directly into your applications. Whether you're building a Next.js app, a Node.js backend, or a React frontend, the SDK provides everything you need to invoke agents and render their results.
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| `@erdo/server` | Server-side client for invoking Erdo agents |
+| `@erdo/ui` | React components for rendering agent results |
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install @erdo/server @erdo/ui
+```
+
+```bash yarn
+yarn add @erdo/server @erdo/ui
+```
+
+```bash pnpm
+pnpm add @erdo/server @erdo/ui
+```
+
+</CodeGroup>
+
+## Quick Start
+
+### 1. Create an API Token
+
+Get your API token from the [Erdo dashboard](https://erdo.ai/settings/api-token).
+
+### 2. Invoke an Agent
+
+```typescript
+import { ErdoClient } from '@erdo/server';
+
+const client = new ErdoClient({
+  authToken: process.env.ERDO_API_KEY,
+});
+
+// Invoke an agent and get the result
+const result = await client.invoke('data-analyst', {
+  messages: [{ role: 'user', content: 'What were our top products last month?' }],
+});
+
+console.log(result.messages);
+```
+
+### 3. Stream Results
+
+For real-time updates, use streaming:
+
+```typescript
+for await (const event of client.invokeStream('data-analyst', {
+  messages: [{ role: 'user', content: 'Analyze our sales data' }],
+})) {
+  switch (event.type) {
+    case 'content':
+      console.log('New content:', event.payload);
+      break;
+    case 'status':
+      console.log('Status:', event.payload);
+      break;
+    case 'done':
+      console.log('Complete!');
+      break;
+  }
+}
+```
+
+### 4. Render Results in React
+
+```tsx
+import { ErdoProvider, Content, useInvocation } from '@erdo/ui';
+import { ErdoClient } from '@erdo/server';
+
+const client = new ErdoClient({
+  authToken: process.env.NEXT_PUBLIC_ERDO_API_KEY,
+});
+
+function App() {
+  return (
+    <ErdoProvider config={{ baseUrl: 'https://api.erdo.ai', client }}>
+      <ChatInterface />
+    </ErdoProvider>
+  );
+}
+
+function ChatInterface() {
+  const { result, isStreaming, invoke } = useInvocation();
+
+  const handleSubmit = async (query: string) => {
+    await invoke('data-analyst', {
+      messages: [{ role: 'user', content: query }],
+    });
+  };
+
+  return (
+    <div>
+      {result?.result?.output?.content?.map((item, i) => (
+        <Content key={i} item={item} />
+      ))}
+    </div>
+  );
+}
+```
+
+## Use Cases
+
+### Embed Data Analysis
+
+Add AI-powered data analysis to your existing application:
+
+```typescript
+// User asks a question in your app
+const result = await client.invoke('data-analyst', {
+  messages: [{ role: 'user', content: userQuestion }],
+  datasets: ['sales-data', 'customer-data'],
+});
+
+// Render charts and insights
+```
+
+### AI Tool in Chat Applications
+
+Use Erdo as a tool alongside your LLM for data-intensive queries:
+
+```typescript
+// When your LLM detects a data question, delegate to Erdo
+if (isDataQuestion(userMessage)) {
+  const erdoResult = await client.invoke('data-analyst', {
+    messages: [{ role: 'user', content: userMessage }],
+  });
+  // Return rich visualizations to the user
+}
+```
+
+### Automated Reporting
+
+Generate reports programmatically:
+
+```typescript
+const report = await client.invoke('data-analyst', {
+  messages: [{ role: 'user', content: 'Generate a weekly sales report' }],
+  parameters: {
+    dateRange: 'last_7_days',
+    format: 'detailed',
+  },
+});
+```
+
+## Environment Variables
+
+Configure the SDK using environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ERDO_AUTH_TOKEN` | Your Erdo API key | Required |
+| `ERDO_ENDPOINT` | API endpoint | `https://api.erdo.ai` |
+
+```typescript
+// Uses environment variables automatically
+const client = new ErdoClient();
+```
+
+## Next Steps
+
+- [Client Reference](/ts-sdk/client) - Detailed API documentation
+- [UI Components](/ts-sdk/ui-components) - React component reference
+- [Integration Patterns](/ts-sdk/integration) - Vercel AI SDK, Next.js patterns
