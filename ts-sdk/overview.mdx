@@ -107,7 +107,7 @@ function ChatInterface() {
   return (
     <div>
       {result?.result?.output?.content?.map((item, i) => (
-        <Content key={i} item={item} />
+        <Content key={i} content={item} />
       ))}
     </div>
   );

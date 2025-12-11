@@ -85,7 +85,7 @@ function ChatInterface() {
       {error && <div className="error">{error.message}</div>}
 
       {result?.result?.output?.content?.map((item, i) => (
-        <Content key={i} item={item} />
+        <Content key={i} content={item} />
       ))}
     </div>
   );
@@ -119,9 +119,45 @@ Auto-routes to the appropriate renderer based on content type:
 import { Content } from '@erdoai/ui';
 
 function ResultView({ content }) {
-  return <Content item={content} />;
+  return <Content content={content} />;
 }
 ```
+
+#### Custom Renderers
+
+Override how specific content types are rendered using the `components` prop:
+
+```tsx
+import { Content } from '@erdoai/ui';
+
+// Custom component receives { content, className } props
+function MyBotInvocationRenderer({ content, className }) {
+  return (
+    <div className={className}>
+      <h3>Bot: {content.content.bot_name}</h3>
+      {/* Custom rendering logic */}
+    </div>
+  );
+}
+
+function ResultView({ content }) {
+  return (
+    <Content
+      content={content}
+      components={{
+        'bot_invocation': MyBotInvocationRenderer,
+        'my_custom_type': MyCustomRenderer,
+      }}
+    />
+  );
+}
+```
+
+The `components` prop is a `Record<string, ComponentType>` where:
+- **Key**: The `content_type` or `ui_content_type` string (e.g., `'bot_invocation'`, `'text'`, `'chart'`)
+- **Value**: A React component that receives `{ content, className }` props
+
+When Content encounters a content type, it first checks if there's a custom renderer in `components`, then falls back to built-in renderers.
 
 ### Individual Renderers
 
