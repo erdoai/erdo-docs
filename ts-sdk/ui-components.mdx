@@ -53,6 +53,91 @@ function App() {
 | `authToken` | `string` | Optional auth token for REST calls |
 | `client` | `ErdoClient` | Optional client for `useInvocation` |
 | `dataFetcher` | `DataFetcher` | Optional custom data fetcher |
+| `ContentComponent` | `React.ComponentType` | Optional component for rendering nested content |
+
+### ContentComponent
+
+The `ContentComponent` config option allows you to provide a default component for rendering nested content in invocation components (like `InvocationEvents`, `Output`, `StepInvocation`):
+
+```tsx
+import { ErdoProvider, Content } from '@erdoai/ui';
+
+<ErdoProvider
+  config={{
+    baseUrl: 'https://api.erdo.ai',
+    ContentComponent: Content, // Use SDK's default Content
+  }}
+>
+  {children}
+</ErdoProvider>
+```
+
+This is useful when:
+- You want to customize how content is rendered across all invocation components
+- You have your own Content component with custom renderers
+- You want to avoid passing `ContentComponent` as a prop to every component
+
+Components will automatically use the provider's `ContentComponent` as a default, but you can still override it via props if needed.
+
+## Invocation Components
+
+Components for rendering streaming invocation results.
+
+### InvocationEvents
+
+Renders a list of invocation events (outputs, steps, etc.):
+
+```tsx
+import { InvocationEvents } from '@erdoai/ui';
+
+<InvocationEvents
+  eventsByID={invocation.eventsByID}
+  ContentComponent={Content} // Optional - uses provider default
+/>
+```
+
+### InvocationEvent
+
+Routes a single event to the appropriate renderer:
+
+```tsx
+import { InvocationEvent } from '@erdoai/ui';
+
+<InvocationEvent
+  event={event}
+  ContentComponent={Content}
+/>
+```
+
+### Output
+
+Renders output contents from a step:
+
+```tsx
+import { Output } from '@erdoai/ui';
+
+<Output
+  output={outputWithContents}
+  ContentComponent={Content}
+/>
+```
+
+### StepInvocation
+
+Renders a step with its status and nested events:
+
+```tsx
+import { StepInvocation } from '@erdoai/ui';
+
+<StepInvocation
+  step={step}
+  ContentComponent={Content}
+/>
+```
+
+<Note>
+All invocation components use `ContentComponent` from the `ErdoProvider` context by default. You only need to pass it explicitly if you want to override the provider's default.
+</Note>
 
 ## Hooks
 
