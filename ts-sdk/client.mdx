@@ -49,8 +49,9 @@ const { token, expiresAt } = await client.createToken(params: CreateTokenParams)
 interface CreateTokenParams {
   botKeys?: string[];           // Bot keys the token can access
   datasetIds?: string[];        // Dataset IDs the token can access
-  externalUserId?: string;      // External user ID for RBAC (enables thread access)
-  expiresInSeconds?: number;    // Token lifetime (default: 3600)
+  threadIds?: string[];         // Thread IDs the token can access (for pre-existing threads)
+  externalUserId?: string;      // External user ID for RBAC (enables thread creation/access)
+  expiresInSeconds?: number;    // Token lifetime (default: 3600, max: 86400)
 }
 ```
 

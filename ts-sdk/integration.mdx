@@ -429,6 +429,21 @@ app.post('/api/erdo-token', async (req, res) => {
 });
 ```
 
+**Thread access options:**
+
+- **`externalUserId`** (recommended): Threads created by the token holder are automatically accessible. The user can list, view, and continue their own threads across sessions.
+
+- **`threadIds`**: Grant access to specific pre-existing threads. Useful when you want to give a user access to threads they didn't create (e.g., shared conversations).
+
+```typescript
+// Grant access to specific threads
+const { token } = await client.createToken({
+  botKeys: ['my-org.data-analyst'],
+  threadIds: ['thread-uuid-1', 'thread-uuid-2'],  // Pre-existing threads
+  expiresInSeconds: 3600,
+});
+```
+
 #### Using Scoped Tokens (Frontend)
 
 Pass the scoped token to `ErdoProvider`:
