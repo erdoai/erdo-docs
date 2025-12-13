@@ -25,18 +25,15 @@ Wrap your app with `ErdoProvider` to configure the SDK:
 
 ```tsx
 import { ErdoProvider } from '@erdoai/ui';
-import { ErdoClient } from '@erdoai/server';
-
-const client = new ErdoClient({
-  authToken: process.env.NEXT_PUBLIC_ERDO_API_KEY,
-});
 
 function App() {
   return (
     <ErdoProvider
       config={{
         baseUrl: 'https://api.erdo.ai',
-        client: client,  // For useInvocation hook
+        // Use an ephemeral token for authenticated data fetching
+        // Token should be obtained from your backend via createToken()
+        token: ephemeralToken,
       }}
     >
       {children}
@@ -45,14 +42,17 @@ function App() {
 }
 ```
 
+<Warning>
+Never expose API keys to the browser. For streaming invocations, use ephemeral tokens or proxy streaming. See [Integration Patterns](/ts-sdk/integration#client-component-with-streaming) for secure patterns.
+</Warning>
+
 **Config Options:**
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `baseUrl` | `string` | API base URL |
-| `authToken` | `string` | Optional auth token for REST calls |
-| `client` | `ErdoClient` | Optional client for `useInvocation` |
-| `dataFetcher` | `DataFetcher` | Optional custom data fetcher |
+| `baseUrl` | `string` | API base URL (or your proxy URL) |
+| `token` | `string` | Ephemeral token from `createToken()` for authenticated data fetching |
+| `dataFetcher` | `DataFetcher` | Optional custom data fetcher (for proxying) |
 | `ContentComponent` | `React.ComponentType` | Optional component for rendering nested content |
 
 ### ContentComponent
