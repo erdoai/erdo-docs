@@ -50,10 +50,22 @@ interface CreateTokenParams {
   botKeys?: string[];           // Bot keys the token can access
   datasetIds?: string[];        // Dataset IDs the token can access
   threadIds?: string[];         // Thread IDs the token can access (for pre-existing threads)
-  externalUserId?: string;      // External user ID for RBAC (enables thread creation/access)
+  externalUserId?: string;      // Your user identifier (optional, for user reuse across tokens)
   expiresInSeconds?: number;    // Token lifetime (default: 3600, max: 86400)
 }
 ```
+
+<Note>
+**How External Users Work**
+
+Every scoped token is linked to an **external user** - a real user identity in Erdo's system. This enables proper RBAC and resource ownership.
+
+- **With `externalUserId`**: If you provide the same `externalUserId` across multiple tokens, they all authenticate as the same user. This is useful when your users need persistent access to their threads and resources.
+
+- **Without `externalUserId`**: A new user is created for each token. Use this for one-off or anonymous interactions where user persistence isn't needed.
+
+The `externalUserId` is your own user identifier (e.g., your database user ID). It's only used for matching - Erdo maintains its own internal user IDs.
+</Note>
 
 **TokenResponse:**
 
@@ -201,7 +213,11 @@ for await (const event of client.invokeStream('data-analyst', {
 
 ## Thread Methods
 
-Thread methods require token authentication with `externalUserId`. Create a token with `externalUserId` to enable thread access for your users.
+Thread methods work with any scoped token. Each token is linked to an external user, and threads created are owned by that user.
+
+<Tip>
+For persistent user threads (where users can return to their conversations), use `externalUserId` when creating tokens. This ensures the same user identity across sessions.
+</Tip>
 
 ### createThread()
 
@@ -245,20 +261,50 @@ console.log('Created thread:', thread.id);
 
 ### listThreads()
 
-List all threads for the authenticated user.
+List threads. The behavior depends on your authentication method:
 
 ```typescript
-const { threads } = await client.listThreads(): Promise<ListThreadsResponse>;
+const { threads } = await client.listThreads(params?: ListThreadsParams): Promise<ListThreadsResponse>;
 ```
 
-**Example:**
+**ListThreadsParams:**
 
 ```typescript
-const { threads } = await client.listThreads();
-for (const thread of threads) {
-  console.log(thread.id, thread.name, thread.createdAt);
+interface ListThreadsParams {
+  externalUserId?: string;  // Filter by external user (API key only)
 }
 ```
+
+<Tabs>
+  <Tab title="Scoped Token">
+    When using a scoped token, returns threads owned by the token's user.
+    The `externalUserId` parameter is ignored (the token already identifies the user).
+
+    ```typescript
+    // Client authenticated with scoped token
+    const client = new ErdoClient({ token: scopedToken });
+
+    // Returns only this user's threads
+    const { threads } = await client.listThreads();
+    ```
+  </Tab>
+  <Tab title="API Key">
+    When using an API key, you can either list your own threads or filter by a specific external user.
+
+    ```typescript
+    // Client authenticated with API key
+    const client = new ErdoClient({ authToken: apiKey });
+
+    // List your own threads
+    const { threads } = await client.listThreads();
+
+    // Filter to a specific external user's threads
+    const { threads } = await client.listThreads({
+      externalUserId: 'user_123'
+    });
+    ```
+  </Tab>
+</Tabs>
 
 ### getThread()
 
@@ -417,13 +463,24 @@ export async function POST(request: Request) {
 
   const { token, expiresAt } = await serverClient.createToken({
     botKeys: ['my-org.data-analyst'],
-    externalUserId: userId,  // Links token to your user
+    externalUserId: userId,  // Your user ID - enables persistent threads
     expiresInSeconds: 3600,
   });
 
   return Response.json({ token, expiresAt });
 }
 ```
+
+<Info>
+**Why use `externalUserId`?**
+
+When you pass your user's ID as `externalUserId`, Erdo creates a persistent user identity. This means:
+- The same user can have multiple tokens over time (e.g., after token expiry)
+- All tokens with the same `externalUserId` see the same threads and resources
+- Perfect for apps where users need to return to their conversation history
+
+If you omit `externalUserId`, each token creates a new isolated user - useful for anonymous or one-time interactions.
+</Info>
 
 ### Client-side: Use Token for Threads
 
