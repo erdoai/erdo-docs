@@ -44,7 +44,7 @@ Get your API token from the [Erdo dashboard](https://erdo.ai/settings/api-token)
 import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
 });
 
 // Invoke an agent and get the result
@@ -91,7 +91,7 @@ Your backend creates a short-lived, scoped token. The frontend uses it to stream
 // app/api/authorize/route.ts (SERVER)
 import { ErdoClient } from '@erdoai/server';
 
-const client = new ErdoClient({ authToken: process.env.ERDO_API_KEY });
+const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
   const { botKey } = await request.json();
@@ -146,7 +146,7 @@ Your backend proxies the stream. The API key never leaves your server.
 // app/api/invoke/route.ts (SERVER)
 import { ErdoClient } from '@erdoai/server';
 
-const client = new ErdoClient({ authToken: process.env.ERDO_API_KEY });
+const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
   const { botKey, messages } = await request.json();

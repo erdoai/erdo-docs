@@ -19,7 +19,7 @@ import { ErdoClient } from '@erdoai/server';
 
 export default async function AnalysisPage() {
   const client = new ErdoClient({
-    authToken: process.env.ERDO_API_KEY,
+    authToken: process.env.ERDO_AUTH_TOKEN,
   });
 
   const result = await client.invoke('data-analyst', {
@@ -57,7 +57,7 @@ Your backend creates a scoped, short-lived token. The frontend uses it to invoke
 // app/api/authorize/route.ts (SERVER)
 import { ErdoClient } from '@erdoai/server';
 
-const client = new ErdoClient({ authToken: process.env.ERDO_API_KEY });
+const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
   const { botKey } = await request.json();
@@ -151,7 +151,7 @@ Your backend proxies all requests. The API key never leaves your server.
 // app/api/invoke/route.ts (SERVER)
 import { ErdoClient } from '@erdoai/server';
 
-const client = new ErdoClient({ authToken: process.env.ERDO_API_KEY });
+const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
   const { botKey, messages, datasets } = await request.json();
@@ -243,7 +243,7 @@ import { z } from 'zod';
 import { ErdoClient } from '@erdoai/server';
 
 const erdoClient = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
 });
 
 export async function POST(req: Request) {
@@ -326,7 +326,7 @@ import { ErdoClient } from '@erdoai/server';
 
 const app = express();
 const client = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
 });
 
 app.use(express.json());
@@ -386,7 +386,7 @@ Point the SDK to your own API endpoint:
 ```typescript
 // Server-side client
 const client = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
   endpoint: 'https://your-backend.com/api/erdo',  // Your proxy
 });
 
@@ -415,7 +415,7 @@ app.all('/api/erdo/*', async (req, res) => {
   const response = await fetch(`https://api.erdo.ai${erdoPath}`, {
     method: req.method,
     headers: {
-      'Authorization': `Bearer ${process.env.ERDO_API_KEY}`,
+      'Authorization': `Bearer ${process.env.ERDO_AUTH_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
@@ -506,13 +506,13 @@ Store your API key securely in environment variables:
 
 ```bash
 # .env
-ERDO_API_KEY=your-api-key
+ERDO_AUTH_TOKEN=your-api-key
 ```
 
 ```typescript
 // Only use on server-side
 const client = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
 });
 ```
 
@@ -550,7 +550,7 @@ Create a scoped token from your backend using `createToken()`:
 import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({
-  authToken: process.env.ERDO_API_KEY,
+  authToken: process.env.ERDO_AUTH_TOKEN,
 });
 
 app.post('/api/erdo-token', async (req, res) => {

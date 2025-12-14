@@ -378,7 +378,7 @@ import { ErdoClient } from '@erdoai/server';
 
 async function main() {
   const client = new ErdoClient({
-    authToken: process.env.ERDO_API_KEY,
+    authToken: process.env.ERDO_AUTH_TOKEN,
   });
 
   console.log('Invoking agent...');
