@@ -40,14 +40,14 @@ You must provide either `authToken` or `token`. Use `authToken` for server-side 
 Create a scoped token for client-side use. Requires `authToken` (API key) authentication.
 
 ```typescript
-const { token, expiresAt } = await client.createToken(params: CreateTokenParams): Promise<TokenResponse>;
+const { token, tokenId, expiresAt } = await client.createToken(params: CreateTokenParams): Promise<TokenResponse>;
 ```
 
 **CreateTokenParams:**
 
 ```typescript
 interface CreateTokenParams {
-  botKeys?: string[];           // Bot keys the token can access
+  botIds?: string[];            // Bot UUIDs the token can access
   datasetIds?: string[];        // Dataset IDs the token can access
   threadIds?: string[];         // Thread IDs the token can access (for pre-existing threads)
   externalUserId?: string;      // Your user identifier (optional, for user reuse across tokens)
@@ -71,6 +71,7 @@ The `externalUserId` is your own user identifier (e.g., your database user ID). 
 
 ```typescript
 interface TokenResponse {
+  tokenId: string;    // Token ID (for revocation)
   token: string;      // The scoped token
   expiresAt: string;  // ISO timestamp when token expires
 }
@@ -84,8 +85,8 @@ const serverClient = new ErdoClient({
   authToken: process.env.ERDO_AUTH_TOKEN,
 });
 
-const { token, expiresAt } = await serverClient.createToken({
-  botKeys: ['my-org.data-analyst'],
+const { token, tokenId, expiresAt } = await serverClient.createToken({
+  botIds: ['uuid-of-data-analyst-bot'],  // Bot UUIDs
   externalUserId: 'user_123',  // Your user's ID
   expiresInSeconds: 3600,
 });
@@ -452,7 +453,7 @@ For B2B applications where your customers' users need to interact with Erdo agen
 import { ErdoClient } from '@erdoai/server';
 
 export async function POST(request: Request) {
-  const { userId } = await request.json();
+  const { userId, botId } = await request.json();
 
   // Your own authorization logic here
   // e.g., check if userId belongs to authenticated session
@@ -461,13 +462,13 @@ export async function POST(request: Request) {
     authToken: process.env.ERDO_AUTH_TOKEN,
   });
 
-  const { token, expiresAt } = await serverClient.createToken({
-    botKeys: ['my-org.data-analyst'],
+  const { token, tokenId, expiresAt } = await serverClient.createToken({
+    botIds: [botId],  // Bot UUIDs
     externalUserId: userId,  // Your user ID - enables persistent threads
     expiresInSeconds: 3600,
   });
 
-  return Response.json({ token, expiresAt });
+  return Response.json({ token, tokenId, expiresAt });
 }
 ```
 

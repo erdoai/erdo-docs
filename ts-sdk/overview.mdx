@@ -94,13 +94,13 @@ import { ErdoClient } from '@erdoai/server';
 const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
-  const { botKey } = await request.json();
+  const { botId } = await request.json();
   // Add your own RBAC logic here
-  const { token, expiresAt } = await client.createToken({
-    botKeys: [botKey],
+  const { token, tokenId, expiresAt } = await client.createToken({
+    botIds: [botId],  // Bot UUIDs
     expiresInSeconds: 3600,
   });
-  return Response.json({ token, expiresAt });
+  return Response.json({ token, tokenId, expiresAt });
 }
 ```
 

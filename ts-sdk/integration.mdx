@@ -60,17 +60,17 @@ import { ErdoClient } from '@erdoai/server';
 const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
 export async function POST(request: Request) {
-  const { botKey } = await request.json();
+  const { botId } = await request.json();
 
   // Add your own RBAC logic here
-  // if (!user.canAccess(botKey)) return Response.json({ error: 'Forbidden' }, { status: 403 });
+  // if (!user.canAccess(botId)) return Response.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { token, expiresAt } = await client.createToken({
-    botKeys: [botKey],
+  const { token, tokenId, expiresAt } = await client.createToken({
+    botIds: [botId],  // Bot UUIDs
     expiresInSeconds: 3600, // 1 hour
   });
 
-  return Response.json({ token, expiresAt });
+  return Response.json({ token, tokenId, expiresAt });
 }
 ```
 
@@ -117,7 +117,7 @@ export default function ChatPage() {
     const res = await fetch('/api/authorize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botKey: 'data-analyst' }),
+      body: JSON.stringify({ botId: 'uuid-of-data-analyst-bot' }),  // Bot UUID
     });
     const { token, expiresAt, endpoint } = await res.json();
     tokenRef.current = { token, expiresAt: new Date(expiresAt), endpoint };
@@ -554,15 +554,15 @@ const client = new ErdoClient({
 
 app.post('/api/erdo-token', async (req, res) => {
   // Create a scoped token for this user
-  const { token, expiresAt } = await client.createToken({
-    botKeys: ['my-org.data-analyst'],     // Bots the user can access
+  const { token, tokenId, expiresAt } = await client.createToken({
+    botIds: ['uuid-of-data-analyst'],      // Bot UUIDs the user can access
     datasetIds: ['dataset-uuid-1'],        // Datasets the user can query
     externalUserId: req.user.id,           // Links token to your user for thread access
     expiresInSeconds: 3600,                // 1 hour
   });
 
   // Return the token to your frontend
-  res.json({ token, expiresAt });
+  res.json({ token, tokenId, expiresAt });
 });
 ```
 
@@ -574,8 +574,8 @@ app.post('/api/erdo-token', async (req, res) => {
 
 ```typescript
 // Grant access to specific threads
-const { token } = await client.createToken({
-  botKeys: ['my-org.data-analyst'],
+const { token, tokenId } = await client.createToken({
+  botIds: ['uuid-of-data-analyst'],  // Bot UUIDs
   threadIds: ['thread-uuid-1', 'thread-uuid-2'],  // Pre-existing threads
   expiresInSeconds: 3600,
 });
@@ -657,8 +657,9 @@ const { threads } = await client.listThreads();
 **CreateTokenParams:**
 ```typescript
 interface CreateTokenParams {
-  botKeys?: string[];        // Bot keys the token can access
+  botIds?: string[];         // Bot UUIDs the token can access
   datasetIds?: string[];     // Dataset IDs the token can query
+  threadIds?: string[];      // Thread IDs the token can access
   externalUserId?: string;   // Your user ID (enables thread management)
   expiresInSeconds?: number; // Token lifetime (default: 3600)
 }
@@ -667,6 +668,7 @@ interface CreateTokenParams {
 **TokenResponse:**
 ```typescript
 interface TokenResponse {
+  tokenId: string;    // Token ID (for revocation)
   token: string;      // The scoped token
   expiresAt: string;  // ISO timestamp when token expires
 }
