@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   // if (!user.canAccess(botId)) return Response.json({ error: 'Forbidden' }, { status: 403 });
 
   const { token, tokenId, expiresAt } = await client.createToken({
-    botIds: [botId],  // Bot UUIDs
+    botKeys: [botKey],  // Bot keys (e.g., "my-org.data-analyst")
     expiresInSeconds: 3600, // 1 hour
   });
 
@@ -117,7 +117,7 @@ export default function ChatPage() {
     const res = await fetch('/api/authorize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botId: 'uuid-of-data-analyst-bot' }),  // Bot UUID
+      body: JSON.stringify({ botKey: 'my-org.data-analyst' }),  // Bot key
     });
     const { token, expiresAt, endpoint } = await res.json();
     tokenRef.current = { token, expiresAt: new Date(expiresAt), endpoint };
@@ -555,7 +555,7 @@ const client = new ErdoClient({
 app.post('/api/erdo-token', async (req, res) => {
   // Create a scoped token for this user
   const { token, tokenId, expiresAt } = await client.createToken({
-    botIds: ['uuid-of-data-analyst'],      // Bot UUIDs the user can access
+    botKeys: ['my-org.data-analyst'],      // Bot keys the user can access
     datasetIds: ['dataset-uuid-1'],        // Datasets the user can query
     externalUserId: req.user.id,           // Links token to your user for thread access
     expiresInSeconds: 3600,                // 1 hour
@@ -575,7 +575,7 @@ app.post('/api/erdo-token', async (req, res) => {
 ```typescript
 // Grant access to specific threads
 const { token, tokenId } = await client.createToken({
-  botIds: ['uuid-of-data-analyst'],  // Bot UUIDs
+  botKeys: ['my-org.data-analyst'],  // Bot keys
   threadIds: ['thread-uuid-1', 'thread-uuid-2'],  // Pre-existing threads
   expiresInSeconds: 3600,
 });
@@ -657,7 +657,7 @@ const { threads } = await client.listThreads();
 **CreateTokenParams:**
 ```typescript
 interface CreateTokenParams {
-  botIds?: string[];         // Bot UUIDs the token can access
+  botKeys?: string[];        // Bot keys to grant access (e.g., ["my-org.data-analyst"])
   datasetIds?: string[];     // Dataset IDs the token can query
   threadIds?: string[];      // Thread IDs the token can access
   externalUserId?: string;   // Your user ID (enables thread management)

@@ -47,7 +47,7 @@ const { token, tokenId, expiresAt } = await client.createToken(params: CreateTok
 
 ```typescript
 interface CreateTokenParams {
-  botIds?: string[];            // Bot UUIDs the token can access
+  botKeys?: string[];           // Bot keys to grant access (e.g., ["my-org.data-analyst"])
   datasetIds?: string[];        // Dataset IDs the token can access
   threadIds?: string[];         // Thread IDs the token can access (for pre-existing threads)
   externalUserId?: string;      // Your user identifier (optional, for user reuse across tokens)
@@ -86,7 +86,7 @@ const serverClient = new ErdoClient({
 });
 
 const { token, tokenId, expiresAt } = await serverClient.createToken({
-  botIds: ['uuid-of-data-analyst-bot'],  // Bot UUIDs
+  botKeys: ['my-org.data-analyst'],  // Bot keys
   externalUserId: 'user_123',  // Your user's ID
   expiresInSeconds: 3600,
 });
@@ -463,7 +463,7 @@ export async function POST(request: Request) {
   });
 
   const { token, tokenId, expiresAt } = await serverClient.createToken({
-    botIds: [botId],  // Bot UUIDs
+    botKeys: [botKey],  // Bot keys
     externalUserId: userId,  // Your user ID - enables persistent threads
     expiresInSeconds: 3600,
   });
