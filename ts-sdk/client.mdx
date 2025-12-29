@@ -98,6 +98,10 @@ const { token, tokenId, expiresAt } = await serverClient.createToken({
 
 Invoke an agent and wait for the complete result.
 
+<Warning>
+**Server-only**: This method uses `/bots/{key}/invoke` which returns raw SSE events without message wrapping. For React UI rendering with the `Content` component, use thread-based messaging (`sendMessage()` or the `useThread` hook).
+</Warning>
+
 ```typescript
 const result = await client.invoke(botKey: string, params: InvokeParams): Promise<InvokeResult>;
 ```
@@ -164,6 +168,10 @@ if (result.success) {
 ### invokeStream()
 
 Invoke an agent and stream results as they arrive.
+
+<Warning>
+**Server-only**: This method uses `/bots/{key}/invoke` which returns raw SSE events without message wrapping. For React UI rendering with the `Content` component, use thread-based messaging (`sendMessage()` or the `useThread` hook).
+</Warning>
 
 ```typescript
 const stream = client.invokeStream(botKey: string, params: InvokeParams): AsyncGenerator<SSEEvent>;

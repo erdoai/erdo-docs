@@ -79,103 +79,58 @@ This is useful when:
 
 Components will automatically use the provider's `ContentComponent` as a default, but you can still override it via props if needed.
 
-## Invocation Components
-
-Components for rendering streaming invocation results.
-
-### InvocationEvents
-
-Renders a list of invocation events (outputs, steps, etc.):
-
-```tsx
-import { InvocationEvents } from '@erdoai/ui';
-
-<InvocationEvents
-  eventsByID={invocation.eventsByID}
-  ContentComponent={Content} // Optional - uses provider default
-/>
-```
-
-### InvocationEvent
-
-Routes a single event to the appropriate renderer:
-
-```tsx
-import { InvocationEvent } from '@erdoai/ui';
-
-<InvocationEvent
-  event={event}
-  ContentComponent={Content}
-/>
-```
-
-### Output
-
-Renders output contents from a step:
-
-```tsx
-import { Output } from '@erdoai/ui';
-
-<Output
-  output={outputWithContents}
-  ContentComponent={Content}
-/>
-```
-
-### StepInvocation
-
-Renders a step with its status and nested events:
-
-```tsx
-import { StepInvocation } from '@erdoai/ui';
-
-<StepInvocation
-  step={step}
-  ContentComponent={Content}
-/>
-```
-
-<Note>
-All invocation components use `ContentComponent` from the `ErdoProvider` context by default. You only need to pass it explicitly if you want to override the provider's default.
-</Note>
-
 ## Hooks
 
-### useInvocation
+### useThread
 
-Invoke agents with streaming support:
+Send messages to threads with streaming support:
 
 ```tsx
-import { useInvocation } from '@erdoai/ui';
+import { useThread, Content } from '@erdoai/ui';
 
 function ChatInterface() {
-  const { result, isStreaming, error, invoke, cancel } = useInvocation({
-    onEvent: (event) => console.log('Event:', event),
-    onFinish: (result) => console.log('Done:', result),
+  const { isStreaming, streamingContents, error, sendMessage } = useThread({
+    botKey: 'data-analyst',
+    onFinish: () => console.log('Done'),
     onError: (error) => console.error('Error:', error),
   });
 
-  const handleSubmit = async (query: string) => {
-    await invoke('data-analyst', {
-      messages: [{ role: 'user', content: query }],
-    });
-  };
-
   return (
     <div>
-      <button onClick={() => handleSubmit('Analyze data')}>
+      <button onClick={() => sendMessage('Analyze data')}>
         {isStreaming ? 'Analyzing...' : 'Analyze'}
       </button>
 
       {error && <div className="error">{error.message}</div>}
 
-      {result?.result?.output?.content?.map((item, i) => (
-        <Content key={i} content={item} />
+      {streamingContents.map((content) => (
+        <Content key={content.id} content={content} />
       ))}
     </div>
   );
 }
 ```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `botKey` | `string` | Bot key for the thread (e.g., `'data-analyst'`) |
+| `threadId` | `string` | Optional existing thread ID to resume |
+| `onFinish` | `() => void` | Called when message streaming completes |
+| `onError` | `(error: Error) => void` | Called on error |
+
+**Returns:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `streamingContents` | `ContentItem[]` | Visible content items ready for rendering |
+| `isStreaming` | `boolean` | Whether currently streaming |
+| `error` | `Error \| null` | Most recent error |
+| `sendMessage` | `(content: string) => Promise<void>` | Send a message |
+| `thread` | `Thread \| null` | Current thread object |
+| `activeMessages` | `MessageWithContents[]` | Raw messages (for advanced use) |
+| `setThread` | `(thread: Thread) => void` | Set thread manually |
 
 ### useDatasetContents
 
@@ -502,4 +457,52 @@ If you're not using shadcn/ui but want Erdo charts to work:
 
 <Note>
 The `--chart-1` through `--chart-5` variables are used for chart colors. Customize these to match your brand.
+</Note>
+
+## Advanced: Custom Content Renderers
+
+The `Content` component handles all content types automatically. For advanced use cases, you can override specific content type renderers using the `components` prop.
+
+### Building Block Components
+
+When building custom renderers that need to display nested content (like bot invocations with steps), these building block components are available:
+
+```tsx
+import {
+  InvocationEvents,  // Renders nested steps/outputs
+  StepInvocation,    // Renders a single step
+  Output,            // Renders output contents
+} from '@erdoai/ui';
+```
+
+### Example: Custom Bot Invocation Renderer
+
+```tsx
+import { Content, InvocationEvents } from '@erdoai/ui';
+
+function MyBotInvocationRenderer({ content, className }) {
+  const data = content.content;
+  const botInvocation = content.botInvocation;
+
+  return (
+    <div className={className}>
+      <h3>Custom Bot: {data.bot_name}</h3>
+      {botInvocation && (
+        <InvocationEvents eventsByID={botInvocation.eventsByID} />
+      )}
+    </div>
+  );
+}
+
+// Use in Content
+<Content
+  content={content}
+  components={{
+    'bot_invocation': MyBotInvocationRenderer,
+  }}
+/>
+```
+
+<Note>
+Most applications don't need custom renderers. The default `Content` component handles all standard content types including nested bot invocations, charts, tables, and markdown.
 </Note>

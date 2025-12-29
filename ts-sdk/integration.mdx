@@ -80,20 +80,21 @@ export async function POST(request: Request) {
 
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { ErdoClient } from '@erdoai/server';
-import { ErdoProvider, useInvocation, Content } from '@erdoai/ui';
+import { ErdoProvider, useThread, Content } from '@erdoai/ui';
 
 function ChatInterface() {
   const [query, setQuery] = useState('');
-  const { result, isStreaming, invoke } = useInvocation();
+  const { activeMessages, isStreaming, sendMessage } = useThread({
+    botKey: 'data-analyst',
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await invoke('data-analyst', {
-      messages: [{ role: 'user', content: query }],
-    });
+    await sendMessage(query);
+    setQuery('');
   };
 
-  const contents = result?.result?.output?.content || [];
+  const contents = activeMessages.flatMap(msg => msg.contents || []);
 
   return (
     <div>
@@ -101,7 +102,7 @@ function ChatInterface() {
         <input value={query} onChange={(e) => setQuery(e.target.value)} />
         <button disabled={isStreaming}>{isStreaming ? 'Analyzing...' : 'Send'}</button>
       </form>
-      {contents.map((item, i) => <Content key={i} content={item} />)}
+      {contents.map((item, i) => <Content key={item.id || i} content={item} />)}
     </div>
   );
 }
@@ -146,19 +147,35 @@ export default function ChatPage() {
 Your backend proxies all requests. The API key never leaves your server.
 
 ```tsx
-// app/api/invoke/route.ts (SERVER)
+// app/api/threads/route.ts (SERVER - create thread)
 import { ErdoClient } from '@erdoai/server';
 
 const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
 
-export async function POST(request: Request) {
-  const { botKey, messages, datasets } = await request.json();
+export async function POST() {
+  const thread = await client.createThread();
+  return Response.json(thread);
+}
+```
+
+```tsx
+// app/api/threads/[threadId]/message/route.ts (SERVER - send message)
+import { ErdoClient } from '@erdoai/server';
+
+const client = new ErdoClient({ authToken: process.env.ERDO_AUTH_TOKEN });
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ threadId: string }> }
+) {
+  const { threadId } = await params;
+  const { content, botKey } = await request.json();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of client.invokeStream(botKey, { messages, datasets })) {
+        for await (const event of client.sendMessage(threadId, { content, botKey })) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -181,23 +198,57 @@ export async function POST(request: Request) {
 // app/chat/page.tsx (CLIENT)
 'use client';
 
-import { useMemo } from 'react';
-import { ErdoClient } from '@erdoai/server';
-import { ErdoProvider, useInvocation, Content } from '@erdoai/ui';
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { ErdoProvider, Content, handleSSEEvent } from '@erdoai/ui';
+import type { SSEEvent } from '@erdoai/types';
 
 function ChatInterface() {
   const [query, setQuery] = useState('');
-  const { result, isStreaming, invoke } = useInvocation();
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [activeMessages, setActiveMessages] = useState<any[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await invoke('data-analyst', {
-      messages: [{ role: 'user', content: query }],
+    setIsStreaming(true);
+
+    // Create thread if needed
+    let currentThreadId = threadId;
+    if (!currentThreadId) {
+      const res = await fetch('/api/threads', { method: 'POST' });
+      const thread = await res.json();
+      currentThreadId = thread.id;
+      setThreadId(thread.id);
+    }
+
+    // Send message via proxy
+    const response = await fetch(`/api/threads/${currentThreadId}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: query, botKey: 'data-analyst' }),
     });
+
+    // Process SSE stream
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    const messagesByID: Record<string, any> = {};
+
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ') && line.slice(6) !== '[DONE]') {
+          const event: SSEEvent = JSON.parse(line.slice(6));
+          handleSSEEvent(event.type || '', event, [], currentThreadId, messagesByID);
+          setActiveMessages(Object.values(messagesByID));
+        }
+      }
+    }
+    setIsStreaming(false);
   };
 
-  const contents = result?.result?.output?.content || [];
+  const contents = activeMessages.flatMap(msg => msg.contents || []);
 
   return (
     <div>
@@ -205,25 +256,14 @@ function ChatInterface() {
         <input value={query} onChange={(e) => setQuery(e.target.value)} />
         <button disabled={isStreaming}>{isStreaming ? 'Analyzing...' : 'Send'}</button>
       </form>
-      {contents.map((item, i) => <Content key={i} content={item} />)}
+      {contents.map((item, i) => <Content key={item.id || i} content={item} />)}
     </div>
   );
 }
 
 export default function ChatPage() {
-  // Point ErdoClient to your proxy endpoint
-  const client = useMemo(() => new ErdoClient({
-    endpoint: '/api',  // Your proxy
-    authToken: 'proxy',  // Proxy handles auth
-  }), []);
-
-  const config = useMemo(() => ({
-    baseUrl: '/api',
-    client,
-  }), [client]);
-
   return (
-    <ErdoProvider config={config}>
+    <ErdoProvider config={{ baseUrl: '' }}>
       <ChatInterface />
     </ErdoProvider>
   );
@@ -232,7 +272,7 @@ export default function ChatPage() {
 
 ## Vercel AI SDK
 
-Use Erdo as a tool in your AI chat application:
+Use Erdo as a tool in your AI chat application with [Vercel AI SDK 6](https://vercel.com/blog/ai-sdk-6):
 
 ```tsx
 // app/api/chat/route.ts
@@ -249,7 +289,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = streamText({
-    model: openai('gpt-4'),
+    model: openai('gpt-4o'),
     messages,
     tools: {
       analyzeData: tool({
@@ -267,7 +307,7 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
 ```
 
@@ -277,7 +317,7 @@ export async function POST(req: Request) {
 // components/chat.tsx
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { Content } from '@erdoai/ui';
 
 export function Chat() {
@@ -288,20 +328,27 @@ export function Chat() {
       {messages.map((m) => (
         <div key={m.id}>
           {m.role === 'user' ? 'User: ' : 'AI: '}
-          {m.content}
+          {/* Render text parts */}
+          {m.parts
+            ?.filter((part) => part.type === 'text')
+            .map((part, i) => (
+              <span key={i}>{part.text}</span>
+            ))}
 
           {/* Render Erdo tool results */}
-          {m.toolInvocations?.map((tool, i) => {
-            if (tool.toolName === 'analyzeData' && tool.result) {
+          {m.parts
+            ?.filter((part) => part.type === 'tool-invocation' && part.toolInvocation.toolName === 'analyzeData')
+            .map((part, i) => {
+              const toolResult = part.toolInvocation.result;
+              if (!toolResult) return null;
               return (
                 <div key={i}>
-                  {tool.result.result?.output?.content?.map((item, j) => (
+                  {toolResult.result?.output?.content?.map((item: unknown, j: number) => (
                     <Content key={j} content={item} />
                   ))}
                 </div>
               );
-            }
-          })}
+            })}
         </div>
       ))}
 
@@ -466,7 +513,7 @@ export function AppProvider({ children }) {
 ```
 
 <Note>
-When using a custom `dataFetcher`, the `baseUrl` is still used by the `useInvocation` hook. Only `fetchDatasetContents` calls are overridden.
+When using a custom `dataFetcher`, the `baseUrl` is still used by the `useThread` hook. Only `fetchDatasetContents` calls are overridden.
 </Note>
 
 ## Error Handling
@@ -488,10 +535,11 @@ function App() {
 ### Hook-Level Error Handling
 
 ```tsx
-const { error, invoke } = useInvocation({
+const { error, sendMessage } = useThread({
+  botKey: 'data-analyst',
   onError: (err) => {
     // Log to error tracking service
-    console.error('Invocation failed:', err);
+    console.error('Message failed:', err);
     toast.error('Analysis failed. Please try again.');
   },
 });
@@ -650,6 +698,76 @@ for await (const event of client.sendMessage(thread.id, {
 
 // List user's threads
 const { threads } = await client.listThreads();
+```
+
+#### Persisting External User IDs
+
+To enable users to access their threads across sessions, store the external user ID in your database:
+
+```typescript
+// Your database schema
+// users: { id, email, erdo_external_user_id }
+
+// When user signs up or first uses Erdo
+async function getOrCreateErdoUserId(userId: string) {
+  const user = await db.users.find(userId);
+
+  if (!user.erdo_external_user_id) {
+    // Generate and store a unique ID for this user
+    user.erdo_external_user_id = `ext-${userId}`;  // Or use crypto.randomUUID()
+    await db.users.update(userId, { erdo_external_user_id: user.erdo_external_user_id });
+  }
+
+  return user.erdo_external_user_id;
+}
+
+// When creating tokens, use the stored ID
+app.post('/api/erdo-token', async (req, res) => {
+  const externalUserId = await getOrCreateErdoUserId(req.user.id);
+
+  const { token } = await client.createToken({
+    botKeys: ['my-org.data-analyst'],
+    externalUserId,  // Same ID every time = same threads
+    expiresInSeconds: 3600,
+  });
+
+  res.json({ token });
+});
+```
+
+The external user ID is embedded in the token and never exposed to the client. Users cannot access other users' threads.
+
+#### Persisting Message History
+
+For production applications, we recommend storing messages in your own database rather than fetching from Erdo each time. This gives you full control and avoids extra API calls:
+
+```tsx
+// Save messages when streaming completes
+const { streamingContents, sendMessage } = useThread({
+  botKey: 'my-org.data-analyst',
+  onFinish: async () => {
+    // Save to your database
+    await db.messages.create({
+      threadId,
+      role: 'assistant',
+      contents: streamingContents,
+      createdAt: new Date(),
+    });
+  },
+});
+
+// Load history from your database
+const { data: history } = useQuery({
+  queryKey: ['messages', threadId],
+  queryFn: () => db.messages.findByThreadId(threadId),
+});
+```
+
+Alternatively, you can fetch history from Erdo using `client.getThreadMessages()`:
+
+```typescript
+// Fetch from Erdo API (simpler, but adds latency)
+const { messages } = await client.getThreadMessages(threadId);
 ```
 
 #### Token API Reference
