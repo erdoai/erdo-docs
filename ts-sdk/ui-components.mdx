@@ -16,7 +16,7 @@ npm install @erdoai/ui
 **Peer Dependencies:**
 
 ```bash
-npm install react react-dom @tanstack/react-query
+npm install react react-dom
 ```
 
 ## ErdoProvider
@@ -52,8 +52,9 @@ Never expose API keys to the browser. For streaming invocations, use ephemeral t
 |--------|------|-------------|
 | `baseUrl` | `string` | API base URL (or your proxy URL) |
 | `token` | `string` | Ephemeral token from `createToken()` for authenticated data fetching |
-| `dataFetcher` | `DataFetcher` | Optional custom data fetcher (for proxying) |
+| `dataFetcher` | `DataFetcher` | Optional custom data fetcher (see [Custom Data Fetching](#custom-data-fetching)) |
 | `ContentComponent` | `React.ComponentType` | Optional component for rendering nested content |
+| `threadId` | `string` | Thread ID for dataset operations |
 
 ### ContentComponent
 
@@ -78,6 +79,63 @@ This is useful when:
 - You want to avoid passing `ContentComponent` as a prop to every component
 
 Components will automatically use the provider's `ContentComponent` as a default, but you can still override it via props if needed.
+
+### Custom Data Fetching
+
+The SDK uses plain React state for data fetching (no React Query required). You can provide a custom `DataFetcher` to:
+
+- **Proxy requests** through your own backend (keeping API keys server-side)
+- **Add custom authentication** headers or logic
+- **Transform data** before it reaches components
+- **Use your own API** instead of Erdo's REST endpoints
+
+```tsx
+import { ErdoProvider, type DataFetcher } from '@erdoai/ui';
+
+const customFetcher: DataFetcher = {
+  // Required: fetch dataset contents for charts/tables
+  fetchDatasetContents: async (slug, invocationId) => {
+    const response = await fetch(`/api/datasets/${slug}?invocationId=${invocationId}`);
+    return response.json();
+  },
+
+  // Optional: get dataset details for download buttons
+  getDatasetDetails: async (slug, threadId) => {
+    const response = await fetch(`/api/datasets/${slug}/details?threadId=${threadId}`);
+    if (!response.ok) return null;
+    return response.json(); // { id: string, name: string }
+  },
+
+  // Optional: download dataset as file
+  downloadDataset: async (datasetId) => {
+    const response = await fetch(`/api/datasets/${datasetId}/download`);
+    return response.blob();
+  },
+};
+
+function App() {
+  return (
+    <ErdoProvider
+      config={{
+        baseUrl: 'https://api.erdo.ai',
+        dataFetcher: customFetcher,
+      }}
+    >
+      {children}
+    </ErdoProvider>
+  );
+}
+```
+
+**DataFetcher Interface:**
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `fetchDatasetContents(slug, invocationId)` | Yes | Fetch dataset rows for charts/tables |
+| `getDatasetDetails(slug, threadId)` | No | Get dataset ID and name for download buttons |
+| `downloadDataset(datasetId)` | No | Download dataset file as Blob |
+
+If no `dataFetcher` is provided, the SDK falls back to the REST API using `baseUrl` and `token`/`authToken` for authentication.
 
 ## Hooks
 
@@ -134,18 +192,47 @@ function ChatInterface() {
 
 ### useDatasetContents
 
-Fetch dataset contents for charts:
+Fetch dataset contents using plain React state (no React Query required):
 
 ```tsx
 import { useDatasetContents } from '@erdoai/ui';
 
 function DataView({ datasetSlug, invocationId }) {
-  const { data, isLoading, error } = useDatasetContents(datasetSlug, invocationId);
+  const { data, isLoading, error, refetch } = useDatasetContents(datasetSlug, invocationId);
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
 
-  return <pre>{JSON.stringify(data, null, 2)}</pre>;
+  return (
+    <div>
+      <button onClick={refetch}>Refresh</button>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+The hook uses the `DataFetcher` from the provider if available, otherwise falls back to the REST API.
+
+### useMultipleDatasetContents
+
+Fetch multiple datasets in parallel:
+
+```tsx
+import { useMultipleDatasetContents } from '@erdoai/ui';
+
+function MultiDataView({ invocationId }) {
+  const results = useMultipleDatasetContents(
+    ['dataset-1', 'dataset-2'],
+    invocationId
+  );
+
+  const isLoading = results.some(r => r.isLoading);
+  const allData = results.map(r => r.data || []);
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return <pre>{JSON.stringify(allData, null, 2)}</pre>;
 }
 ```
 
