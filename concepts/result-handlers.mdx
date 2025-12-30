@@ -202,8 +202,8 @@ analysis_step.on(
             key="success_handler",
             depends_on=["analysis_step"],
             user_output_visibility="visible",
-            running_message="Processing result...",
-            finished_message="Result processed"
+            running_status="Processing result...",
+            finished_status="Result processed"
         )
     )
 )
@@ -243,8 +243,8 @@ step_metadata = StepMetadata(
     user_output_visibility=OutputVisibility.VISIBLE,
     bot_output_visibility=OutputVisibility.HIDDEN,
     output_content_type="json",
-    running_message="Processing result...",
-    finished_message="Result processed"
+    running_status="Processing result...",
+    finished_status="Result processed"
 )
 
 # Use in result handler

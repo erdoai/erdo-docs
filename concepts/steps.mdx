@@ -154,8 +154,8 @@ step.output.urls          # Found URLs
 step = agent.step(
     llm.message(model="claude-sonnet-4", query=state.query),
     depends_on=previous_step,
-    running_message="Processing your request...",
-    finished_message="Analysis complete!"
+    running_status="Processing your request...",
+    finished_status="Analysis complete!"
 )
 ```
 
@@ -192,7 +192,7 @@ main_step.on(
             key="detailed_report",
             depends_on=["main_step"],
             user_output_visibility="visible",
-            running_message="Generating report..."
+            running_status="Generating report..."
         )
     )
 )

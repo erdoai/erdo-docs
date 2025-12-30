@@ -132,8 +132,8 @@ agent = Agent(
     description="Agent description",        # What it does
     persona="You are a helpful assistant",  # Agent personality
     visibility="public",                    # "public" or "private"
-    running_message="Processing...",        # Status while running
-    finished_message="Done!",               # Status when complete
+    running_status="Processing...",        # Status while running
+    finished_status="Done!",               # Status when complete
     version="1.0",
     timeout=300,                            # Seconds
     retry_attempts=3,
@@ -201,8 +201,8 @@ step = agent.step(
         user_output_visibility=OutputVisibility.VISIBLE,
         bot_output_visibility=OutputVisibility.HIDDEN,
         output_behavior={"result": OutputBehaviorType.MERGE},
-        running_message="Processing...",
-        finished_message="Done",
+        running_status="Processing...",
+        finished_status="Done",
     ),
 )
 ```
@@ -571,8 +571,8 @@ answer_step = agent.step(
                     "query": TemplateString("{{query}}"),
                     "num_results": TemplateString("{{num_results?}}"),
                 },
-                running_message=TemplateString('Searching for "{{query}}"...'),
-                finished_message=TemplateString('Searched for "{{query}}"'),
+                running_status=TemplateString('Searching for "{{query}}"...'),
+                finished_status=TemplateString('Searched for "{{query}}"'),
             ),
         ],
     ),
@@ -656,7 +656,7 @@ tools=[
             required=["query"],
         ),
         parameters={"query": TemplateString("{{query}}")},
-        running_message=TemplateString('Searching "{{query}}"...'),
+        running_status=TemplateString('Searching "{{query}}"...'),
         history_content_type="web_search",
     ),
     # Web parser tool
@@ -672,7 +672,7 @@ tools=[
             required=["url"],
         ),
         parameters={"url": TemplateString("{{url}}")},
-        running_message=TemplateString("Reading {{url}}..."),
+        running_status=TemplateString("Reading {{url}}..."),
         history_content_type="web_parse",
     ),
     # Bot invocation tool
