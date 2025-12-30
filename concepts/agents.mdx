@@ -40,6 +40,70 @@ agent = Agent(
 )
 ```
 
+## Status Messages
+
+Agents display status messages to users during execution. There are three ways to configure these messages, listed in priority order:
+
+### 1. Static Status (`running_status`, `finished_status`)
+
+Simple static strings shown immediately. Use when the message doesn't need context from inputs or outputs.
+
+```python
+agent = Agent(
+    name="data_analyzer",
+    running_status="Analyzing data...",
+    finished_status="Analysis complete"
+)
+```
+
+### 2. Context-based Status (`running_status_context`, `finished_status_context`)
+
+Provide context that gets hydrated with template variables and wrapped in a standard LLM prompt to generate a dynamic status message. Use when you want dynamic messages but don't need full control over the prompt.
+
+```python
+agent = Agent(
+    name="data_analyzer",
+    running_status_context=TemplateString("User query: {{query}}"),
+    finished_status_context=TemplateString("Result: {{steps.analysis.output}}")
+)
+```
+
+The context is wrapped in a standard prompt like:
+> "Generate a very short (max 50 chars) present-progressive status message for this task. Context: [your context]. Output only the message."
+
+### 3. Custom Prompt (`running_status_prompt`, `finished_status_prompt`)
+
+Provide the full LLM prompt for complete control over status generation. Use when you need custom instructions or formatting.
+
+```python
+agent = Agent(
+    name="data_analyzer",
+    running_status_prompt=TemplateString(
+        "You are a status message generator. The user asked: {{query}}. "
+        "Write a brief, friendly status message (max 40 chars) that explains "
+        "what you're doing. Use emoji if appropriate."
+    )
+)
+```
+
+### Priority Order
+
+When multiple status fields are set, priority is: **prompt > context > status**
+
+1. If `*_prompt` is set → LLM called with your full prompt
+2. Else if `*_context` is set → LLM called with context wrapped in standard prompt
+3. Else if `*_status` is set → static message shown immediately
+
+### Choosing the Right Approach
+
+| Use Case | Field | Example |
+|----------|-------|---------|
+| Simple, fixed message | `running_status` | "Processing request..." |
+| Dynamic based on input | `running_status_context` | `TemplateString("Query: {{query}}")` |
+| Custom LLM instructions | `running_status_prompt` | Full custom prompt with specific format |
+
+**Best practice**: Start with `_status` for simple cases. Use `_context` when you want dynamic messages that reference inputs/outputs. Reserve `_prompt` for advanced cases requiring full prompt control.
+
 ## Steps and Dependencies
 
 Steps define what actions an agent performs. Use `depends_on` to control execution order:
