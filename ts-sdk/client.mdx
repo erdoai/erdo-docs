@@ -312,6 +312,24 @@ interface ListThreadsParams {
       externalUserId: 'user_123'
     });
     ```
+
+    <Warning>
+    **Security: Never accept `externalUserId` from client requests**
+
+    When using the proxy pattern with API key auth, you must get `externalUserId` from your own authentication system (session, JWT, etc.). Never trust client-provided user IDs—this would allow users to access other users' threads.
+
+    ```typescript
+    // CORRECT: Get user from YOUR auth system
+    const session = await getServerSession(authOptions);
+    const { threads } = await client.listThreads({
+      externalUserId: session.user.id  // From your auth, NOT from request
+    });
+
+    // WRONG: Never do this!
+    const { externalUserId } = await request.json();  // Attacker-controlled!
+    const { threads } = await client.listThreads({ externalUserId });
+    ```
+    </Warning>
   </Tab>
 </Tabs>
 
@@ -329,6 +347,50 @@ const thread = await client.getThread(threadId: string): Promise<Thread>;
 const thread = await client.getThread('thread_abc123');
 console.log(thread.name, thread.updatedAt);
 ```
+
+### getThreadMessages()
+
+Get all messages in a thread. Useful for loading conversation history when a user returns to a previous thread.
+
+```typescript
+const { messages } = await client.getThreadMessages(threadId: string): Promise<ListThreadMessagesResponse>;
+```
+
+**ListThreadMessagesResponse:**
+
+```typescript
+interface ListThreadMessagesResponse {
+  messages: ThreadMessage[];
+}
+
+interface ThreadMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  contents: ContentItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+**Example:**
+
+```typescript
+// Load conversation history for a thread
+const { messages } = await client.getThreadMessages(threadId);
+
+for (const message of messages) {
+  console.log(`${message.role}: ${message.contents.length} content items`);
+
+  // Render content items (charts, tables, text, etc.)
+  for (const content of message.contents) {
+    console.log(`  - ${content.content_type}`);
+  }
+}
+```
+
+<Tip>
+Use `getThreadMessages()` to build a threads sidebar where users can click on previous conversations and see the full message history with all visualizations.
+</Tip>
 
 ### sendMessage()
 

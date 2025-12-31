@@ -770,6 +770,89 @@ Alternatively, you can fetch history from Erdo using `client.getThreadMessages()
 const { messages } = await client.getThreadMessages(threadId);
 ```
 
+#### Building a Threads Sidebar
+
+A common pattern is to show users their previous conversations in a sidebar. Here's how to implement this:
+
+```tsx
+function ThreadsSidebar({
+  client,
+  selectedThreadId,
+  onSelectThread,
+}: {
+  client: ErdoClient;
+  selectedThreadId: string | null;
+  onSelectThread: (threadId: string, messages: ThreadMessage[]) => void;
+}) {
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch threads on mount
+  useEffect(() => {
+    async function fetchThreads() {
+      const { threads } = await client.listThreads();
+      setThreads(threads);
+      setIsLoading(false);
+    }
+    fetchThreads();
+  }, [client]);
+
+  // Load messages when a thread is selected
+  const handleSelect = async (thread: Thread) => {
+    const { messages } = await client.getThreadMessages(thread.id);
+    onSelectThread(thread.id, messages);
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div className="w-64 border-r">
+      <button onClick={() => onSelectThread(null, [])}>
+        + New Chat
+      </button>
+      {threads.map((thread) => (
+        <button
+          key={thread.id}
+          onClick={() => handleSelect(thread)}
+          className={selectedThreadId === thread.id ? 'bg-blue-100' : ''}
+        >
+          {thread.name || `Thread ${thread.id.slice(0, 8)}`}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+Then use it with your chat component:
+
+```tsx
+function ChatApp() {
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [initialMessages, setInitialMessages] = useState<ThreadMessage[]>([]);
+
+  const handleSelectThread = (threadId: string | null, messages: ThreadMessage[]) => {
+    setSelectedThreadId(threadId);
+    setInitialMessages(messages);
+  };
+
+  return (
+    <div className="flex h-screen">
+      <ThreadsSidebar
+        client={client}
+        selectedThreadId={selectedThreadId}
+        onSelectThread={handleSelectThread}
+      />
+      <ChatInterface
+        key={selectedThreadId || 'new'}  // Force remount on thread change
+        threadId={selectedThreadId}
+        initialMessages={initialMessages}
+      />
+    </div>
+  );
+}
+```
+
 #### Token API Reference
 
 **CreateTokenParams:**
