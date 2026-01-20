@@ -7,10 +7,50 @@ description: "Execute agents programmatically with the invoke() function"
 
 The `invoke()` function allows you to execute agents programmatically from Python code, making it easy to test agents, integrate them into applications, and automate workflows.
 
+## Configuration
+
+Before invoking agents, configure the SDK with your credentials:
+
+```python
+import erdo
+
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="your-org-slug"  # or organization UUID
+)
+```
+
+Configuration can also be set via environment variables:
+
+```bash
+export ERDO_ENDPOINT="https://api.erdo.ai"
+export ERDO_AUTH_TOKEN="your-api-token"
+export ERDO_ORGANIZATION="your-org-slug"
+```
+
+Or via `~/.erdo/config.yaml`:
+
+```yaml
+endpoint: https://api.erdo.ai
+auth_token: your-api-token
+organization: your-org-slug
+```
+
+**Priority order:** `erdo.setup()` > environment variables > config file
+
 ## Quick Start
 
 ```python
+import erdo
 from erdo import invoke
+
+# Configure SDK (or use env vars / config file)
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="my-org"
+)
 
 # Simple invocation
 response = invoke(
@@ -700,7 +740,19 @@ erdo sync-agent path/to/agent.py
 
 ### Authentication Errors
 
-Login first:
+Configure the SDK with valid credentials:
+
+```python
+import erdo
+
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="your-org-slug"
+)
+```
+
+Or use the CLI to login:
 
 ```bash
 erdo login
@@ -711,6 +763,7 @@ Or set environment variables:
 ```bash
 export ERDO_ENDPOINT="https://api.erdo.ai"
 export ERDO_AUTH_TOKEN="your-token"
+export ERDO_ORGANIZATION="your-org-slug"
 ```
 
 ### Slow Invocations
