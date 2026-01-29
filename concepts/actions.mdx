@@ -44,14 +44,14 @@ from erdo.template import TemplateString
 
 # Basic message generation
 basic_llm = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query=f"Analyze this data: {state.input_data}",
     system_prompt="You are a data analysis expert"
 )
 
 # Structured response with JSON schema
 structured_llm = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query=f"Extract key insights from: {state.document}",
     response_format={
         "Type": "json_schema",
@@ -74,7 +74,7 @@ structured_llm = llm.message(
 
 # LLM with tools
 llm_with_tools = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query=f"Research and analyze {state.topic}",
     tools=[
         Tool(
@@ -269,7 +269,7 @@ Configure how actions return data:
   <Tab title="JSON Schema">
     ```python
     structured_response = llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.query,
         response_format={
             "Type": "json_schema",
@@ -308,7 +308,7 @@ Configure how actions return data:
   <Tab title="Free Text">
     ```python
     text_response = llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.query,
         response_format="text"
     )
@@ -317,7 +317,7 @@ Configure how actions return data:
   <Tab title="Markdown">
     ```python
     markdown_response = llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Generate a report for {state.topic}",
         response_format="markdown"
     )
@@ -332,7 +332,7 @@ Configure how actions handle errors:
 ```python
 # Action with retry configuration
 resilient_action = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query="{{query}}",
     retry_config={
         "max_attempts": 3,
@@ -344,7 +344,7 @@ resilient_action = llm.message(
 
 # Action with fallback
 fallback_action = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query="{{query}}",
     fallback_model="gpt-4o",
     fallback_on_error=True
@@ -388,7 +388,7 @@ Actions that execute based on conditions:
 ```python
 # Action with execution condition
 conditional_action = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query="{{specialized_query}}",
     execution_condition="{{data_type}} == 'complex'"
 )
@@ -438,7 +438,7 @@ def composite_analysis(data):
 
     # Step 2: Analyze
     analysis = llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze: {preprocessed}"
     )
 

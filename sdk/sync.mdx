@@ -37,7 +37,7 @@ agent = Agent(
 # Add steps
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         context="Analyze this data: {{dataset}}"
     )
 )
@@ -221,7 +221,7 @@ from erdo.sync import Sync
 
 agent = Agent(name="notebook_agent")
 step = agent.step(llm.message(
-    model="claude-sonnet-4", 
+    model="claude-sonnet-4-5", 
     context="Process: {{data}}"
 ))
 

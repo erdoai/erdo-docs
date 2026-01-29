@@ -276,7 +276,7 @@ from erdo import LlmModel, JSONSchema, JSONSchemaProperty, JSONSchemaType
 # Simple message step
 response_step = agent.step(
     llm.message(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-5-20250514",
         system_prompt="You are a helpful assistant.",
         user_prompt=TemplateString("{{query}}"),
     ),
@@ -715,7 +715,7 @@ agent = Agent(name="my agent")
 
 # Create step and capture reference
 analyze_step = agent.step(
-    llm.message(model="claude-sonnet-4-20250514", user_prompt="{{query}}"),
+    llm.message(model="claude-sonnet-4-5-20250514", user_prompt="{{query}}"),
     key="analyze",
 )
 
@@ -936,12 +936,12 @@ def agent_test_basic():
 ```python
 search = agent.step(memory.search(query="{{query}}"), key="search")
 analyze = agent.step(
-    llm.message(model="claude-sonnet-4", user_prompt="Analyze: {{steps.search.output}}"),
+    llm.message(model="claude-sonnet-4-5", user_prompt="Analyze: {{steps.search.output}}"),
     key="analyze",
     depends_on=search,
 )
 report = agent.step(
-    llm.message(model="claude-sonnet-4", user_prompt="Create report: {{steps.analyze.output}}"),
+    llm.message(model="claude-sonnet-4-5", user_prompt="Create report: {{steps.analyze.output}}"),
     key="report",
     depends_on=analyze,
 )

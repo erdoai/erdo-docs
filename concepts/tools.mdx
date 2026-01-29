@@ -73,7 +73,7 @@ from erdo import Tool
 
 # LLM action with multiple tools available
 analyst_action = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query="Analyze this data and provide insights: {{data}}",
     tools=[
         Tool(
@@ -249,7 +249,7 @@ LLMs select tools based on:
 ```python
 # Research workflow with multiple tool options
 research_action = llm.message(
-    model="claude-sonnet-4",
+    model="claude-sonnet-4-5",
     query="Research and analyze the latest trends in {{industry}}",
     tools=[
         Tool(
@@ -296,7 +296,7 @@ comprehensive_research = Tool(
     description="Perform thorough research using multiple sources",
     actiontype="llm.message",
     parameters={
-        "model": "claude-sonnet-4",
+        "model": "claude-sonnet-4-5",
         "query": "Research {{topic}} thoroughly",
         "tools": [
             # First search for current information

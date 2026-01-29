@@ -28,7 +28,7 @@ agent = Agent(name="analysis_agent")
 
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this data: {state.input_data}",
         response_format={
             "Type": "json_schema",
@@ -186,7 +186,7 @@ agent = Agent(name="analysis_agent")
 
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Analyze the data",
         response_format={"type": "json_schema", "schema": {...}}
     )
@@ -251,7 +251,7 @@ step_metadata = StepMetadata(
 main_step.on(
     IsSuccess(),
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Process the successful result",
         step_metadata=step_metadata
     )
@@ -298,7 +298,7 @@ step.on(
 # Different paths based on results
 classification_step.on(
     IsSuccess() & TextEquals("category", "urgent"),
-    llm.message(model="claude-sonnet-4", query="Handle urgent case")
+    llm.message(model="claude-sonnet-4-5", query="Handle urgent case")
 )
 
 classification_step.on(

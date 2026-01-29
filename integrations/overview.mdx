@@ -123,7 +123,7 @@ data_analyzer = Agent(
 # Query data from integrated source
 query_step = data_analyzer.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze sales trends from: {state.database_query_result}",
         system_prompt="You are a sales analyst. Provide insights on sales performance."
     )

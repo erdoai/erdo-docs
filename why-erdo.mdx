@@ -96,7 +96,7 @@ Erdo's template system provides several advantages:
 # Template references can be validated before execution
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.query,  # CLI validates this field exists
         context=state.previous_results
     )

@@ -64,7 +64,7 @@ agent = Agent(
 # Add a step
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this data: {state.dataset}",
         response_format={
             "Type": "json_schema",
@@ -109,7 +109,7 @@ Steps define what actions an agent performs. Each step can perform LLM calls, ex
 ```python
 step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.user_input
     ),
     depends_on=previous_step
@@ -193,7 +193,7 @@ Integrations can then be used in agents for data access, API calls, and workflow
     
     extract_step = invoice_processor.step(
         llm.message(
-            model="claude-sonnet-4",
+            model="claude-sonnet-4-5",
             query=f"Extract key information from this invoice: {state.invoice_image}",
             response_format={
                 "Type": "json_schema",
@@ -237,7 +237,7 @@ Integrations can then be used in agents for data access, API calls, and workflow
     
     analysis_step = analyst.step(
         llm.message(
-            model="claude-sonnet-4",
+            model="claude-sonnet-4-5",
             query=f"Analyze trends in this data: {state.dataset}"
         )
     )
@@ -261,7 +261,7 @@ Integrations can then be used in agents for data access, API calls, and workflow
   communication: ```python content_creator = Agent(name="content_creator")
   research_step = content_creator.step( websearch.search(query=f"{state.topic}{" "}
   latest trends") ) content_step = content_creator.step( llm.message(
-  model="claude-sonnet-4", query=f"Create engaging content about {state.topic}{" "}
+  model="claude-sonnet-4-5", query=f"Create engaging content about {state.topic}{" "}
   using: {research_step.output.results}" ), depends_on=research_step ) ```
 </Accordion>
 
@@ -280,7 +280,7 @@ Integrations can then be used in agents for data access, API calls, and workflow
     
     response_step = support_agent.step(
         llm.message(
-            model="claude-sonnet-4",
+            model="claude-sonnet-4-5",
             query=state.customer_message,
             context=context_step.output.memories
         ),

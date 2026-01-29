@@ -27,7 +27,7 @@ agent = Agent(name="data_analyzer")
 # Create a step
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this data: {state.input_data}"
     )
 )
@@ -50,7 +50,7 @@ collect_step = agent.step(
 # Step 2: Analyze (waits for collect_step)
 analyze_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this data: {collect_step.output.results}"
     ),
     depends_on=collect_step
@@ -80,7 +80,7 @@ Steps can depend on multiple previous steps:
 ```python
 validation_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Validate results from: {data_step.output}, {api_step.output}"
     ),
     depends_on=[data_step, api_step, query_step]
@@ -96,7 +96,7 @@ Reference step outputs in subsequent steps:
 ```python
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze: {state.data}",
         response_format={
             "Type": "json_schema",
@@ -152,7 +152,7 @@ step.output.urls          # Found URLs
 
 ```python
 step = agent.step(
-    llm.message(model="claude-sonnet-4", query=state.query),
+    llm.message(model="claude-sonnet-4-5", query=state.query),
     depends_on=previous_step,
     running_status="Processing your request...",
     finished_status="Analysis complete!"
@@ -165,7 +165,7 @@ Control what users see:
 
 ```python
 step = agent.step(
-    llm.message(model="claude-sonnet-4", query=state.query),
+    llm.message(model="claude-sonnet-4-5", query=state.query),
     user_output_visibility="visible",    # visible, hidden
     bot_output_visibility="hidden"       # visible, hidden
 )
@@ -179,14 +179,14 @@ To configure step attributes in result handlers, use `StepMetadata`:
 from erdo import StepMetadata
 
 main_step = agent.step(
-    llm.message(model="claude-sonnet-4", query="Analyze data")
+    llm.message(model="claude-sonnet-4-5", query="Analyze data")
 )
 
 # Result handler with step metadata
 main_step.on(
     IsSuccess(),
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Create detailed report",
         step_metadata=StepMetadata(
             key="detailed_report",
@@ -217,7 +217,7 @@ clean_step = agent.step(
 # 3. Analyze
 analyze_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this cleaned data: {clean_step.output.result}"
     ),
     depends_on=clean_step
@@ -235,7 +235,7 @@ search_step = agent.step(
 # Analysis phase
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze research findings: {search_step.output.results}"
     ),
     depends_on=search_step
@@ -257,13 +257,13 @@ storage_step = agent.step(
 ```python
 # Process data
 process_step = agent.step(
-    llm.message(model="claude-sonnet-4", query=f"Process: {state.input}")
+    llm.message(model="claude-sonnet-4-5", query=f"Process: {state.input}")
 )
 
 # Validate results
 validate_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Validate this processing result: {process_step.output.response}"
     ),
     depends_on=process_step

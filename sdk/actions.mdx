@@ -17,7 +17,7 @@ Generate responses using large language models with tool support.
 from erdo.actions import llm
 
 message_action = llm.message(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-5-20250514",
     query="{{user_input}}",
     system_prompt="You are a helpful assistant",
     response_format={
@@ -41,7 +41,7 @@ message_action = llm.message(
 
 <CardGroup cols={2}>
   <Card title="Model Options" icon="brain">
-    - `claude-sonnet-4-20250514` (Latest) - `claude-sonnet-4` - `claude-haiku-4`
+    - `claude-sonnet-4-5-20250514` (Latest) - `claude-sonnet-4-5` - `claude-haiku-4`
     - `gpt-4o` - `gpt-4o-mini`
   </Card>
   <Card title="Response Formats" icon="code">
@@ -467,7 +467,7 @@ from erdo._generated.condition import And, Or, IsSuccess, TextContains
 
 conditional_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="{{conditional_query}}"
     )
 )

@@ -25,7 +25,7 @@ research_agent = Agent(
 # Step 1: Research topic
 research_step = research_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Research {{topic}} and gather key information",
         tools=[web_search_tool, web_parser_tool]
     ),
@@ -35,7 +35,7 @@ research_step = research_agent.step(
 # Step 2: Analyze findings (depends on research)
 analysis_step = research_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Analyze research findings: {{research.output.content}}",
         system_prompt="You are an expert analyst. Provide structured insights."
     ),
@@ -46,7 +46,7 @@ analysis_step = research_agent.step(
 # Step 3: Generate report (depends on analysis)
 report_step = research_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Create comprehensive report from analysis: {{analyze.output.content}}"
     ),
     key="report",
@@ -143,7 +143,7 @@ smart_processor = Agent(
 # Initial data analysis
 analyze_data_step = smart_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Analyze data characteristics: {{input_data}}",
         response_format={
             "Type": "json_schema",
@@ -194,7 +194,7 @@ content_processor = Agent(
 # Classify content
 classify_step = content_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Classify this content: {{content}}",
         response_format={
             "Type": "json_schema",
@@ -218,7 +218,7 @@ classify_step = content_processor.step(
 classify_step.on(
     TextContains("content_type", "text"),
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Process text content: {{content}}"
     )
 )
@@ -233,7 +233,7 @@ classify_step.on(
 classify_step.on(
     TextContains("content_type", "document"),
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Extract and summarize document: {{content}}"
     )
 )
@@ -255,7 +255,7 @@ email_processor = Agent(
 # Process each email in the batch
 process_email_step = email_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Process this email: {{email}}",
         response_format={
             "Type": "json_schema",
@@ -278,7 +278,7 @@ process_email_step = email_processor.step(
 # Generate summary after processing all emails
 summary_step = email_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Generate summary of processed emails: {{process_email.output.all_results}}"
     ),
     key="summary",
@@ -355,7 +355,7 @@ main_processing.on(
 main_processing.on(
     IsError() & TextContains("error", "syntax"),
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Fix the code error: {{main_processing.error}}\nOriginal code: {{generated_code}}",
         system_prompt="Fix syntax and logical errors in the code."
     )
@@ -449,7 +449,7 @@ adaptive_agent = Agent(
 # Analyze requirements and generate workflow plan
 plan_workflow = adaptive_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Create processing plan for: {{requirements}}",
         response_format={
             "Type": "json_schema",

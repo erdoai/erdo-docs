@@ -135,7 +135,7 @@ Combine `.exec` steps with regular agent steps:
 # Step 1: AI generates analysis plan
 plan_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Create analysis plan for: {{query}}",
         response_format={
             "Type": "json_schema",

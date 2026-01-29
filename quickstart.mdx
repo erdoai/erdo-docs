@@ -138,7 +138,7 @@ Agents are built with these components:
 
     automation_step = agent.step(
         llm.message(
-            model="claude-sonnet-4",
+            model="claude-sonnet-4-5",
             query=f"Help automate this task: {state.task_description}"
         )
     )
@@ -153,7 +153,7 @@ Agents are built with these components:
 
     # Language model actions
     llm_step = agent.step(
-        llm.message(model="claude-sonnet-4", query=state.query)
+        llm.message(model="claude-sonnet-4-5", query=state.query)
     )
 
     # Memory operations
@@ -216,7 +216,7 @@ task_agent = Agent(
 # Step 1: Analyze the task
 analyze_step = task_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this task and provide automation recommendations: {state.task_description}",
         response_format={
             "Type": "json_schema",
@@ -235,7 +235,7 @@ analyze_step = task_agent.step(
 # Step 2: Generate automation plan
 plan_step = task_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Create a detailed automation plan for: {analyze_step.output.recommendations}"
     ),
     depends_on=analyze_step

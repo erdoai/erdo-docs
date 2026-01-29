@@ -34,7 +34,7 @@ Erdo analyzes your agent's structure to identify all possible execution paths:
 
 ```python
 analysis_step = agent.step(
-    llm.message(model="claude-sonnet-4", query=state.query)
+    llm.message(model="claude-sonnet-4-5", query=state.query)
 )
 
 # Success path
@@ -289,7 +289,7 @@ Agents using `ITERATE_OVER` execution mode are tested with array iteration:
 ```python
 analyze_files = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze file: {state.file.name}"
     ),
     execution_mode=ExecutionMode(

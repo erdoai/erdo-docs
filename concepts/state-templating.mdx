@@ -37,7 +37,7 @@ from erdo.actions import llm, memory, codeexec
 # Simple state field access
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.query,  # Clean, readable syntax
         context=state.previous_analysis
     )
@@ -75,7 +75,7 @@ context_step = agent.step(
 # Multi-line dynamic content
 report_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=TemplateString("""
         Generate a comprehensive analysis report for:
 
@@ -102,7 +102,7 @@ Access outputs from previous steps with clean syntax:
 # Step output references
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Analyze this data",
         data=state.input_data
     )
@@ -118,7 +118,7 @@ insights_step = agent.step(
             "tags": ["analysis", state.project_name],
             "extra": {
                 "confidence": analysis_step.output.confidence,
-                "model_used": "claude-sonnet-4",
+                "model_used": "claude-sonnet-4-5",
                 "processing_time": analysis_step.metadata.execution_time
             }
         }
@@ -212,7 +212,7 @@ Access workflow parameters and context:
 # Parameters and context
 params_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=state.query,
         context={
             "user_preferences": state.parameters.preferences,

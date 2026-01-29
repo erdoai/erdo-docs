@@ -21,7 +21,7 @@ agent = Agent(
 # Add a step to the agent
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this data: {state.dataset}"
     )
 )
@@ -117,7 +117,7 @@ research_step = agent.step(
 
 analysis_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this research: {research_step.output.results}"
     ),
     depends_on=research_step  # Wait for research to complete
@@ -166,7 +166,7 @@ processor = Agent(
 # Step 1: Extract information
 extract_step = processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Extract key information from: {state.document}",
         response_format={
             "Type": "json_schema",
@@ -185,7 +185,7 @@ extract_step = processor.step(
 # Step 2: Validate extraction
 validate_step = processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Validate this extraction is complete: {extract_step.output.response}"
     ),
     depends_on=extract_step

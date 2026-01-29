@@ -24,7 +24,7 @@ email_processor = Agent(
 # Classify incoming email
 classify_step = email_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Classify this email: {state.email_content}",
         response_format={
             "Type": "json_schema",
@@ -43,7 +43,7 @@ classify_step = email_processor.step(
 # Generate response
 response_step = email_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Generate a professional response to this {classify_step.output.category} email: {state.email_content}",
         system_prompt="You are a professional customer service representative."
     ),
@@ -84,7 +84,7 @@ document_processor = Agent(
 # Analyze document
 analysis_step = document_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this document: {state.document_content}",
         response_format={
             "Type": "json_schema",
@@ -103,7 +103,7 @@ analysis_step = document_processor.step(
 # Extract data
 extraction_step = document_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Extract structured data from this {analysis_step.output.document_type}: {state.document_content}",
         system_prompt="Extract accurate, structured information from the document."
     ),
@@ -134,7 +134,7 @@ onboarding_agent = Agent(
 # Validate customer information
 validation_step = onboarding_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Validate customer information: {state.customer_data}",
         response_format={
             "Type": "json_schema",
@@ -153,7 +153,7 @@ validation_step = onboarding_agent.step(
 # Generate welcome message
 welcome_step = onboarding_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Generate personalized welcome message for: {state.customer_data}",
         system_prompt="Create a warm, professional welcome message."
     ),
@@ -194,7 +194,7 @@ invoice_processor = Agent(
 # Extract invoice data
 extract_step = invoice_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Extract invoice details: {state.invoice_content}",
         response_format={
             "Type": "json_schema",
@@ -214,7 +214,7 @@ extract_step = invoice_processor.step(
 # Validate invoice
 validate_step = invoice_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Validate invoice data: {extract_step.output.response}",
         system_prompt="Check for completeness and accuracy of invoice data."
     ),
@@ -255,7 +255,7 @@ lead_qualifier = Agent(
 # Analyze lead information
 analysis_step = lead_qualifier.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this sales lead: {state.lead_data}",
         response_format={
             "Type": "json_schema",
@@ -275,7 +275,7 @@ analysis_step = lead_qualifier.step(
 # Generate follow-up strategy
 strategy_step = lead_qualifier.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Create follow-up strategy for lead: {analysis_step.output.response}",
         system_prompt="Provide specific, actionable follow-up recommendations."
     ),
@@ -316,7 +316,7 @@ task_assigner = Agent(
 # Analyze task requirements
 task_analysis = task_assigner.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze task requirements: {state.task_description}",
         response_format={
             "Type": "json_schema",
@@ -336,7 +336,7 @@ task_analysis = task_assigner.step(
 # Find best assignee
 assignment_step = task_assigner.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Find best team member for task: {task_analysis.output.response}, Available team: {state.team_data}",
         system_prompt="Consider skills, workload, and availability when assigning tasks."
     ),

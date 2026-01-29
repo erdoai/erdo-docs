@@ -46,7 +46,7 @@ agent = Agent(
 
 response_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         context="Generate a professional response to this email: {{email_content}}"
     )
 )
@@ -90,7 +90,7 @@ agent = Agent(
 
 response_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Generate a professional response to this email: {{email_content}}"
     )
 )
@@ -150,7 +150,7 @@ from erdo.actions import llm
 agent = Agent(name="my_agent")
 
 step = agent.step(
-    llm.message(model="claude-sonnet-4", query="{{query}}")
+    llm.message(model="claude-sonnet-4-5", query="{{query}}")
 )
 ```
 
@@ -174,7 +174,7 @@ Erdo provides multiple action types for different use cases:
     # Simple message generation
     response_step = agent.step(
         llm.message(
-            model="claude-sonnet-4",
+            model="claude-sonnet-4-5",
             query="Analyze this data: {{input_data}}"
         )
     )
@@ -442,7 +442,7 @@ collect_step = agent.step(
 # Step 2: Analysis (depends on collection)
 analyze_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Analyze this data: {{collect_step.output.results}}"
     ),
     depends_on=collect_step
@@ -451,7 +451,7 @@ analyze_step = agent.step(
 # Step 3: Report (depends on analysis)
 report_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Create report from: {{analyze_step.output.insights}}"
     ),
     depends_on=analyze_step
@@ -473,7 +473,7 @@ marketing_step = agent.step(
 # Combine results after parallel processing
 combine_step = agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Combine results: {{sales_step.output.data}}, {{marketing_step.output.data}}"
     ),
     depends_on=[sales_step, marketing_step]
@@ -545,7 +545,7 @@ search_step = data_processor.step(
 # Step 2: Generate analysis code
 code_gen_step = data_processor.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Generate Python code to analyze: {{query}}",
         context="{{search_step.output.memories}}",
         response_format={

@@ -271,7 +271,7 @@ consolidate = Step(
     agent=knowledge_builder,
     key="consolidate",
     actiontype=llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="""
         Analyze the existing knowledge and new information:
 
@@ -489,7 +489,7 @@ analyze_with_context = Step(
     agent=smart_agent,
     key="analyze",
     actiontype=llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="""
         Perform analysis considering previous insights:
 

@@ -51,7 +51,7 @@ print(json.dumps(result))
 # Step 2: Generate insights
 analysis_step = sales_analyzer.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze this sales data: {preprocess_step.output.result}",
         response_format={
             "Type": "json_schema",
@@ -138,7 +138,7 @@ print(json.dumps(result))
 # Generate segment insights
 insights_step = segmentation_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze customer segments: {segment_step.output.result}",
         system_prompt="Provide actionable insights for each customer segment"
     ),
@@ -193,7 +193,7 @@ print(json.dumps(result))
 # Generate financial insights
 financial_insights = financial_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze financial trends: {trend_step.output.result}",
         response_format={
             "Type": "json_schema",
@@ -269,7 +269,7 @@ print(json.dumps(result))
 # Generate quality report
 report_step = quality_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Generate data quality report: {quality_step.output.result}",
         system_prompt="Provide specific recommendations for data quality improvements"
     ),
@@ -300,7 +300,7 @@ market_agent = Agent(
 # Research data analysis
 research_step = market_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Analyze market research data: {state.research_data}",
         response_format={
             "Type": "json_schema",
@@ -321,7 +321,7 @@ research_step = market_agent.step(
 # Generate strategic recommendations
 strategy_step = market_agent.step(
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query=f"Generate strategic recommendations based on: {research_step.output.response}",
         system_prompt="You are a strategic business consultant. Provide actionable recommendations."
     ),
@@ -370,7 +370,7 @@ print(json.dumps(result))
 # Only proceed if data is valid
 validation_step.on(
     IsSuccess() & TextContains("valid", "true"),
-    llm.message(model="claude-sonnet-4", query="Proceed with analysis")
+    llm.message(model="claude-sonnet-4-5", query="Proceed with analysis")
 )
 ```
 
@@ -387,7 +387,7 @@ analysis_step.on(
     ),
     # Try simpler analysis as fallback
     llm.message(
-        model="claude-sonnet-4",
+        model="claude-sonnet-4-5",
         query="Provide basic summary of the data",
         system_prompt="Focus on simple, observable patterns"
     )
@@ -407,7 +407,7 @@ analysis_step.on(
         "tags": ["analysis", state.dataset_name, state.analysis_type],
         "extra": {
             "timestamp": "{{system.current_time}}",
-            "model_used": "claude-sonnet-4"
+            "model_used": "claude-sonnet-4-5"
         }
     })
 )
