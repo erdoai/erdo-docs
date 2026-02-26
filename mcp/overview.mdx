@@ -1,0 +1,174 @@
+---
+title: "MCP Server"
+description: "Connect AI assistants like Claude, Cursor, and Windsurf to your data via Erdo"
+---
+
+# MCP Server
+
+Erdo exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that lets AI assistants query your datasets, ask data questions, and run SQL queries — all using your existing Erdo permissions.
+
+## Quick Start
+
+### 1. Get an API Key
+
+Go to **Settings > API Keys** in Erdo and create a new key. Copy the token — you'll need it for configuration.
+
+### 2. Configure Your Client
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Add to your `claude_desktop_config.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "erdo": {
+          "url": "https://api.erdo.ai/mcp",
+          "headers": {
+            "Authorization": "Bearer YOUR_API_KEY",
+            "X-Organization-ID": "YOUR_ORG_ID"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add erdo \
+      --transport http \
+      --url https://api.erdo.ai/mcp \
+      --header "Authorization: Bearer YOUR_API_KEY" \
+      --header "X-Organization-ID: YOUR_ORG_ID"
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Add to your `.cursor/mcp.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "erdo": {
+          "url": "https://api.erdo.ai/mcp",
+          "headers": {
+            "Authorization": "Bearer YOUR_API_KEY",
+            "X-Organization-ID": "YOUR_ORG_ID"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+  Find your Organization ID in **Settings > General** in Erdo, or from the URL when logged in.
+</Info>
+
+### 3. Start Using It
+
+Once configured, your AI assistant can access Erdo tools directly. Try asking:
+
+- "List my datasets in Erdo"
+- "What columns does the sales dataset have?"
+- "How many orders were placed last month?" (uses the Data Question Answerer agent)
+- "Run a SQL query on my customers dataset to find the top 10 by revenue"
+
+## Available Tools
+
+### erdo_list_datasets
+List all datasets in your organization with name, type, description, and status.
+
+### erdo_get_dataset_schema
+Get detailed schema for a dataset including column names, types, statistics, and sample data.
+
+### erdo_gather_dataset_context
+Get detailed context for multiple datasets at once — schemas, column types, statistics, descriptions, and sample data. Useful for understanding your data landscape before asking questions.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slugs` | string[] | Optional. Specific dataset IDs or slugs. Empty returns all. |
+| `limit` | number | Optional. Max datasets to return (default 10). |
+
+### erdo_search_data
+Search across all datasets using natural language. Returns matching records with source information.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search text |
+| `limit` | number | Optional. Max results (default 20). |
+
+### erdo_ask_data_question
+Ask a natural language question about your data. This invokes Erdo's Data Question Answerer agent, which analyzes datasets, writes and executes code, and returns structured answers with charts, tables, and text.
+
+<Warning>
+  This tool can take 30 seconds to 2 minutes for complex questions, as it runs a full AI analysis pipeline.
+</Warning>
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `question` | string | The data question to answer |
+| `dataset_slugs` | string[] | Optional. Dataset slugs to scope the question to. |
+| `timezone` | string | Optional. User timezone (e.g. `America/New_York`). |
+
+**Returns:** A thread ID (for follow-up in the Erdo UI) and the agent's structured answer.
+
+### erdo_query_data
+Query a dataset using natural language. Describe what data you want and Erdo will generate and execute the SQL query for you.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `question` | string | Natural language question, e.g. "show top 10 customers by revenue" |
+| `dataset_slug` | string | Dataset UUID or slug to query |
+
+**Returns:** The generated SQL query and the results.
+
+### erdo_run_query
+Run a raw SQL query directly against a dataset and return rows and columns. Use this when you already know the exact SQL you want to run. The SQL dialect depends on the dataset's storage backend (PostgreSQL, ClickHouse, or DuckDB for file-based datasets).
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slug` | string | Dataset UUID or slug to query |
+| `query` | string | SQL query to execute |
+| `limit` | number | Optional. Max rows to return (default 100). |
+
+### erdo_list_threads
+List conversation threads with name, creation date, and visibility.
+
+### erdo_get_thread_messages
+Get all messages from a conversation thread including content and metadata.
+
+## REST API
+
+All MCP tools are also available as REST endpoints for direct HTTP integration:
+
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
+| `erdo_list_datasets` | `/v1/datasets` | GET |
+| `erdo_get_dataset_schema` | `/v1/datasets/:id/schema` | GET |
+| `erdo_gather_dataset_context` | `/v1/dataset-context` | GET |
+| `erdo_search_data` | `/v1/search` | POST |
+| `erdo_ask_data_question` | `/v1/ask` | POST |
+| `erdo_query_data` | `/v1/datasets/:slug/query-nl` | POST |
+| `erdo_run_query` | `/v1/datasets/:slug/query` | POST |
+| `erdo_list_threads` | `/v1/threads` | GET |
+| `erdo_get_thread_messages` | `/v1/threads/:id/messages` | GET |
+
+**Authentication:** Pass `Authorization: Bearer YOUR_API_KEY` and `X-Organization-ID: YOUR_ORG_ID` headers.
+
+**Base URL:** `https://api.erdo.ai`
+
+### Example
+
+```bash
+curl -X POST https://api.erdo.ai/v1/ask \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Organization-ID: YOUR_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What were total sales last quarter?"}'
+```

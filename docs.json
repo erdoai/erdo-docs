@@ -15,6 +15,12 @@
         "pages": ["introduction"]
       },
       {
+        "group": "MCP & REST API",
+        "pages": [
+          "mcp/overview"
+        ]
+      },
+      {
         "group": "Python SDK",
         "pages": [
           "sdk/invoke"
