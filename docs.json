@@ -12,7 +12,7 @@
     "groups": [
       {
         "group": "Get Started",
-        "pages": ["introduction", "quickstart", "installation", "cli-vs-sdk", "cheatsheet", "changelog"]
+        "pages": ["introduction", "quickstart", "installation", "cheatsheet", "changelog"]
       },
       {
         "group": "Core Concepts",
@@ -41,17 +41,6 @@
           "examples/business-automation",
           "examples/data-analysis",
           "examples/code-execution"
-        ]
-      },
-      {
-        "group": "Python SDK",
-        "pages": [
-          "sdk/overview",
-          "sdk/sync",
-          "sdk/invoke",
-          "sdk/test",
-          "sdk/actions",
-          "sdk/workflows"
         ]
       },
       {

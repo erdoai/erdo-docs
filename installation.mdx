@@ -5,7 +5,7 @@ description: "Install and set up Erdo on your system"
 
 ## Overview
 
-Erdo provides multiple ways to get started, depending on your use case and preferences. This guide covers installation of the CLI, SDK, and platform access.
+Erdo provides multiple ways to get started. This guide covers installation of the CLI and platform access.
 
 ## Erdo CLI
 
@@ -69,50 +69,6 @@ curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli
 erdo --version
 ```
 
-## Python SDK
-
-Install the Erdo Python SDK for pure Python workflows - sync, test, and invoke agents all from Python without needing the CLI.
-
-<CodeGroup>
-
-```bash pip
-pip install erdo
-```
-
-```bash Poetry
-poetry add erdo
-```
-
-```bash uv
-uv add erdo
-```
-
-</CodeGroup>
-
-### Verify SDK Installation
-
-```python
-import erdo
-from erdo.sync import Sync
-from erdo.invoke import Invoke
-
-print(f"Erdo SDK version: {erdo.__version__}")
-print("SDK modules available: sync, invoke, test")
-```
-
-### SDK Configuration
-
-The SDK uses the same configuration as the CLI, reading from `~/.erdo/config.yaml` or environment variables:
-
-```python
-from erdo.config import Config
-
-# Automatically loads from ~/.erdo/config.yaml or env vars
-config = Config()
-print(f"API URL: {config.api_url}")
-print(f"Authenticated: {config.is_authenticated()}")
-```
-
 ## Platform Access
 
 ### Create Account
@@ -123,57 +79,28 @@ print(f"Authenticated: {config.is_authenticated()}")
 
 ### Authentication
 
-<Tabs>
-  <Tab title="CLI">
-    Connect your local tools to the platform:
+Connect your local tools to the platform:
 
-    ```bash
-    erdo login
-    ```
+```bash
+erdo login
+```
 
-    This will:
-    - Open your browser for authentication
-    - Store your credentials securely
-    - Set up API access for both CLI and SDK
+This will:
+- Open your browser for authentication
+- Store your credentials securely
+- Set up API access
 
-    ### Verify Authentication
-    ```bash
-    erdo whoami
-    ```
-  </Tab>
-  <Tab title="SDK">
-    The SDK automatically uses CLI authentication. If you haven't logged in yet:
-
-    ```bash
-    erdo login
-    ```
-
-    Or set environment variables directly:
-    ```bash
-    export ERDO_API_URL="https://api.erdo.ai"
-    export ERDO_AUTH_TOKEN="your-token"
-    ```
-
-    ### Verify in Python
-    ```python
-    from erdo.config import Config
-    
-    config = Config()
-    if config.is_authenticated():
-        print("Ready to sync and invoke agents!")
-        print(f"Organization: {config.organization}")
-    else:
-        print("Please run 'erdo login' first")
-    ```
-  </Tab>
-</Tabs>
+### Verify Authentication
+```bash
+erdo whoami
+```
 
 ## System Requirements
 
 <CardGroup cols={2}>
   <Card title="Minimum Requirements" icon="computer">
     - **OS**: macOS 10.15+, Linux, Windows 10+ - **Memory**: 2GB RAM -
-    **Python**: 3.8+ (for SDK) - **Node.js**: 16+ (for development)
+    **Python**: 3.8+ - **Node.js**: 16+ (for development)
   </Card>
   <Card title="Recommended" icon="rocket">
     - **OS**: Latest macOS, Ubuntu 20.04+, Windows 11 - **Memory**: 8GB+ RAM -
@@ -205,7 +132,7 @@ print(f"Authenticated: {config.is_authenticated()}")
     Configure PyCharm for optimal Erdo development:
 
     1. Install the Erdo plugin from the marketplace
-    2. Configure the Python interpreter to include the Erdo SDK
+    2. Configure the Python interpreter
     3. Set up code templates for common agent patterns
 
   </Tab>
@@ -288,22 +215,6 @@ development:
 
   </Accordion>
 
-  <Accordion title="SDK import errors">
-    **Virtual environment issues:**
-    ```bash
-    python -m venv erdo-env
-    source erdo-env/bin/activate  # On Windows: erdo-env\Scripts\activate
-    pip install erdo
-    ```
-
-    **Dependency conflicts:**
-    ```bash
-    pip install --upgrade erdo
-    pip install --force-reinstall erdo
-    ```
-
-  </Accordion>
-
   <Accordion title="Authentication problems">
     **Login failures:**
     ```bash
@@ -334,4 +245,4 @@ Now that you have Erdo installed:
 
 1. **[Follow the Quick Start](/quickstart)** - Build your first agent
 2. **[Explore Examples](/examples/business-automation)** - See real-world use cases
-3. **[Read the SDK Docs](/sdk/overview)** - Dive deeper into development
+3. **[Read the CLI Docs](/cli/overview)** - Dive deeper into the CLI

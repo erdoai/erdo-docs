@@ -12,97 +12,39 @@ Create your first AI agent with Erdo. This guide covers installation, authentica
   ([sign up here](https://erdo.ai))
 </Info>
 
-## Step 1: Choose Your Approach
+## Step 1: Install the CLI
 
-Choose between CLI and Python SDK based on your preference:
+<CodeGroup>
 
-<Tabs>
-  <Tab title="CLI">
-    The fastest way to get started is with the Erdo CLI:
+```bash Homebrew (Recommended)
+brew install erdoai/tap/erdo
+```
 
-    <CodeGroup>
+```bash Manual Download
+# Download from GitHub Releases
+curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
+unzip erdo-cli.zip
+chmod +x erdo
+mv erdo /usr/local/bin/
+rm erdo-cli.zip
+```
 
-    ```bash Homebrew (Recommended)
-    brew install erdoai/tap/erdo
-    ```
+</CodeGroup>
 
-    ```bash Manual Download
-    # Download from GitHub Releases
-    curl -L https://github.com/erdoai/homebrew-tap/releases/latest/download/erdo-cli_Darwin_arm64.zip -o erdo-cli.zip
-    unzip erdo-cli.zip
-    chmod +x erdo
-    mv erdo /usr/local/bin/
-    rm erdo-cli.zip
-    ```
-
-    </CodeGroup>
-
-    Verify the installation:
-    ```bash
-    erdo --version
-    ```
-  </Tab>
-  <Tab title="Python SDK">
-    Install the Python SDK for pure Python workflows:
-
-    <CodeGroup>
-
-    ```bash pip
-    pip install erdo
-    ```
-
-    ```bash Poetry
-    poetry add erdo
-    ```
-
-    ```bash uv
-    uv add erdo
-    ```
-
-    </CodeGroup>
-
-    Verify the installation:
-    ```python
-    import erdo
-    from erdo.sync import Sync
-    from erdo.invoke import Invoke
-    print(f"Erdo SDK version: {erdo.__version__}")
-    ```
-  </Tab>
-</Tabs>
+Verify the installation:
+```bash
+erdo --version
+```
 
 ## Step 2: Authenticate
 
-<Tabs>
-  <Tab title="CLI">
-    Connect the CLI to your Erdo account:
+Connect the CLI to your Erdo account:
 
-    ```bash
-    erdo login
-    ```
+```bash
+erdo login
+```
 
-    This will open your browser to authenticate with your Erdo account.
-  </Tab>
-  <Tab title="SDK">
-    The SDK uses the same authentication as the CLI:
-
-    ```bash
-    erdo login
-    ```
-
-    Or set environment variables:
-    ```bash
-    export ERDO_AUTH_TOKEN="your-token"
-    ```
-
-    Verify authentication:
-    ```python
-    from erdo.config import Config
-    config = Config()
-    print(f"Authenticated: {config.is_authenticated()}")
-    ```
-  </Tab>
-</Tabs>
+This will open your browser to authenticate with your Erdo account.
 
 ## Step 3: Create Your First Agent
 
@@ -342,54 +284,16 @@ Erdo provides two complementary testing approaches:
 
 ## Step 7: Deploy Your Agent
 
-<Tabs>
-  <Tab title="CLI">
-    Sync your validated agent to the platform:
+Sync your validated agent to the platform:
 
-    ```bash
-    # Deploy to platform
-    erdo sync
+```bash
+# Deploy to platform
+erdo sync
 
-    # Invoke remotely
-    erdo invoke task_automator \
-      --message "Organize my email inbox"
-    ```
-  </Tab>
-  <Tab title="SDK">
-    Deploy directly from Python:
-
-    ```python
-    from erdo.sync import Sync
-    from erdo.invoke import invoke
-
-    # Sync your agent to the platform
-    result = Sync(task_agent)
-    print(f"Synced agent: {result.agent_key}")
-
-    # Invoke your agent
-    response = invoke(
-        result.agent_key,
-        messages=[{
-            "role": "user",
-            "content": "Organize my email inbox"
-        }]
-    )
-
-    # Access the structured result
-    if response.success:
-        print(f"Status: {response.result['status']}")
-
-        # Extract text content
-        if response.result.get('output'):
-            for item in response.result['output'].get('content', []):
-                if item.get('content_type') == 'text':
-                    print(f"Response: {item['content']}")
-
-        # Show execution steps
-        print(f"Executed {len(response.steps)} steps")
-    ```
-  </Tab>
-</Tabs>
+# Invoke remotely
+erdo invoke task_automator \
+  --message "Organize my email inbox"
+```
 
 ## Next Steps
 
@@ -397,8 +301,8 @@ Erdo provides two complementary testing approaches:
   <Card title="Core Concepts" icon="book" href="/concepts/overview">
     Learn about agents, steps, actions, and result handlers
   </Card>
-  <Card title="SDK Reference" icon="code" href="/sdk/overview">
-    Explore the full Python SDK capabilities
+  <Card title="CLI Reference" icon="code" href="/cli/overview">
+    Explore the full CLI capabilities
   </Card>
   <Card title="Examples" icon="lightbulb" href="/examples/business-automation">
     See real-world automation examples
