@@ -1,0 +1,411 @@
+---
+title: "Python SDK — Invoke"
+description: "Execute agents programmatically with the Python SDK"
+---
+
+# Invoke
+
+The `invoke()` function allows you to execute agents programmatically from Python code, making it easy to test agents, integrate them into applications, and automate workflows.
+
+## Configuration
+
+Before invoking agents, configure the SDK with your credentials:
+
+```python
+import erdo
+
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="your-org-slug"  # or organization UUID
+)
+```
+
+Configuration can also be set via environment variables:
+
+```bash
+export ERDO_ENDPOINT="https://api.erdo.ai"
+export ERDO_AUTH_TOKEN="your-api-token"
+export ERDO_ORGANIZATION="your-org-slug"
+```
+
+Or via `~/.erdo/config.yaml`:
+
+```yaml
+endpoint: https://api.erdo.ai
+auth_token: your-api-token
+organization: your-org-slug
+```
+
+**Priority order:** `erdo.setup()` > environment variables > config file
+
+## Quick Start
+
+```python
+import erdo
+from erdo import invoke
+
+# Configure SDK (or use env vars / config file)
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="my-org"
+)
+
+# Simple invocation
+response = invoke(
+    "my-agent",
+    input="Hello!",
+)
+
+print(f"Success: {response.success}")
+print(f"Result: {response.result}")
+```
+
+## Basic Usage
+
+### Invoke with Input
+
+```python
+from erdo import invoke
+
+response = invoke(
+    "data-question-answerer",
+    input="What were Q4 sales?"
+)
+
+if response.success:
+    # Print assistant messages
+    for msg in response.messages:
+        print(msg["content"])
+else:
+    print(f"Error: {response.error}")
+```
+
+### Invoke with Datasets
+
+```python
+response = invoke(
+    "data-question-answerer",
+    input="Show me the top products",
+    datasets=["sales-q4-2024", "products-catalog"]
+)
+```
+
+### Invoke with Parameters
+
+```python
+response = invoke(
+    "data-analyzer",
+    input="Analyze the data",
+    parameters={
+        "analysis_type": "trend",
+        "time_period": "monthly"
+    }
+)
+```
+
+## Streaming
+
+Stream events in real-time as the agent executes:
+
+```python
+response = invoke(
+    "my-agent",
+    input="Analyze this dataset",
+    stream=True,
+    output_format="text"
+)
+
+# Output streams to stdout automatically as events arrive
+# Final result available in response after completion
+```
+
+Stream with verbose step tracking:
+
+```python
+response = invoke(
+    "my-agent",
+    input="Process this data",
+    stream=True,
+    output_format="text",
+    verbose=True
+)
+
+# Output includes step-by-step progress:
+# ▸ erdo.data-analyst (agent)
+# ✓ erdo.data-analyst
+# The analysis shows that...
+```
+
+## InvokeResult
+
+The `invoke()` function returns an `InvokeResult` object:
+
+```python
+class InvokeResult:
+    success: bool                    # Whether invocation succeeded
+    agent_key: Optional[str]        # Agent key
+    invocation_id: Optional[str]    # Unique invocation ID
+    result: Optional[Dict]          # Terminal result event {status, message, error}
+    messages: List[Dict[str, Any]]  # Visible text messages from the agent
+    steps: List[Dict[str, Any]]     # Step execution info {step_id, key, name, type, status}
+    events: List[Dict[str, Any]]    # Complete raw event stream for debugging
+    error: Optional[str]            # Error message if failed
+```
+
+### Understanding the Result Structure
+
+The `result` field contains the terminal event from the agent service:
+
+```python
+{
+    "status": "success",     # "success" or "error"
+    "message": "...",        # Error message (only if status is "error")
+    "error": "timeout"       # Error type (only if status is "error")
+}
+```
+
+The `messages` field contains visible text output from the agent — this is typically what you want to display to users.
+
+### Example Usage
+
+```python
+response = invoke("my-agent", input="What were Q4 sales?")
+
+if response.success:
+    # Print agent's text output
+    for msg in response.messages:
+        print(msg["content"])
+
+    # Access step execution info
+    print(f"\nSteps ({len(response.steps)}):")
+    for step in response.steps:
+        print(f"  ✓ {step['key']} ({step['type']})")
+
+    # Get invocation ID
+    print(f"\nInvocation: {response.invocation_id}")
+
+    # Access raw events for debugging
+    print(f"Events: {len(response.events)} raw events")
+else:
+    print(f"Error: {response.error}")
+```
+
+## Complete API Reference
+
+```python
+def invoke(
+    agent_key: str,
+    input: Optional[str] = None,
+    parameters: Optional[Dict[str, Any]] = None,
+    datasets: Optional[List[str]] = None,
+    stream: bool = False,
+    output_format: str = "events",
+    verbose: bool = False,
+    print_events: bool = False,
+    **kwargs
+) -> InvokeResult
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `agent_key` | `str` | required | Agent key (e.g., `"data-question-answerer"`) |
+| `input` | `str` | `None` | User input string |
+| `parameters` | `dict` | `None` | Parameters to pass to the agent |
+| `datasets` | `list` | `None` | Dataset slugs to include (e.g., `["sales-2024"]`) |
+| `stream` | `bool` | `False` | Stream events in real-time |
+| `output_format` | `str` | `"events"` | `"events"` (raw), `"text"` (formatted), or `"json"` (summary) |
+| `verbose` | `bool` | `False` | Show step execution details (text format only) |
+| `print_events` | `bool` | `False` | Print all raw events as they arrive |
+
+### Keyword Arguments
+
+- `endpoint` (str): Custom API endpoint
+- `auth_token` (str): Custom auth token
+
+## Examples
+
+### Data Analysis
+
+```python
+response = invoke(
+    "data-question-answerer",
+    input="What were Q4 sales by region?",
+    datasets=["sales-2024"],
+    parameters={
+        "time_period": "Q4",
+        "group_by": "region"
+    }
+)
+
+if response.success:
+    for msg in response.messages:
+        print(msg["content"])
+
+    print(f"\nExecuted {len(response.steps)} steps:")
+    for step in response.steps:
+        print(f"  ✓ {step['key']} ({step['type']})")
+```
+
+### Batch Processing
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+def process_query(query):
+    return invoke(
+        "data-analyzer",
+        input=query,
+        datasets=["my-dataset"]
+    )
+
+queries = ["Query 1", "Query 2", "Query 3"]
+
+with ThreadPoolExecutor(max_workers=3) as executor:
+    results = list(executor.map(process_query, queries))
+
+for i, result in enumerate(results):
+    if result.success:
+        for msg in result.messages:
+            print(f"Query {i+1}: {msg['content']}")
+```
+
+### Integration with Flask
+
+```python
+from flask import Flask, request, jsonify
+from erdo import invoke
+
+app = Flask(__name__)
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.json
+
+    response = invoke(
+        "data-analyzer",
+        input=data["query"],
+        datasets=data.get("datasets", []),
+        parameters=data.get("parameters"),
+    )
+
+    if response.success:
+        return jsonify({
+            "success": True,
+            "messages": response.messages,
+            "result": response.result,
+            "steps": response.steps,
+            "invocation_id": response.invocation_id,
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "error": response.error,
+        }), 400
+
+if __name__ == "__main__":
+    app.run()
+```
+
+### Error Handling
+
+```python
+from erdo import invoke
+
+try:
+    response = invoke(
+        "my-agent",
+        input="Hello"
+    )
+
+    if response.success:
+        for msg in response.messages:
+            print(msg["content"])
+    else:
+        # Agent returned an error
+        print(f"Agent error: {response.error}")
+
+except Exception as e:
+    # Network or other error
+    print(f"Invocation failed: {e}")
+```
+
+## Best Practices
+
+### 1. Always Check Success
+
+```python
+response = invoke("my-agent", input="...")
+if response.success:
+    for msg in response.messages:
+        print(msg["content"])
+else:
+    print(f"Error: {response.error}")
+```
+
+### 2. Stream Long-Running Agents
+
+```python
+# Good for long-running agents — see progress in real-time
+response = invoke(
+    "long-agent",
+    input="Process large dataset",
+    stream=True,
+    output_format="text"
+)
+```
+
+### 3. Use Appropriate Output Format
+
+```python
+# For humans — prints to stdout as agent runs
+response = invoke("my-agent", input="...", output_format="text")
+
+# For integration/parsing — structured data
+response = invoke("my-agent", input="...", output_format="json")
+
+# For custom processing — raw events
+response = invoke("my-agent", input="...", output_format="events")
+```
+
+## Troubleshooting
+
+### Authentication Errors
+
+Configure the SDK with valid credentials:
+
+```python
+import erdo
+erdo.setup(
+    endpoint="https://api.erdo.ai",
+    auth_token="your-api-token",
+    organization="your-org-slug"
+)
+```
+
+Or use the CLI:
+
+```bash
+erdo login
+```
+
+Or set environment variables:
+
+```bash
+export ERDO_ENDPOINT="https://api.erdo.ai"
+export ERDO_AUTH_TOKEN="your-token"
+export ERDO_ORGANIZATION="your-org-slug"
+```
+
+### Import Errors
+
+Install the SDK:
+
+```bash
+pip install erdo
+# or
+uv pip install erdo
+```

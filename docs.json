@@ -15,6 +15,12 @@
         "pages": ["introduction"]
       },
       {
+        "group": "Python SDK",
+        "pages": [
+          "sdk/invoke"
+        ]
+      },
+      {
         "group": "TypeScript SDK",
         "pages": [
           "ts-sdk/overview",
