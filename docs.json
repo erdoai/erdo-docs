@@ -12,36 +12,7 @@
     "groups": [
       {
         "group": "Get Started",
-        "pages": ["introduction", "quickstart", "installation", "cheatsheet", "changelog"]
-      },
-      {
-        "group": "Core Concepts",
-        "pages": [
-          "concepts/overview",
-          "concepts/agents",
-          "concepts/steps",
-          "concepts/actions",
-          "concepts/tools",
-          "concepts/result-handlers",
-          "concepts/state-templating"
-        ]
-      },
-      {
-        "group": "Testing & Validation",
-        "pages": [
-          "testing/overview",
-          "testing/unit-tests",
-          "testing/integration-tests",
-          "why-erdo"
-        ]
-      },
-      {
-        "group": "Examples & Use Cases",
-        "pages": [
-          "examples/business-automation",
-          "examples/data-analysis",
-          "examples/code-execution"
-        ]
+        "pages": ["introduction"]
       },
       {
         "group": "TypeScript SDK",
@@ -50,44 +21,6 @@
           "ts-sdk/client",
           "ts-sdk/ui-components",
           "ts-sdk/integration"
-        ]
-      },
-      {
-        "group": "CLI Tools",
-        "pages": [
-          "cli/overview",
-          "cli/commands",
-          "cli/login",
-          "cli/development",
-          "cli/deployment"
-        ]
-      },
-      {
-        "group": "Pre-built Agents",
-        "pages": [
-          "agents/security-checker",
-          "agents/data-analyst",
-          "agents/file-analyzer",
-          "agents/data-quality-checker",
-          "agents/integration-analyzer",
-          "agents/data-question-answerer",
-          "agents/memory-manager"
-        ]
-      },
-      {
-        "group": "Advanced",
-        "pages": [
-          "advanced/memory-management",
-          "advanced/background-tasks",
-          "troubleshooting"
-        ]
-      },
-      {
-        "group": "Integrations",
-        "pages": [
-          "integrations/overview",
-          "integrations/creating-integrations",
-          "integration-configs"
         ]
       }
     ]
@@ -98,7 +31,6 @@
       "href": "https://github.com/erdoai",
       "icon": "github"
     },
-
     {
       "name": "Blog",
       "href": "https://erdo.ai/blog",
