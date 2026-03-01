@@ -272,94 +272,11 @@ export default function ChatPage() {
 
 ## Vercel AI SDK
 
-Use Erdo as a tool in your AI chat application with [Vercel AI SDK 6](https://vercel.com/blog/ai-sdk-6):
+For integrating Erdo with Vercel AI SDK, see the dedicated [Vercel AI SDK guide](/ts-sdk/vercel-ai-sdk). It covers:
 
-```tsx
-// app/api/chat/route.ts
-import { openai } from '@ai-sdk/openai';
-import { streamText, tool } from 'ai';
-import { z } from 'zod';
-import { ErdoClient } from '@erdoai/server';
-
-const erdoClient = new ErdoClient({
-  authToken: process.env.ERDO_AUTH_TOKEN,
-});
-
-export async function POST(req: Request) {
-  const { messages } = await req.json();
-
-  const result = streamText({
-    model: openai('gpt-4o'),
-    messages,
-    tools: {
-      analyzeData: tool({
-        description: 'Analyze data and create visualizations using Erdo',
-        parameters: z.object({
-          query: z.string().describe('The data analysis question'),
-        }),
-        execute: async ({ query }) => {
-          const result = await erdoClient.invoke('data-analyst', {
-            messages: [{ role: 'user', content: query }],
-          });
-          return result;
-        },
-      }),
-    },
-  });
-
-  return result.toUIMessageStreamResponse();
-}
-```
-
-### Rendering Tool Results
-
-```tsx
-// components/chat.tsx
-'use client';
-
-import { useChat } from '@ai-sdk/react';
-import { Content } from '@erdoai/ui';
-
-export function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
-
-  return (
-    <div>
-      {messages.map((m) => (
-        <div key={m.id}>
-          {m.role === 'user' ? 'User: ' : 'AI: '}
-          {/* Render text parts */}
-          {m.parts
-            ?.filter((part) => part.type === 'text')
-            .map((part, i) => (
-              <span key={i}>{part.text}</span>
-            ))}
-
-          {/* Render Erdo tool results */}
-          {m.parts
-            ?.filter((part) => part.type === 'tool-invocation' && part.toolInvocation.toolName === 'analyzeData')
-            .map((part, i) => {
-              const toolResult = part.toolInvocation.result;
-              if (!toolResult) return null;
-              return (
-                <div key={i}>
-                  {toolResult.result?.output?.content?.map((item: unknown, j: number) => (
-                    <Content key={j} content={item} />
-                  ))}
-                </div>
-              );
-            })}
-        </div>
-      ))}
-
-      <form onSubmit={handleSubmit}>
-        <input value={input} onChange={handleInputChange} />
-        <button type="submit">Send</button>
-      </form>
-    </div>
-  );
-}
-```
+- Connecting Erdo's MCP tools to any LLM via `@ai-sdk/mcp`
+- Rendering rich charts and tables with `ErdoToolResult`
+- The bridge pattern using `client.getTools()`
 
 ## Express.js / Node.js
 

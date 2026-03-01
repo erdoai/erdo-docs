@@ -32,7 +32,8 @@
           "ts-sdk/overview",
           "ts-sdk/client",
           "ts-sdk/ui-components",
-          "ts-sdk/integration"
+          "ts-sdk/integration",
+          "ts-sdk/vercel-ai-sdk"
         ]
       }
     ]

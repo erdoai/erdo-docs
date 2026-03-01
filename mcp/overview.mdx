@@ -172,3 +172,9 @@ curl -X POST https://api.erdo.ai/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"question": "What were total sales last quarter?"}'
 ```
+
+## Using with Vercel AI SDK
+
+You can connect Erdo's MCP server to your own AI chat application using Vercel AI SDK's `@ai-sdk/mcp` package. This lets any LLM use Erdo tools, with rich chart and table rendering in your React UI.
+
+See the [Vercel AI SDK integration guide](/ts-sdk/vercel-ai-sdk) for setup instructions and examples.
