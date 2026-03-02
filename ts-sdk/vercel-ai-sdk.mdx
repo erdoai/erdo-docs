@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: anthropic('claude-sonnet-4-5-20250929'),
     messages: modelMessages,
     tools: tools as ToolSet,
     system: 'You are a helpful data analyst. Use the Erdo tools to answer data questions.',
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: anthropic('claude-sonnet-4-5-20250929'),
     messages: modelMessages,
     tools: tools as ToolSet,
     system: 'You are a helpful data analyst. Use the Erdo tools to answer data questions.',
