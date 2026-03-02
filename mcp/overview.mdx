@@ -101,7 +101,7 @@ Search across all datasets using natural language. Returns matching records with
 | `limit` | number | Optional. Max results (default 20). |
 
 ### erdo_ask_data_question
-Ask a natural language question about your data. This invokes Erdo's Data Question Answerer agent, which analyzes datasets, writes and executes code, and returns structured answers with charts, tables, and text.
+Ask a natural language question about your data. This invokes Erdo's Data Question Answerer agent, which analyzes datasets, writes and executes code, and returns a text answer. To visualize results, use `erdo_render_chart` or `erdo_render_table`.
 
 <Warning>
   This tool can take 30 seconds to 2 minutes for complex questions, as it runs a full AI analysis pipeline.
@@ -114,7 +114,34 @@ Ask a natural language question about your data. This invokes Erdo's Data Questi
 | `dataset_slugs` | string[] | Optional. Dataset slugs to scope the question to. |
 | `timezone` | string | Optional. User timezone (e.g. `America/New_York`). |
 
-**Returns:** A thread ID (for follow-up in the Erdo UI) and the agent's structured answer.
+**Returns:** A thread ID (for follow-up in the Erdo UI) and the agent's text answer.
+
+### erdo_render_chart
+Render a data visualization chart. Supports bar, line, pie, histogram, and scatter chart types. The chart fetches data directly from the dataset — no embedded data needed.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `chart_type` | string | Chart type: `bar`, `line`, `pie`, `histogram`, or `scatter` |
+| `chart_title` | string | Title for the chart |
+| `x_axis` | object | X-axis configuration (label, key, format, value_type) |
+| `y_axes` | object[] | Y-axis configurations |
+| `series` | object[] | Data series, each with `dataset_slug`, `key`, `sql_query`, `resource_key` |
+| `data_reduction` | object | Data reduction strategy (none, sample, aggregate, bin) |
+| `stacked` | boolean | Whether to stack bars (for bar charts) |
+| `sort` | object[] | Sort conditions |
+
+### erdo_render_table
+Render a data table. The table fetches data directly from the dataset.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table_title` | string | Title for the table |
+| `dataset_slug` | string | Dataset slug |
+| `columns` | object[] | Column definitions (column_name, key, format, value_type) |
+| `sql_query` | string \| null | Optional SQL query to filter/transform data |
+| `resource_key` | string \| null | Required for file datasets (CSV/Excel) |
 
 ### erdo_query_data
 Query a dataset using natural language. Describe what data you want and Erdo will generate and execute the SQL query for you.
@@ -154,6 +181,8 @@ All MCP tools are also available as REST endpoints for direct HTTP integration:
 | `erdo_gather_dataset_context` | `/v1/dataset-context` | GET |
 | `erdo_search_data` | `/v1/search` | POST |
 | `erdo_ask_data_question` | `/v1/ask` | POST |
+| `erdo_render_chart` | `/v1/render/chart` | POST |
+| `erdo_render_table` | `/v1/render/table` | POST |
 | `erdo_query_data` | `/v1/datasets/:slug/query-nl` | POST |
 | `erdo_run_query` | `/v1/datasets/:slug/query` | POST |
 | `erdo_list_threads` | `/v1/threads` | GET |

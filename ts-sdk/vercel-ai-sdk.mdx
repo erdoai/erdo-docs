@@ -212,7 +212,8 @@ isErdoTool(part) // → true for any erdo_* tool
 
 Renders an Erdo tool result with appropriate UI based on the tool type:
 
-- **UI tools** (`erdo_ask_data_question`, `erdo_query_data`): Charts, tables, and markdown
+- **UI tools** (`erdo_render_chart`, `erdo_render_table`): Charts and tables via UIGenerationNodes
+- **Markdown tools** (`erdo_ask_data_question`): Text answer rendered as markdown
 - **Data tools** (`erdo_list_datasets`, `erdo_get_dataset_schema`, etc.): Formatted JSON
 - **Loading states**: Spinner with tool name
 - **Errors**: Error message display
@@ -223,7 +224,6 @@ import { ErdoToolResult, type ErdoToolResultProps } from '@erdoai/ui';
 <ErdoToolResult
   part={part}              // AI SDK tool part from message.parts
   className="my-4"        // Optional styling
-  invocationId="inv-123"  // Optional, for chart/table data fetching
   onSuggestionClick={fn}  // Optional callback for follow-up suggestions
 />
 ```
@@ -300,7 +300,9 @@ When connected via MCP, the LLM can use these Erdo tools:
 | `erdo_get_dataset_schema` | Get column names, types, and statistics |
 | `erdo_gather_dataset_context` | Get context for multiple datasets at once |
 | `erdo_search_data` | Search across datasets with natural language |
-| `erdo_ask_data_question` | AI analysis with charts, tables, and text |
+| `erdo_ask_data_question` | AI analysis — returns a text answer |
+| `erdo_render_chart` | Render a chart (bar, line, pie, histogram, scatter) |
+| `erdo_render_table` | Render a data table |
 | `erdo_query_data` | Natural language SQL queries |
 | `erdo_run_query` | Execute raw SQL queries |
 
