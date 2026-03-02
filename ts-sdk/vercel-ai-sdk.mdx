@@ -274,6 +274,10 @@ import { ErdoProvider } from '@erdoai/ui';
 </ErdoProvider>
 ```
 
+<Info>
+If you don't need chart/table rendering (only text and JSON results), `ErdoProvider` is optional.
+</Info>
+
 ## Authentication
 
 The API key (`ERDO_AUTH_TOKEN`) stays server-side for the MCP connection and token creation. The client gets a short-lived scoped token for data fetching — this is already set up in the quick start above.
