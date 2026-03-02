@@ -35,9 +35,9 @@ Replace `@ai-sdk/anthropic` with your preferred model provider (`@ai-sdk/openai`
 
 ## Quick Start
 
-### 1. Create an API Route (Server)
+### 1. Server Routes
 
-The API route connects to Erdo's MCP server, discovers tools, and passes them to the LLM:
+Two server routes: one for the LLM chat stream, one to create a scoped token for client-side data fetching (charts and tables).
 
 ```typescript
 // app/api/chat/route.ts
@@ -48,7 +48,6 @@ import { anthropic } from '@ai-sdk/anthropic';
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // Connect to Erdo's MCP server
   const mcpClient = await createMCPClient({
     transport: {
       type: 'http',
@@ -59,14 +58,11 @@ export async function POST(req: Request) {
     },
   });
 
-  // Discover Erdo tools (list_datasets, ask_data_question, query_data, etc.)
   const tools = await mcpClient.tools();
-
-  // Convert UI messages (from useChat) to model messages (for streamText)
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-5-20250929'),
+    model: anthropic('claude-sonnet-4-5'),
     messages: modelMessages,
     tools: tools as ToolSet,
     system: 'You are a helpful data analyst. Use the Erdo tools to answer data questions.',
@@ -79,23 +75,49 @@ export async function POST(req: Request) {
 }
 ```
 
+```typescript
+// app/api/erdo-token/route.ts
+import { ErdoClient } from '@erdoai/server';
+
+const erdoClient = new ErdoClient({
+  authToken: process.env.ERDO_AUTH_TOKEN,
+});
+
+export async function POST() {
+  const { token } = await erdoClient.createToken({
+    botKeys: [],           // Leave empty to grant access to all bots
+    expiresInSeconds: 3600,
+  });
+  return Response.json({ token });
+}
+```
+
 <Warning>
-Never expose your `ERDO_AUTH_TOKEN` to the browser. The MCP connection happens server-side only.
+Never expose your `ERDO_AUTH_TOKEN` to the browser. The MCP connection and token creation happen server-side only.
 </Warning>
 
 ### 2. Render Results (Client)
 
-Use `isErdoTool` and `ErdoToolResult` to render rich charts and tables from tool results:
+Fetch a scoped token on mount and pass it to `ErdoProvider`. Charts and tables use this token to fetch dataset contents.
 
 ```tsx
 // app/chat/page.tsx
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart } from 'ai';
 import { ErdoProvider, ErdoToolResult, isErdoTool } from '@erdoai/ui';
 
 export default function ChatPage() {
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/erdo-token', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => setToken(data.token));
+  }, []);
+
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
@@ -103,21 +125,20 @@ export default function ChatPage() {
   const isStreaming = status === 'streaming' || status === 'submitted';
 
   return (
-    <ErdoProvider config={{ baseUrl: 'https://api.erdo.ai' }}>
+    <ErdoProvider config={{
+      baseUrl: process.env.NEXT_PUBLIC_ERDO_ENDPOINT || 'https://api.erdo.ai',
+      token,
+    }}>
       <div>
         {messages.map((message) => (
           <div key={message.id}>
             {message.parts.map((part, i) => {
-              // Erdo tool results → rich charts, tables, markdown
               if (isToolUIPart(part) && isErdoTool(part)) {
                 return <ErdoToolResult key={part.toolCallId} part={part} />;
               }
-
-              // Text parts
               if (part.type === 'text' && part.text) {
                 return <p key={i}>{part.text}</p>;
               }
-
               return null;
             })}
           </div>
@@ -131,10 +152,7 @@ export default function ChatPage() {
             input.value = '';
           }
         }}>
-          <input
-            placeholder="Ask a data question..."
-            disabled={isStreaming}
-          />
+          <input placeholder="Ask a data question..." disabled={isStreaming} />
           <button type="submit" disabled={isStreaming}>Send</button>
         </form>
       </div>
@@ -147,8 +165,9 @@ export default function ChatPage() {
 
 ```bash
 # .env.local
-ERDO_AUTH_TOKEN=your-api-key        # Server-side only
-ERDO_ENDPOINT=https://api.erdo.ai   # Optional, defaults to https://api.erdo.ai
+ERDO_AUTH_TOKEN=your-api-key                          # Server-side only
+ERDO_ENDPOINT=https://api.erdo.ai                     # Optional, defaults to https://api.erdo.ai
+NEXT_PUBLIC_ERDO_ENDPOINT=https://api.erdo.ai          # Client-side, for ErdoProvider
 ```
 
 That's it. The LLM will automatically use Erdo tools like `erdo_list_datasets`, `erdo_ask_data_question`, and `erdo_query_data` based on user questions.
@@ -176,7 +195,7 @@ export async function POST(req: Request) {
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-5-20250929'),
+    model: anthropic('claude-sonnet-4-5'),
     messages: modelMessages,
     tools: tools as ToolSet,
     system: 'You are a helpful data analyst. Use the Erdo tools to answer data questions.',
@@ -240,7 +259,7 @@ getErdoToolName(part) // → 'erdo_list_datasets' | 'erdo_ask_data_question' | .
 
 ### `ErdoProvider`
 
-Required for chart and table rendering. Provides the data fetching context so charts can load dataset contents.
+Required for chart and table rendering. Provides the data fetching context so charts can load dataset contents. Pass a scoped token created from your backend (see quick start above).
 
 ```tsx
 import { ErdoProvider } from '@erdoai/ui';
@@ -248,47 +267,18 @@ import { ErdoProvider } from '@erdoai/ui';
 <ErdoProvider
   config={{
     baseUrl: 'https://api.erdo.ai',
-    token: scopedToken,  // Optional: scoped token for client-side auth
+    token: scopedToken,
   }}
 >
   {children}
 </ErdoProvider>
 ```
 
-<Info>
-If you don't need chart/table rendering (only text and JSON results), `ErdoProvider` is optional.
-</Info>
-
 ## Authentication
 
-### Server-Side (MCP Connection)
+The API key (`ERDO_AUTH_TOKEN`) stays server-side for the MCP connection and token creation. The client gets a short-lived scoped token for data fetching — this is already set up in the quick start above.
 
-The MCP connection uses your API key, which stays server-side:
-
-```bash
-ERDO_AUTH_TOKEN=your-api-key
-```
-
-### Client-Side (ErdoProvider)
-
-For chart and table rendering, `ErdoProvider` needs to fetch dataset contents. You have two options:
-
-1. **No auth needed** if charts don't load external data (simple results work without auth)
-2. **Scoped token** for full chart/table support — create a short-lived token from your backend:
-
-```typescript
-// Server: create a scoped token
-const { token } = await erdoClient.createToken({
-  botKeys: ['my-org.data-analyst'],
-  datasetIds: ['dataset-uuid'],
-  expiresInSeconds: 3600,
-});
-
-// Client: pass to ErdoProvider
-<ErdoProvider config={{ baseUrl: 'https://api.erdo.ai', token }}>
-```
-
-See [Scoped Tokens](/ts-sdk/integration#scoped-tokens-b2b2c) for full details.
+For more advanced token scoping (restricting to specific datasets or users), see [Scoped Tokens](/ts-sdk/integration#scoped-tokens-b2b2c).
 
 ## Available Tools
 
