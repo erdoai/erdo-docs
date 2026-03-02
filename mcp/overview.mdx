@@ -16,11 +16,11 @@ Use it to:
 
 ### 1. Get an API Key
 
-Go to **Settings > API Keys** in Erdo and create a new key. Copy the token — you'll need it for configuration.
+Click your profile in the bottom-left corner of Erdo and go to **API Keys**. Create a new key and copy the token.
 
 ### 2. Connect to the MCP Server
 
-The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http). Any MCP-compatible client can connect.
+The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http). Any MCP-compatible client can connect. The organization is inferred from your API key automatically.
 
 <Tabs>
   <Tab title="Claude Desktop">
@@ -32,8 +32,7 @@ The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](
         "erdo": {
           "url": "https://api.erdo.ai/mcp",
           "headers": {
-            "Authorization": "Bearer YOUR_API_KEY",
-            "X-Organization-ID": "YOUR_ORG_ID"
+            "Authorization": "Bearer YOUR_API_KEY"
           }
         }
       }
@@ -45,8 +44,7 @@ The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](
     claude mcp add erdo \
       --transport http \
       --url https://api.erdo.ai/mcp \
-      --header "Authorization: Bearer YOUR_API_KEY" \
-      --header "X-Organization-ID: YOUR_ORG_ID"
+      --header "Authorization: Bearer YOUR_API_KEY"
     ```
   </Tab>
   <Tab title="Cursor">
@@ -58,8 +56,7 @@ The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](
         "erdo": {
           "url": "https://api.erdo.ai/mcp",
           "headers": {
-            "Authorization": "Bearer YOUR_API_KEY",
-            "X-Organization-ID": "YOUR_ORG_ID"
+            "Authorization": "Bearer YOUR_API_KEY"
           }
         }
       }
@@ -80,7 +77,6 @@ The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](
         requestInit: {
           headers: {
             'Authorization': 'Bearer YOUR_API_KEY',
-            'X-Organization-ID': 'YOUR_ORG_ID',
           },
         },
       },
@@ -97,10 +93,6 @@ The MCP endpoint is `https://api.erdo.ai/mcp` using [Streamable HTTP transport](
     ```
   </Tab>
 </Tabs>
-
-<Info>
-  Find your Organization ID in **Settings > General** in Erdo, or from the URL when logged in.
-</Info>
 
 ### 3. Start Using It
 
@@ -225,7 +217,7 @@ All MCP tools are also available as REST endpoints for direct HTTP integration:
 | `erdo_list_threads` | `/v1/threads` | GET |
 | `erdo_get_thread_messages` | `/v1/threads/:id/messages` | GET |
 
-**Authentication:** Pass `Authorization: Bearer YOUR_API_KEY` and `X-Organization-ID: YOUR_ORG_ID` headers.
+**Authentication:** Pass `Authorization: Bearer YOUR_API_KEY` header. The organization is inferred from your API key.
 
 **Base URL:** `https://api.erdo.ai`
 
