@@ -62,6 +62,51 @@ curl "https://api.erdo.ai/v1/datasets?limit=10" \
 }
 ```
 
+### Create Dataset
+
+```
+POST /v1/datasets-create
+```
+
+Create a new empty dataset. Uses your organization's default storage backend. After creation, use [Write Rows](#write-rows) to add data.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Name for the dataset |
+| `description` | string | Optional description |
+| `instructions` | string | Optional instructions for AI agents analyzing this dataset |
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/datasets-create" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Daily Metrics", "description": "Automated metrics from our monitoring pipeline"}'
+```
+
+```json
+{
+  "id": "uuid",
+  "slug": "my-org.daily-metrics",
+  "name": "Daily Metrics",
+  "description": "Automated metrics from our monitoring pipeline",
+  "type": "file",
+  "status": "active"
+}
+```
+
+### Delete Dataset
+
+```
+DELETE /v1/datasets/:slug
+```
+
+Permanently delete a dataset and all its data. Requires admin permission on the dataset.
+
+```bash
+curl -X DELETE "https://api.erdo.ai/v1/datasets/my-org.daily-metrics" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
 ### Search Datasets
 
 ```

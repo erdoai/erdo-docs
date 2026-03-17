@@ -108,7 +108,7 @@ Once connected, the MCP client can discover and call Erdo tools. In AI assistant
 
 ## Available Tools
 
-Erdo exposes 26 MCP tools across five categories: data, threads, memory, artifacts, and automations.
+Erdo exposes 28 MCP tools across five categories: data, threads, memory, artifacts, and automations.
 
 ### Data Tools
 
@@ -218,6 +218,26 @@ Render a data table. The table fetches data directly from the dataset.
 | `columns` | object[] | Column definitions (column_name, key, format, value_type) |
 | `sql_query` | string \| null | Optional SQL query to filter/transform data |
 | `resource_key` | string \| null | Required for file datasets (CSV/Excel) |
+
+#### erdo_create_dataset
+Create a new empty dataset. After creation, use `erdo_write_rows` to add data. The dataset uses your organization's default storage backend.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Name for the dataset |
+| `description` | string | Optional. Description. |
+| `instructions` | string | Optional. Instructions for AI agents analyzing this dataset. |
+
+**Returns:** The created dataset with `id`, `slug`, `name`, `type`, and `status`.
+
+#### erdo_delete_dataset
+Delete a dataset and all its data. This is permanent.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slug` | string | Dataset UUID or slug to delete |
 
 #### erdo_write_rows
 Write or upsert rows to a dataset. For database-backed datasets (Postgres, ClickHouse), set `key_column` to upsert — matching rows are updated, new rows are inserted. For file datasets (CSV), rows are always appended.
@@ -426,6 +446,8 @@ All MCP tools are also available as REST endpoints for direct HTTP integration. 
 | `erdo_ask_data_question` | `/v1/ask` | POST |
 | `erdo_render_chart` | `/v1/render/chart` | POST |
 | `erdo_render_table` | `/v1/render/table` | POST |
+| `erdo_create_dataset` | `/v1/datasets-create` | POST |
+| `erdo_delete_dataset` | `/v1/datasets/:slug` | DELETE |
 | `erdo_write_rows` | `/v1/datasets/:slug/rows` | POST |
 | `erdo_delete_rows` | `/v1/datasets/:slug/rows` | DELETE |
 
@@ -505,7 +527,7 @@ curl -X POST https://api.erdo.ai/v1/heartbeats \
 
 When building your own app on top of Erdo, you'll want your end-users to interact with Erdo without giving them full access to your organization. **Scoped tokens** solve this — they restrict access to specific datasets and threads that you choose.
 
-All 26 tools work with scoped tokens. Each tool automatically scopes results to the resources the token has access to.
+All 28 tools work with scoped tokens. Each tool automatically scopes results to the resources the token has access to.
 
 Create scoped tokens via the [TypeScript SDK](/ts-sdk/client) using `createToken()`:
 
