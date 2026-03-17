@@ -5,12 +5,14 @@ description: "Connect AI assistants and applications to your data via Erdo's MCP
 
 # MCP Server
 
-Erdo exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that lets AI assistants and applications query your datasets, ask data questions, and run SQL queries — all using your existing Erdo permissions.
+Erdo exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that lets AI assistants and applications query your datasets, ask data questions, manage conversations, and automate analysis — all using your existing Erdo permissions.
 
 Use it to:
 - **Connect AI assistants** like Claude Desktop, Cursor, or Windsurf to your data
 - **Build AI-powered apps** that query and visualize your data using any MCP client library
 - **Integrate with any LLM** via Vercel AI SDK, LangChain, or direct MCP client connections
+- **Automate recurring analysis** with heartbeat automations
+- **Manage knowledge** with memories and skills that persist across conversations
 
 ## Quick Start
 
@@ -102,16 +104,40 @@ Once connected, the MCP client can discover and call Erdo tools. In AI assistant
 - "What columns does the sales dataset have?"
 - "How many orders were placed last month?" (uses the Data Question Answerer agent)
 - "Run a SQL query on my customers dataset to find the top 10 by revenue"
+- "Create a heartbeat that checks for anomalies in my revenue data every hour"
 
 ## Available Tools
 
-### erdo_list_datasets
+Erdo exposes 26 MCP tools across five categories: data, threads, memory, artifacts, and automations.
+
+### Data Tools
+
+#### erdo_list_datasets
 List all datasets in your organization with name, type, description, and status.
 
-### erdo_get_dataset_schema
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Optional. Max results (default 20). |
+
+#### erdo_search_datasets
+Search datasets by name or description.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search text |
+| `limit` | number | Optional. Max results (default 20). |
+
+#### erdo_get_dataset_schema
 Get detailed schema for a dataset including column names, types, statistics, and sample data.
 
-### erdo_gather_dataset_context
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_id` | string | Dataset UUID |
+
+#### erdo_gather_dataset_context
 Get detailed context for multiple datasets at once — schemas, column types, statistics, descriptions, and sample data. Useful for understanding your data landscape before asking questions.
 
 **Parameters:**
@@ -120,16 +146,37 @@ Get detailed context for multiple datasets at once — schemas, column types, st
 | `dataset_slugs` | string[] | Optional. Specific dataset IDs or slugs. Empty returns all. |
 | `limit` | number | Optional. Max datasets to return (default 10). |
 
-### erdo_search_data
-Search across all datasets using natural language. Returns matching records with source information.
+#### erdo_fetch_dataset_contents
+Fetch raw contents of a dataset. Returns rows and columns directly without requiring a SQL query. Useful for exploring small datasets or getting a quick preview.
 
 **Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `query` | string | Search text |
-| `limit` | number | Optional. Max results (default 20). |
+| `dataset_slug` | string | Dataset UUID or slug |
+| `limit` | number | Optional. Max rows to return. |
 
-### erdo_ask_data_question
+#### erdo_run_query
+Run a raw SQL query directly against a dataset and return rows and columns. Use this when you already know the exact SQL you want to run. The SQL dialect depends on the dataset's storage backend (PostgreSQL, ClickHouse, or DuckDB for file-based datasets).
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slug` | string | Dataset UUID or slug to query |
+| `query` | string | SQL query to execute |
+| `limit` | number | Optional. Max rows to return (default 100). |
+
+#### erdo_query_data
+Query a dataset using natural language. Describe what data you want and Erdo will generate and execute the SQL query for you.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `question` | string | Natural language question, e.g. "show top 10 customers by revenue" |
+| `dataset_slug` | string | Dataset UUID or slug to query |
+
+**Returns:** The generated SQL query and the results.
+
+#### erdo_ask_data_question
 Ask a natural language question about your data. This invokes Erdo's Data Question Answerer agent, which analyzes datasets, writes and executes code, and returns a text answer. To visualize results, use `erdo_render_chart` or `erdo_render_table`.
 
 <Warning>
@@ -145,7 +192,7 @@ Ask a natural language question about your data. This invokes Erdo's Data Questi
 
 **Returns:** A thread ID (for follow-up in the Erdo UI) and the agent's text answer.
 
-### erdo_render_chart
+#### erdo_render_chart
 Render a data visualization chart. Supports bar, line, pie, histogram, and scatter chart types. The chart fetches data directly from the dataset — no embedded data needed.
 
 **Parameters:**
@@ -160,7 +207,7 @@ Render a data visualization chart. Supports bar, line, pie, histogram, and scatt
 | `stacked` | boolean | Whether to stack bars (for bar charts) |
 | `sort` | object[] | Sort conditions |
 
-### erdo_render_table
+#### erdo_render_table
 Render a data table. The table fetches data directly from the dataset.
 
 **Parameters:**
@@ -172,64 +219,326 @@ Render a data table. The table fetches data directly from the dataset.
 | `sql_query` | string \| null | Optional SQL query to filter/transform data |
 | `resource_key` | string \| null | Required for file datasets (CSV/Excel) |
 
-### erdo_query_data
-Query a dataset using natural language. Describe what data you want and Erdo will generate and execute the SQL query for you.
+#### erdo_write_rows
+Write or upsert rows to a dataset. For database-backed datasets (Postgres, ClickHouse), set `key_column` to upsert — matching rows are updated, new rows are inserted. For file datasets (CSV), rows are always appended.
 
 **Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `question` | string | Natural language question, e.g. "show top 10 customers by revenue" |
-| `dataset_slug` | string | Dataset UUID or slug to query |
+| `dataset_slug` | string | Dataset slug to write to |
+| `rows` | object[] | Array of row objects (column name → value) |
+| `key_column` | string | Optional. Column for upsert (update on conflict). |
 
-**Returns:** The generated SQL query and the results.
+**Returns:** `{ rows_affected: number }`
 
-### erdo_run_query
-Run a raw SQL query directly against a dataset and return rows and columns. Use this when you already know the exact SQL you want to run. The SQL dialect depends on the dataset's storage backend (PostgreSQL, ClickHouse, or DuckDB for file-based datasets).
+#### erdo_delete_rows
+Delete rows from a dataset. Not supported for file datasets (CSV).
 
 **Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `dataset_slug` | string | Dataset UUID or slug to query |
-| `query` | string | SQL query to execute |
-| `limit` | number | Optional. Max rows to return (default 100). |
+| `dataset_slug` | string | Dataset slug to delete from |
+| `key_column` | string | Optional. Column to match keys against. |
+| `keys` | string[] | Optional. Key values to delete. If empty, deletes all rows. |
 
-### erdo_list_threads
+**Returns:** `{ rows_affected: number }`
+
+### Thread & Conversation Tools
+
+#### erdo_list_threads
 List conversation threads with name, creation date, and visibility.
 
-### erdo_get_thread_messages
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Optional. Max results (default 20). |
+
+#### erdo_get_thread_messages
 Get all messages from a conversation thread including content and metadata.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `thread_id` | string | Thread UUID |
+
+#### erdo_create_thread
+Create a new conversation thread, optionally with datasets attached.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Optional. Thread name. |
+| `dataset_ids` | string[] | Optional. Dataset UUIDs to attach. |
+
+#### erdo_send_message
+Send a message to a thread and get an AI-generated response. The message is processed by an AI agent that can analyze data, write SQL, generate charts, and more.
+
+<Warning>
+  This tool can take 30 seconds to 2 minutes depending on the question complexity.
+</Warning>
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `thread_id` | string | Thread UUID |
+| `message` | string | The message to send |
+| `agent_key` | string | Optional. Agent to use (default: `erdo.data-question-answerer`). Use `erdo.data-analyst` for deeper analysis. |
+| `timezone` | string | Optional. User timezone (e.g. `America/New_York`). |
+
+**Returns:** The thread ID, message ID, status, and the agent's answer.
+
+### Memory & Skills Tools
+
+Memories store reusable knowledge ("snippets") or instructions ("skills") that Erdo's AI agent uses in future conversations. Use these to teach the agent about your domain.
+
+#### erdo_create_memory
+Create a new memory or skill.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | string | Short title for the memory |
+| `content` | string | The main content or instructions |
+| `description` | string | Brief description of what this memory does |
+| `type` | string | `snippet` (knowledge) or `skill` (reusable instructions) |
+| `category` | string | Optional. Category (e.g. "Data Analysis", "SQL"). |
+| `tags` | string[] | Optional. Tags for organization. |
+| `dataset_ids` | string[] | Optional. Associated dataset UUIDs. |
+
+#### erdo_search_memories
+Search for memories and skills by semantic similarity.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search text |
+| `limit` | number | Optional. Max results (default 10). |
+
+#### erdo_list_memories
+List memories with optional filtering.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Optional. Filter by `snippet` or `skill`. |
+| `category` | string | Optional. Filter by category. |
+| `limit` | number | Optional. Max results (default 20). |
+| `offset` | number | Optional. Pagination offset. |
+
+#### erdo_delete_memory
+Delete a memory or skill by ID (soft delete — can be recovered).
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `memory_id` | string | Memory UUID |
+
+### Artifact Tools
+
+Artifacts are AI-generated outputs from agent runs and automations — insights, charts, metrics, alerts, and suggestions.
+
+#### erdo_list_artifacts
+List artifacts with optional type filtering.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Optional. Filter by: `insight`, `chart`, `metric`, `alert`, `table`, `suggestion`. |
+| `limit` | number | Optional. Max results (default 20). |
+| `offset` | number | Optional. Pagination offset. |
+
+#### erdo_get_artifact
+Get full details of a specific artifact including its content, metadata, and severity.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `artifact_id` | string | Artifact UUID |
+
+### Automation Tools
+
+Heartbeats are recurring agents that analyze your data on a schedule and generate insights, alerts, and reports.
+
+#### erdo_list_heartbeats
+List heartbeat automations with their schedule, state, and latest execution status.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Optional. Max results (default 20). |
+| `offset` | number | Optional. Pagination offset. |
+
+#### erdo_create_heartbeat
+Create a recurring automation that analyzes your data on a schedule.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Name for the automation |
+| `instructions` | string | Instructions for the agent to follow on each run |
+| `interval_minutes` | number | How often to run (minimum 5 minutes) |
+| `description` | string | Optional. What this automation does. |
+| `timezone` | string | Optional. Timezone for scheduling (default UTC). |
+| `active_window_start` | string | Optional. Only run after this time (24h format, e.g. `09:00`). |
+| `active_window_end` | string | Optional. Only run before this time (e.g. `18:00`). |
+| `active_days` | number[] | Optional. Days of week to run (0=Sun..6=Sat). Omit for every day. |
+| `dataset_ids` | string[] | Optional. Dataset UUIDs to analyze. |
+| `effort` | string | Optional. Agent effort: `low`, `medium`, or `high`. |
+
+#### erdo_run_heartbeat
+Manually trigger a heartbeat to run immediately, outside its normal schedule.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `heartbeat_id` | string | Heartbeat UUID |
+
+#### erdo_list_heartbeat_executions
+List recent executions of a heartbeat with status, timing, and associated thread.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `heartbeat_id` | string | Heartbeat UUID |
+| `limit` | number | Optional. Max results (default 10). |
 
 ## REST API
 
-All MCP tools are also available as REST endpoints for direct HTTP integration:
+All MCP tools are also available as REST endpoints for direct HTTP integration. Use these when you don't need the full MCP protocol (e.g. from LangChain, Vercel AI SDK, or custom scripts).
+
+**Base URL:** `https://api.erdo.ai`
+
+**Authentication:** Pass `Authorization: Bearer YOUR_API_KEY` header. The organization is inferred from your API key.
+
+### Endpoint Reference
+
+#### Data Endpoints
 
 | MCP Tool | REST Endpoint | Method |
 |----------|--------------|--------|
 | `erdo_list_datasets` | `/v1/datasets` | GET |
+| `erdo_search_datasets` | `/v1/datasets-search` | GET |
 | `erdo_get_dataset_schema` | `/v1/datasets/:id/schema` | GET |
 | `erdo_gather_dataset_context` | `/v1/dataset-context` | GET |
-| `erdo_search_data` | `/v1/search` | POST |
+| `erdo_fetch_dataset_contents` | `/v1/datasets/:slug/fetch` | POST |
+| `erdo_run_query` | `/v1/datasets/:slug/query` | POST |
+| `erdo_query_data` | `/v1/datasets/:slug/query-nl` | POST |
 | `erdo_ask_data_question` | `/v1/ask` | POST |
 | `erdo_render_chart` | `/v1/render/chart` | POST |
 | `erdo_render_table` | `/v1/render/table` | POST |
-| `erdo_query_data` | `/v1/datasets/:slug/query-nl` | POST |
-| `erdo_run_query` | `/v1/datasets/:slug/query` | POST |
+| `erdo_write_rows` | `/v1/datasets/:slug/rows` | POST |
+| `erdo_delete_rows` | `/v1/datasets/:slug/rows` | DELETE |
+
+#### Thread & Conversation Endpoints
+
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
 | `erdo_list_threads` | `/v1/threads` | GET |
 | `erdo_get_thread_messages` | `/v1/threads/:id/messages` | GET |
+| `erdo_create_thread` | `/v1/threads-create` | POST |
+| `erdo_send_message` | `/v1/threads/:id/send` | POST |
 
-**Authentication:** Pass `Authorization: Bearer YOUR_API_KEY` header. The organization is inferred from your API key.
+#### Memory Endpoints
 
-**Base URL:** `https://api.erdo.ai`
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
+| `erdo_create_memory` | `/v1/memories` | POST |
+| `erdo_search_memories` | `/v1/memories-search` | GET |
+| `erdo_list_memories` | `/v1/memories` | GET |
+| `erdo_delete_memory` | `/v1/memories/:id` | DELETE |
 
-### Example
+#### Artifact Endpoints
+
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
+| `erdo_list_artifacts` | `/v1/artifacts` | GET |
+| `erdo_get_artifact` | `/v1/artifacts/:id` | GET |
+
+#### Automation Endpoints
+
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
+| `erdo_list_heartbeats` | `/v1/heartbeats` | GET |
+| `erdo_create_heartbeat` | `/v1/heartbeats` | POST |
+| `erdo_run_heartbeat` | `/v1/heartbeats/:id/run` | POST |
+| `erdo_list_heartbeat_executions` | `/v1/heartbeats/:id/executions` | GET |
+
+### Examples
 
 ```bash
+# List datasets
+curl https://api.erdo.ai/v1/datasets?limit=5 \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Ask a data question
 curl -X POST https://api.erdo.ai/v1/ask \
   -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "X-Organization-ID: YOUR_ORG_ID" \
   -H "Content-Type: application/json" \
   -d '{"question": "What were total sales last quarter?"}'
+
+# Create a memory
+curl -X POST https://api.erdo.ai/v1/memories \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Revenue analysis", "content": "Always compare to YoY when analyzing revenue", "description": "Revenue analysis best practice", "type": "skill"}'
+
+# Write rows to a dataset
+curl -X POST https://api.erdo.ai/v1/datasets/my-org.metrics/rows \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"rows": [{"date": "2025-03-17", "revenue": 42300, "orders": 156}], "key_column": "date"}'
+
+# Delete rows from a dataset
+curl -X DELETE https://api.erdo.ai/v1/datasets/my-org.metrics/rows \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key_column": "date", "keys": ["2025-03-17"]}'
+
+# Create a heartbeat automation
+curl -X POST https://api.erdo.ai/v1/heartbeats \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Daily revenue check", "instructions": "Check revenue for anomalies", "interval_minutes": 60}'
 ```
+
+## Scoped Tokens & External Users
+
+When building your own app on top of Erdo, you'll want your end-users to interact with Erdo without giving them full access to your organization. **Scoped tokens** solve this — they restrict access to specific datasets and threads that you choose.
+
+All 26 tools work with scoped tokens. Each tool automatically scopes results to the resources the token has access to.
+
+Create scoped tokens via the [TypeScript SDK](/ts-sdk/client) using `createToken()`:
+
+```typescript
+const token = await erdo.createToken({
+  datasetIds: ['dataset-uuid-1', 'dataset-uuid-2'],
+  threadIds: ['thread-uuid-1'],
+});
+
+// Pass this token to your end-user's MCP client
+const transport = new StreamableHTTPClientTransport(
+  new URL('https://api.erdo.ai/mcp'),
+  {
+    requestInit: {
+      headers: { 'Authorization': `Bearer ${token}` },
+    },
+  },
+);
+```
+
+### How scoping works
+
+| Tool category | Scoped token behavior |
+|---------------|----------------------|
+| **Data tools** (list, search, query, render, write, delete) | Only datasets included in the token scope. Write/delete requires edit permission. |
+| **Thread tools** (list, read, create, send) | Only threads in the token scope + threads they create. New threads are private to the user. |
+| **Memory tools** (create, search, list, delete) | Users create personal memories (not org-wide). Search/list returns their own memories + public ones. Delete only works on their own memories. |
+| **Artifact tools** (list, get) | Only artifacts from their organization |
+| **Automation tools** (create, run, list) | Users create personal heartbeats (not visible to org). List/run only shows their own heartbeats. |
+
+<Note>
+  Scoped tokens are designed for your customers' end-users. For your own team members, use organization API keys which have full access to all tools and org-wide visibility.
+</Note>
 
 ## Building Apps with Erdo MCP
 

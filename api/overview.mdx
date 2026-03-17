@@ -1,0 +1,513 @@
+---
+title: "REST API"
+description: "Use Erdo's REST API to query, write, and manage your data programmatically"
+---
+
+# REST API
+
+Erdo's REST API lets you integrate your data platform into any application. Query datasets, write data, manage conversations, create automations, and more — all via standard HTTP requests.
+
+**Base URL:** `https://api.erdo.ai`
+
+**Authentication:** All requests require a Bearer token in the `Authorization` header.
+
+```bash
+curl https://api.erdo.ai/v1/datasets \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Getting an API Key
+
+Click your profile in the bottom-left corner of Erdo and go to **API Keys**. Create a new key and copy the token. The organization is inferred from your API key automatically.
+
+### Scoped Tokens
+
+For building apps where your end-users interact with Erdo, use [scoped tokens](/mcp/overview#scoped-tokens--external-users) to restrict access to specific datasets and threads.
+
+---
+
+## Datasets
+
+### List Datasets
+
+```
+GET /v1/datasets
+```
+
+Returns all datasets in your organization.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Max results (default 20, max 100) |
+| `offset` | number | Pagination offset |
+
+```bash
+curl "https://api.erdo.ai/v1/datasets?limit=10" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json
+{
+  "datasets": [
+    {
+      "id": "uuid",
+      "slug": "my-org.sales-data",
+      "name": "Sales Data",
+      "description": "Monthly sales figures",
+      "type": "file",
+      "status": "active"
+    }
+  ],
+  "total": 42
+}
+```
+
+### Search Datasets
+
+```
+GET /v1/datasets-search
+```
+
+Search datasets by name.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search text |
+
+```bash
+curl "https://api.erdo.ai/v1/datasets-search?query=revenue" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Get Dataset Schema
+
+```
+GET /v1/datasets/:id/schema
+```
+
+Get detailed schema for a dataset including column names, types, statistics, and sample data. Call this before writing data to understand the column structure.
+
+```bash
+curl "https://api.erdo.ai/v1/datasets/my-dataset-uuid/schema" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Query Dataset (SQL)
+
+```
+POST /v1/datasets/:slug/query
+```
+
+Run a SQL query against a dataset. The SQL dialect depends on the storage backend (PostgreSQL, ClickHouse, or DuckDB for file datasets).
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | SQL query to execute |
+| `limit` | number | Max rows (default 100) |
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/datasets/my-org.sales-data/query" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM data WHERE revenue > 10000 ORDER BY date DESC", "limit": 50}'
+```
+
+```json
+{
+  "columns": ["date", "revenue", "orders"],
+  "rows": [["2025-03-15", "42300", "156"], ["2025-03-14", "38900", "142"]],
+  "row_count": 2
+}
+```
+
+<Note>
+  For file datasets (CSV/Excel), the table name is always `data`. For database datasets, use the actual table name from the schema.
+</Note>
+
+### Query Dataset (Natural Language)
+
+```
+POST /v1/datasets/:slug/query-nl
+```
+
+Query a dataset using natural language. Erdo generates and executes the correct SQL for you.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `question` | string | Natural language question |
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/datasets/my-org.sales-data/query-nl" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What were the top 5 products by revenue last month?"}'
+```
+
+### Fetch Dataset Contents
+
+```
+POST /v1/datasets/:slug/fetch
+```
+
+Fetch raw contents of a dataset without writing SQL.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Max rows (default 1000) |
+| `sql_query` | string | Optional SQL filter |
+
+### Get Dataset Context
+
+```
+GET /v1/dataset-context
+```
+
+Get detailed context for multiple datasets at once — schemas, column types, statistics, and sample data.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slugs` | string[] | Specific dataset slugs (empty = all) |
+| `limit` | number | Max datasets (default 10) |
+
+---
+
+## Writing Data
+
+Write data into your datasets from any application. Rows are written to whatever storage backend the dataset uses (Postgres, ClickHouse, or CSV file storage).
+
+### Write Rows
+
+```
+POST /v1/datasets/:slug/rows
+```
+
+Write or upsert rows to a dataset.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `rows` | object[] | Array of row objects with column names as keys |
+| `key_column` | string | Optional. Column to upsert on (update existing, insert new) |
+
+**Append rows (no key column):**
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/datasets/my-org.metrics/rows" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rows": [
+      {"date": "2025-03-17", "revenue": 42300, "orders": 156},
+      {"date": "2025-03-18", "revenue": 45100, "orders": 163}
+    ]
+  }'
+```
+
+**Upsert rows (with key column):**
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/datasets/my-org.metrics/rows" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rows": [
+      {"date": "2025-03-17", "revenue": 43500, "orders": 160}
+    ],
+    "key_column": "date"
+  }'
+```
+
+```json
+{
+  "rows_affected": 2
+}
+```
+
+**Storage-specific behavior:**
+
+| Storage | Append | Upsert (`key_column`) | Notes |
+|---------|--------|----------------------|-------|
+| **Postgres** | Insert rows | `ON CONFLICT DO UPDATE` | Key column must have a unique constraint |
+| **ClickHouse** | Batch insert | Insert (use ReplacingMergeTree for dedup) | |
+| **CSV/File** | Append to CSV | Not supported (always appends) | New columns are added automatically |
+
+### Delete Rows
+
+```
+DELETE /v1/datasets/:slug/rows
+```
+
+Delete rows from a dataset. Not supported for file datasets.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key_column` | string | Column to match against |
+| `keys` | string[] | Values to delete. Empty = delete all rows. |
+
+```bash
+curl -X DELETE "https://api.erdo.ai/v1/datasets/my-org.metrics/rows" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key_column": "date", "keys": ["2025-03-17"]}'
+```
+
+```json
+{
+  "rows_affected": 1
+}
+```
+
+---
+
+## Ask Questions
+
+### Ask a Data Question
+
+```
+POST /v1/ask
+```
+
+Ask a natural language question about your data. Invokes an AI agent that analyzes datasets, writes code, and returns a text answer.
+
+<Warning>
+  Can take 30 seconds to 2 minutes for complex questions.
+</Warning>
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `question` | string | The data question |
+| `dataset_slugs` | string[] | Optional. Scope to specific datasets. |
+| `timezone` | string | Optional. e.g. `America/New_York` |
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/ask" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What were total sales last quarter?", "dataset_slugs": ["my-org.sales-data"]}'
+```
+
+```json
+{
+  "thread_id": "uuid",
+  "status": "success",
+  "answer": "Total sales last quarter were $1.2M, up 15% from the previous quarter..."
+}
+```
+
+---
+
+## Threads & Conversations
+
+### List Threads
+
+```
+GET /v1/threads
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Max results (default 20) |
+| `offset` | number | Pagination offset |
+
+### Get Thread Messages
+
+```
+GET /v1/threads/:id/messages
+```
+
+Get all messages from a conversation thread.
+
+### Create Thread
+
+```
+POST /v1/threads-create
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Optional thread name |
+| `dataset_ids` | string[] | Optional dataset UUIDs to attach |
+
+### Send Message
+
+```
+POST /v1/threads/:id/send
+```
+
+Send a message to a thread and get an AI-generated response.
+
+<Warning>
+  Can take 30 seconds to 2 minutes.
+</Warning>
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `message` | string | The message |
+| `agent_key` | string | Optional. Default: `erdo.data-question-answerer` |
+| `timezone` | string | Optional timezone |
+
+---
+
+## Memories & Skills
+
+Memories store reusable knowledge and instructions that Erdo's AI uses in future conversations.
+
+### Create Memory
+
+```
+POST /v1/memories
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | string | Short title |
+| `content` | string | The content or instructions |
+| `description` | string | Brief description |
+| `type` | string | `snippet` (knowledge) or `skill` (instructions) |
+| `category` | string | Optional category |
+| `tags` | string[] | Optional tags |
+| `dataset_ids` | string[] | Optional associated dataset UUIDs |
+
+### Search Memories
+
+```
+GET /v1/memories-search
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search text |
+| `limit` | number | Max results (default 10) |
+
+### List Memories
+
+```
+GET /v1/memories
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Optional filter: `snippet` or `skill` |
+| `category` | string | Optional category filter |
+| `limit` | number | Max results (default 20) |
+| `offset` | number | Pagination offset |
+
+### Delete Memory
+
+```
+DELETE /v1/memories/:id
+```
+
+Soft delete — can be recovered.
+
+---
+
+## Artifacts
+
+Artifacts are AI-generated outputs from agent runs — insights, metrics, alerts, and tables.
+
+### List Artifacts
+
+```
+GET /v1/artifacts
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Optional: `insight`, `chart`, `metric`, `alert`, `table`, `suggestion` |
+| `limit` | number | Max results (default 20) |
+| `offset` | number | Pagination offset |
+
+### Get Artifact
+
+```
+GET /v1/artifacts/:id
+```
+
+---
+
+## Automations (Heartbeats)
+
+Heartbeats are recurring agents that analyze your data on a schedule.
+
+### List Heartbeats
+
+```
+GET /v1/heartbeats
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Max results (default 20) |
+| `offset` | number | Pagination offset |
+
+### Create Heartbeat
+
+```
+POST /v1/heartbeats
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Name |
+| `instructions` | string | What to do on each run |
+| `interval_minutes` | number | Run frequency (min 5) |
+| `description` | string | Optional description |
+| `timezone` | string | Optional (default UTC) |
+| `active_window_start` | string | Optional. e.g. `09:00` |
+| `active_window_end` | string | Optional. e.g. `18:00` |
+| `active_days` | number[] | Optional. 0=Sun..6=Sat |
+| `dataset_ids` | string[] | Optional dataset UUIDs |
+| `effort` | string | Optional: `low`, `medium`, `high` |
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/heartbeats" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Revenue monitor",
+    "instructions": "Check daily revenue for anomalies and alert if down >10% vs last week",
+    "interval_minutes": 60,
+    "dataset_ids": ["dataset-uuid"],
+    "active_window_start": "09:00",
+    "active_window_end": "18:00",
+    "timezone": "America/New_York"
+  }'
+```
+
+### Run Heartbeat
+
+```
+POST /v1/heartbeats/:id/run
+```
+
+Trigger a heartbeat immediately, outside its schedule.
+
+### List Heartbeat Executions
+
+```
+GET /v1/heartbeats/:id/executions
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Max results (default 10) |
+
+---
+
+## Rendering
+
+### Render Chart
+
+```
+POST /v1/render/chart
+```
+
+Render a data visualization. Supports bar, line, pie, histogram, and scatter charts. See [MCP docs](/mcp/overview#erdo_render_chart) for full schema.
+
+### Render Table
+
+```
+POST /v1/render/table
+```
+
+Render a data table. See [MCP docs](/mcp/overview#erdo_render_table) for full schema.

@@ -15,8 +15,9 @@
         "pages": ["introduction"]
       },
       {
-        "group": "MCP & REST API",
+        "group": "Platform API",
         "pages": [
+          "api/overview",
           "mcp/overview"
         ]
       },
