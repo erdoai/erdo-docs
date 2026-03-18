@@ -263,6 +263,25 @@ Delete rows from a dataset. Not supported for file datasets (CSV).
 
 **Returns:** `{ rows_affected: number }`
 
+#### erdo_update_dataset_schema
+Update a dataset's schema: add, remove, rename columns, or change column types. Operations are applied atomically — if any fails, none are applied. Supported for CSV file datasets only. After changes, analysis is automatically refreshed.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `dataset_slug` | string | Dataset UUID or slug |
+| `operations` | object[] | Schema operations to apply atomically |
+
+**Operation object:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `add_column`, `remove_column`, `rename_column`, or `alter_column_type` |
+| `column` | string | Target column name |
+| `new_name` | string | New name (for `rename_column` only) |
+| `column_type` | string | Type hint: `text`, `integer`, `float`, `date`, `boolean` (for `add_column` and `alter_column_type`) |
+
+**Returns:** `{ columns_added, columns_removed, columns_renamed, columns_retyped, current_columns }`
+
 ### Thread & Conversation Tools
 
 #### erdo_list_threads
@@ -450,6 +469,7 @@ All MCP tools are also available as REST endpoints for direct HTTP integration. 
 | `erdo_delete_dataset` | `/v1/datasets/:slug` | DELETE |
 | `erdo_write_rows` | `/v1/datasets/:slug/rows` | POST |
 | `erdo_delete_rows` | `/v1/datasets/:slug/rows` | DELETE |
+| `erdo_update_dataset_schema` | `/v1/datasets/:slug/schema` | POST |
 
 #### Thread & Conversation Endpoints
 
