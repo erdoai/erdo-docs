@@ -394,6 +394,45 @@ Get full details of a specific artifact including its content, metadata, and sev
 |-----------|------|-------------|
 | `artifact_id` | string | Artifact UUID |
 
+### Page Deploy Tools
+
+Deploy HTML pages/apps to Erdo from any coding agent. Pages run in the Erdo page runtime: `window.erdo` gives them governed access to the datasets you grant, and the default `react-tailwind` runtime provides React 18, Tailwind, and the Erdo UI components (`DatasetChart`, `DatasetTable`, ...). A deploy with validation errors still saves and reports them — fix with `erdo_update_page` and iterate until clean.
+
+#### erdo_deploy_page
+Deploy a new page and get back its URL plus structured validation results. Pages are private by default.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | string | Page title shown in Erdo. |
+| `html` | string | HTML content — full document or fragment. With `react-tailwind`, include a root element and put React code in `js`. |
+| `css` | string | Optional stylesheet. |
+| `js` | string | Optional JavaScript/JSX. |
+| `runtime` | string | Optional. `react-tailwind` (default) or `none`. |
+| `dataset_slugs` | string[] | Optional. Datasets the page reads via `window.erdo.queryDataset` — the page is granted read access on each. |
+| `public` | boolean | Optional. Make the page publicly viewable at its share URL immediately (default: private). |
+
+**Returns:** `{ id, title, url, public_url?, public, thread_id, validation }`. `url` is the authenticated editor view; `public_url` is the visitor-facing share link (present while public). Use the returned URLs verbatim — hosts differ per environment.
+
+#### erdo_update_page
+Update a deployed page. Provided fields are merged — send only `js` to fix a script without resending `html`/`css`. Returns fresh validation results.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page_id` | string | Page ID from `erdo_deploy_page` or `erdo_list_artifacts`. |
+| `title` | string | Optional. New title. |
+| `html` | string | Optional. New HTML. |
+| `css` | string | Optional. New stylesheet. |
+| `js` | string | Optional. New JavaScript/JSX. |
+| `dataset_slugs` | string[] | Optional. Replacement dataset list. |
+| `public` | boolean | Optional. `true` shares publicly, `false` reverts to private. |
+
+#### erdo_validate_page
+Dry-run validation without deploying anything: HTML structure, JS/JSX syntax and runtime smoke checks, `window.erdo` usage, and dataset-slug references. Real data queries are additionally probed on actual deploy/update.
+
+**Parameters:** same content fields as `erdo_deploy_page` (`html`, `css`, `js`, `runtime`, `dataset_slugs`).
+
 ### Automation Tools
 
 Heartbeats are recurring agents that analyze your data on a schedule and generate insights, alerts, and reports.
@@ -495,6 +534,14 @@ All MCP tools are also available as REST endpoints for direct HTTP integration. 
 |----------|--------------|--------|
 | `erdo_list_artifacts` | `/v1/artifacts` | GET |
 | `erdo_get_artifact` | `/v1/artifacts/:id` | GET |
+
+#### Page Deploy Endpoints
+
+| MCP Tool | REST Endpoint | Method |
+|----------|--------------|--------|
+| `erdo_deploy_page` | `/v1/pages` | POST |
+| `erdo_update_page` | `/v1/pages/:id` | PUT |
+| `erdo_validate_page` | `/v1/pages/validate` | POST |
 
 #### Automation Endpoints
 
