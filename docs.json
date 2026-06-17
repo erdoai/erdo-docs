@@ -22,6 +22,12 @@
         ]
       },
       {
+        "group": "Build Apps",
+        "pages": [
+          "apps/build-apps"
+        ]
+      },
+      {
         "group": "Python SDK",
         "pages": [
           "sdk/invoke"
