@@ -515,6 +515,59 @@ GET /v1/artifacts/:id
 
 ---
 
+## Pages
+
+Deploy authenticated, data-wired HTML apps to Erdo over HTTP — the same surface as the `erdo_deploy_page` MCP tools, for CI and scripts. See the [Build Apps on Erdo](/apps/build-apps) guide for the page runtime, the `window.erdo` client, and the read/write model.
+
+### Deploy Page
+
+```
+POST /v1/pages
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | string | Page title shown in Erdo |
+| `html` | string | Full document or fragment. With the `react-tailwind` runtime, include a root element and put React code in `js` |
+| `css` | string | Optional. Stylesheet |
+| `js` | string | Optional. JavaScript/JSX; `window.erdo` is available |
+| `runtime` | string | Optional. `react-tailwind` (default) or `none` |
+| `dataset_slugs` | string[] | Optional. Datasets the page reads — granted read access (you must be able to view them); unknown slugs are a hard error |
+| `public` | boolean | Optional. `true` makes the page publicly viewable (view-only). Default `false` |
+
+Returns the page `id`, editor `url`, optional `public_url`, and structured `validation` results. A deploy with validation errors still saves — fix them and iterate.
+
+```bash
+curl -X POST "https://api.erdo.ai/v1/pages" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Sales Dashboard",
+    "html": "<div id=\"root\"></div>",
+    "js": "const {rows} = await erdo.queryDataset(\"acme.sales\", {limit: 1000}); /* render */",
+    "dataset_slugs": ["acme.sales"],
+    "public": false
+  }'
+```
+
+### Update Page
+
+```
+PUT /v1/pages/:pageID
+```
+
+Provided fields are **merged** — send only `js` to fix a script without resending `html`/`css`. Omit any field to keep its current value. `dataset_slugs` replaces the current grants; `public` toggles visibility. Returns fresh `validation` results.
+
+### Validate Page
+
+```
+POST /v1/pages/validate
+```
+
+Dry-run validation without deploying: HTML structure, JS/JSX syntax and runtime smoke checks, `window.erdo` usage, and dataset-slug references. Accepts `html` (required), `css`, `js`, `runtime`, and `dataset_slugs`.
+
+---
+
 ## Automations (Heartbeats)
 
 Heartbeats are recurring agents that analyze your data on a schedule.

@@ -1,0 +1,237 @@
+---
+title: "Build Apps on Erdo"
+description: "Deploy authenticated, data-wired HTML apps to Erdo — read your data directly, write through governed APIs, and go realtime with a few lines of JavaScript."
+---
+
+# Build Apps on Erdo
+
+Erdo pages are small apps that run in a managed runtime with first-class, permission-aware access to your data. A page can query your datasets, read and write per-page state, react to other viewers in realtime, and submit events into pipelines — all under your existing Erdo RBAC, with no servers to run.
+
+You write plain HTML/CSS/JS (React is available by default). Erdo hosts it, injects the `window.erdo` client, wires data access to your grants, validates the build, and gives you a private editor URL plus an optional public share link.
+
+<Info>
+**The model in one line:** pages **read directly** (`queryDataset`, `collections.get`, channel subscribe) and **write through governed, RBAC-checked APIs** (`collections.set`, `insertRows`, `submitEvent`). Identity is always the signed-in viewer — attribution and authorization come from your token, never from anything the page sends.
+</Info>
+
+## Quickstart — deploy from Claude Code in under 5 minutes
+
+Pages deploy through the [Erdo MCP server](/mcp/overview), so any MCP client (Claude Code, Claude Desktop, Cursor) can ship one. Connect the server first (see [MCP Quick Start](/mcp/overview#quick-start)), then ask your agent to deploy a page — it calls `erdo_deploy_page` for you.
+
+<Steps>
+  <Step title="Connect the MCP server">
+    ```bash
+    claude mcp add erdo \
+      --transport http \
+      --url https://api.erdo.ai/mcp \
+      --header "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Step>
+  <Step title="Ask the agent to deploy">
+    > "Deploy a page titled *Sales Dashboard* that charts my `acme.sales` dataset by month."
+
+    The agent writes the HTML/JS and calls `erdo_deploy_page` with `dataset_slugs: ["acme.sales"]`. You get back an editor URL, validation results, and (if you asked for `public: true`) a share link.
+  </Step>
+  <Step title="Iterate until validation is clean">
+    A deploy with validation errors still saves — the agent fixes them with `erdo_update_page` (send just `js` to patch a script) and re-checks until the build is clean.
+  </Step>
+</Steps>
+
+## The deploy tools
+
+These are MCP tools (and matching REST endpoints) — the external front door to the same artifact service, validation, and renderer that Erdo's own agents use.
+
+| Tool | What it does |
+| --- | --- |
+| `erdo_deploy_page` | Deploy a new HTML page/app. Returns its ID, editor URL, optional public URL, and structured validation results. |
+| `erdo_update_page` | Update a deployed page. Fields are **merged** — send only `js` to fix a script without resending `html`/`css`. |
+| `erdo_validate_page` | Dry-run validation (HTML structure, JS/JSX syntax + runtime smoke checks, `window.erdo` usage, dataset-slug references) without deploying. |
+| `erdo_list_artifacts` / `erdo_get_artifact` | Find and inspect pages you've already deployed. |
+
+### `erdo_deploy_page` inputs
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title` | string | Page title shown in Erdo. |
+| `html` | string | Full document or a fragment. With the default runtime, include a root element (e.g. `<div id="root"></div>`) and put React code in `js`. |
+| `css` | string? | Optional stylesheet. |
+| `js` | string? | Optional JavaScript/JSX. `window.erdo` is available; with `react-tailwind`, React 18 + Tailwind + Erdo UI components are loaded. |
+| `runtime` | string? | `react-tailwind` (default) or `none`. |
+| `dataset_slugs` | string[]? | Datasets the page reads via `window.erdo.queryDataset`. The page is granted read access to each — **you must be able to view them**. Unknown slugs are a hard error, not a silent drop. |
+| `public` | bool? | `true` makes the page publicly viewable (view-only) at its share URL. Default `false`: only you and people the page's thread is shared with can view it. |
+
+<Note>
+**Runtimes.** `react-tailwind` (default) preloads React 18, Tailwind, and the Erdo UI SDK (`DatasetChart`, `DatasetTable`, …) so your `js` can render components against query results immediately. `none` ships your HTML/CSS/JS with no runtime scripts injected — use it for fully hand-rolled pages.
+</Note>
+
+## The `window.erdo` client
+
+Every page gets `window.erdo`, a Promise-based client that talks to the Erdo platform over a sandboxed bridge. Everything it does runs as **you** (or, on a public page, as the anonymous viewer) under your RBAC.
+
+### Reading data
+
+```js
+// Query a dataset you've been granted (returns columns + rows)
+const { columns, rows, row_count } = await erdo.queryDataset("acme.sales", {
+  query: "SELECT month, revenue FROM data ORDER BY month",
+  limit: 1000,
+});
+
+// Same query, shaped as objects keyed by column name
+const records = await erdo.queryAsObjects("acme.sales", { limit: 100 });
+
+// Discover and inspect datasets
+const { datasets } = await erdo.listDatasets({ limit: 50 });
+const dataset = await erdo.getDataset("acme.sales");
+
+// Other resources
+await erdo.getResource("knowledge_object", id);
+await erdo.getKnowledgeObject(id);   // { object, links, backlinks, related_objects }
+await erdo.getAsk(id);
+await erdo.runAsk(id);
+```
+
+### Writing data
+
+```js
+// Append rows to a writable dataset (RBAC-checked)
+await erdo.insertRows("acme.leads", [
+  { name: "Ada", email: "ada@example.com" },
+], { key_column: "email" });
+
+// Submit an event into a pipeline (the governed write path for forms, actions, etc.)
+const res = await erdo.submitEvent(pipelineId, { name, email }, { variant: "signup-form" });
+// → { ok, status, body }
+```
+
+### Per-page state (collections / KV)
+
+`erdo.collections` (aliased as `erdo.kv`) is per-page key/value state with two partitions:
+
+- **`shared`** — one value for the whole page, visible to every viewer. Collaborative state (a counter, a guestbook, a board).
+- **`viewer`** — private to the signed-in viewer (their draft, their preferences). Requires a signed-in user.
+
+```js
+// Read (direct, viewer-authorized)
+const { value, found, updated_at } = await erdo.collections.get("theme", { partition: "viewer" });
+const { items } = await erdo.collections.list({ prefix: "todo:", partition: "shared" });
+
+// Write (direct, RBAC-checked)
+await erdo.collections.set("theme", { mode: "dark" }, { partition: "viewer" });
+await erdo.collections.delete("todo:42", { partition: "shared" });
+
+// erdo.kv is the same object
+await erdo.kv.set("count", 1, { partition: "shared" });
+```
+
+<Warning>
+**Every write needs a signed-in viewer.** Both `viewer` and `shared` writes require a verified identity — an anonymous visitor to a public page can *read* shared state but cannot write it (until anonymous identity ships). The page's own VIEW access is the gate; for named collections an explicit EDIT grant is additionally required (see [Auth & sharing](#auth--sharing)).
+</Warning>
+
+### Realtime channels
+
+`erdo.channel(topic)` is pub/sub between everyone viewing the page — the basis for multiplayer.
+
+```js
+const chan = erdo.channel("cursors");
+
+// Subscribe; returns an unsubscribe function
+const off = chan.subscribe((msg) => render(msg));
+
+// Publish to other viewers
+await chan.publish({ x, y, user: "Ada" });
+
+// later
+off();
+```
+
+Shared-KV mutations automatically broadcast on the reserved **`collection.change`** topic, so you can make state reactive without wiring your own messages:
+
+```js
+erdo.channel("collection.change").subscribe(({ collection, key }) => {
+  // re-read the shared value that just changed
+  erdo.kv.get(key, { partition: "shared" }).then(applyUpdate);
+});
+```
+
+### Live datasets, filters, and theme
+
+```js
+await erdo.subscribeLiveDataset(datasetId);
+const offLive = erdo.onLiveEvent((evt) => append(evt));
+
+const filters = erdo.getFilters();                 // current filter-bar state
+const offFilter = erdo.onFilterChange((f) => refetch(f));
+const offData = erdo.onDatasetChange((e) => refetch()); // parent-pushed refresh completed
+
+erdo.getTheme();                                   // 'light' | 'dark'
+const offTheme = erdo.onThemeChange((t) => setTheme(t));
+```
+
+## Collections vs. datasets — which store?
+
+Both store structured values. The decision rule is about **who reads it**:
+
+<Card title="The rule" icon="scale-balanced">
+**If anything other than this page reads the value, it's a dataset. If only the page reads it, it's a collection.**
+</Card>
+
+- **Dataset** — leads from a form, events, anything an agent will analyze, anything another page or report consumes, anything that needs schema/queries/joins. Write with `insertRows` or a `dataset.write` pipeline.
+- **Collection (KV)** — page-private memory: UI state, a draft, a shared scratchpad, a small leaderboard *that only this page renders*. Capped and key/value only.
+
+When in doubt, prefer a dataset — collections are deliberately small and page-scoped.
+
+## A reactive multiplayer example
+
+A shared counter every viewer sees update live, built from two primitives — shared KV + the `collection.change` channel:
+
+```js
+async function render() {
+  const { value } = await erdo.kv.get("count", { partition: "shared" });
+  document.getElementById("count").textContent = value ?? 0;
+}
+
+document.getElementById("inc").onclick = async () => {
+  const { value } = await erdo.kv.get("count", { partition: "shared" });
+  await erdo.kv.set("count", (value ?? 0) + 1, { partition: "shared" });
+};
+
+// Any viewer's write re-renders for everyone
+erdo.channel("collection.change").subscribe(({ key }) => {
+  if (key === "count") render();
+});
+
+render();
+```
+
+## Auth & sharing
+
+- **Private by default.** A new page is visible only to you and anyone the page's thread is shared with. Set `public: true` (on deploy or update) for a **view-only** public link at `/p/:id`.
+- **Identity is the signed-in viewer.** `window.erdo` calls run as the authenticated user; the page can never impersonate someone — identity comes from your token, server-side.
+- **Reads are viewer-authorized.** A page can only read datasets you granted it (`dataset_slugs`), and only viewers who can see the page can read its data and shared state. On a public page, anonymous visitors get view/read access to public content and shared state.
+- **Writes are RBAC-checked.** Writing the page's own collection requires VIEW on the page plus a signed-in identity. Writing a **named** (cross-page) collection additionally requires an explicit EDIT grant the page holds — org membership alone is not enough.
+- **One permission model.** Pages reuse Erdo's standard RBAC (`view` / `edit`) — no separate app-level permission system.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Collection value size | 64 KB per item |
+| Collection keys | 1,000 per partition |
+| Event body size | 1 MB per submission |
+| Viewer write rate (events) | 300 / minute sustained, burst 60 |
+| Page content | HTML + CSS + JS (single page; multi-file bundles are not supported in v1) |
+
+<Note>
+Pages run today's artifact shape (HTML/CSS/JS) in the Erdo page runtime — they are not arbitrary built bundles (Vite/webpack output). The runtime injects React/Tailwind/the bridge, validates the result, and wires data access. This keeps every page governed by the same validation and RBAC.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="MCP Server" icon="plug" href="/mcp/overview">
+    Connect your MCP client and see the full tool reference, including the page deploy tools.
+  </Card>
+  <Card title="REST API" icon="bolt" href="/api/overview">
+    Deploy and manage pages over HTTP for CI and scripts.
+  </Card>
+</CardGroup>
