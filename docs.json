@@ -18,7 +18,8 @@
         "group": "Platform API",
         "pages": [
           "api/overview",
-          "mcp/overview"
+          "mcp/overview",
+          "evals"
         ]
       },
       {

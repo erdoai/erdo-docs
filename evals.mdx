@@ -1,0 +1,88 @@
+---
+title: "Evals"
+description: "Run and maintain evaluations of agents and generated pages — over MCP, REST, or the CLI"
+---
+
+# Evals
+
+Erdo evals score an agent's work against a rubric, with pass/score tracking over
+time. They run in production and are designed to be driven by an AI coding agent
+(e.g. Claude Code via MCP): change how something is generated, run the suite, read
+the per-criterion scores, then add, rewrite, or remove cases as the generation
+changes.
+
+Two kinds of suite:
+
+- **Text suites** — judge the agent's text answer against the rubric (e.g. the
+  data-question-answerer).
+- **Artifact suites** (`evaluate_artifact: true`) — judge the **rendered page** the
+  agent builds (landing pages, dashboards, apps). Erdo publishes the page,
+  screenshots it on desktop and mobile, drives it in a real browser (submits the
+  lead form, advances the carousel, confirms the voice widget loads, checks the
+  conversion analytics event), and scores the screenshots + interaction with a
+  vision model. A page that looks fine but doesn't capture the lead scores low.
+
+Suites are referenced by **slug**. Each suite has cases (`name`, `input` brief,
+`rubric` of weighted criteria), a judge model, and a `pass_threshold` (0–5).
+
+## CLI
+
+```bash
+npm i -g @erdoai/cli
+
+erdo auth login                           # paste an API key (multi-account, like gh)
+erdo org list                             # your orgs (* = active)
+erdo org use acme                         # set the active org (evals are org-scoped)
+
+erdo eval suites                          # list suites
+erdo eval create landing-variations --agent erdo.artifact-builder \
+  --evaluate-artifact --no-cron \
+  --case '{"name":"voice","input":"{\"artifact_kind\":\"landing_page\",\"description\":\"...\"}","rubric":[{"criterion":"voice widget loads","weight":2}]}'
+erdo eval suite landing-variations        # show a suite + cases
+erdo eval run landing-variations --watch  # run and poll to completion (CI-friendly: non-zero on failure)
+erdo eval results <run-id>                # per-case scores + lenses
+erdo eval runs --suite landing-variations # recent runs
+
+erdo eval case add landing-variations \
+  --name voice-concierge \
+  --input '{"artifact_kind":"landing_page","description":"Landing page for ACME with a voice concierge ..."}' \
+  --rubric '[{"criterion":"voice widget loads and is on-brand","weight":2},{"criterion":"hero + form render","weight":1}]'
+erdo eval case rm landing-variations voice-concierge
+```
+
+For artifact suites the case `input` is the builder's JSON input — `artifact_kind`
+(`landing_page` | `dashboard` | `app`) plus a `description`.
+
+## MCP tools
+
+Available on the [MCP server](/mcp/overview); identity and permissions ride your
+token, so you only see your organization's and global suites.
+
+| Tool | Purpose |
+|------|---------|
+| `erdo_list_eval_suites` | List suites (slug, agent, settings) |
+| `erdo_get_eval_suite` | A suite with all its cases |
+| `erdo_create_eval_suite` | Create a suite + first cases (set `evaluate_artifact` for visual suites) |
+| `erdo_add_eval_case` / `erdo_update_eval_case` / `erdo_remove_eval_case` | Maintain the case corpus |
+| `erdo_run_eval_suite` | Run a suite, returns `run_id` |
+| `erdo_get_eval_run` | Run status + per-case scores, per-criterion breakdown, judge reasoning, artifact links |
+| `erdo_list_eval_runs` | Recent runs with aggregate pass counts/scores |
+
+## REST
+
+Base URL `https://api.erdo.ai`, `Authorization: Bearer YOUR_API_KEY`.
+
+| Method | Path |
+|--------|------|
+| GET | `/v1/evals/suites` |
+| GET | `/v1/evals/suites/{suiteSlug}` |
+| POST | `/v1/evals/suites` |
+| POST | `/v1/evals/suites/{suiteSlug}/cases` |
+| PUT | `/v1/evals/suites/{suiteSlug}/cases/{caseName}` |
+| DELETE | `/v1/evals/suites/{suiteSlug}/cases/{caseName}` |
+| POST | `/v1/evals/suites/{suiteSlug}/run` |
+| GET | `/v1/evals/runs/{runID}` |
+| GET | `/v1/evals/runs?suite_slug={slug}&limit={n}` |
+
+Artifact suites are expensive (they build + render + score real pages), so they're
+excluded from the daily cron (`cron_enabled: false`) and run on demand.
