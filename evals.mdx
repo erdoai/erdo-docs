@@ -29,10 +29,15 @@ Suites are referenced by **slug**. Each suite has cases (`name`, `input` brief,
 
 ```bash
 npm i -g @erdoai/cli
-export ERDO_API_KEY=erdo_api_...        # create one in Erdo
-export ERDO_API_URL=https://api.erdo.ai # optional
+
+erdo auth login                           # paste an API key (multi-account, like gh)
+erdo org list                             # your orgs (* = active)
+erdo org use acme                         # set the active org (evals are org-scoped)
 
 erdo eval suites                          # list suites
+erdo eval create landing-variations --agent erdo.artifact-builder \
+  --evaluate-artifact --no-cron \
+  --case '{"name":"voice","input":"{\"artifact_kind\":\"landing_page\",\"description\":\"...\"}","rubric":[{"criterion":"voice widget loads","weight":2}]}'
 erdo eval suite landing-variations        # show a suite + cases
 erdo eval run landing-variations --watch  # run and poll to completion (CI-friendly: non-zero on failure)
 erdo eval results <run-id>                # per-case scores + lenses
