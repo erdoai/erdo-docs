@@ -25,6 +25,20 @@ Two kinds of suite:
 Suites are referenced by **slug**. Each suite has cases (`name`, `input` brief,
 `rubric` of weighted criteria), a judge model, and a `pass_threshold` (0–5).
 
+### Evaluators
+
+A case can specify **evaluators** instead of just a rubric (combined into one
+weighted score):
+
+- **`llm_rubric`** — an LLM scores the output (or rendered page) against the rubric.
+- **`script`** — a JS function `evaluate(ctx)` returning `{score, passed, reasoning}`,
+  run deterministically (**no LLM tokens**). `ctx = {input, output, artifact, data_store}`,
+  so it can assert on the output, the built artifact, or persisted data (e.g. that a
+  lead actually landed). Only the agent-under-test costs tokens — the scoring is free.
+
+Set them at creation via `--evaluator` (CLI) or the `evaluators` field (MCP). Omit to
+use the rubric as a single `llm_rubric`.
+
 ## CLI
 
 ```bash
